@@ -371,13 +371,13 @@ def test_measuring_a_nonexistent_object_raises_a_named_error(engine) -> None:
 # --------------------------------------------------------------------- ALIGN_SPECS
 
 
-def test_align_specs_are_all_mutating_refine_tools() -> None:
+def test_align_specs_are_all_mutating_align_tools() -> None:
     """This package's operations are one-shot corrections applied directly to the scene —
-    never exposed to the read-only INSPECT role (ADR-007), always REFINE per the module's
+    never exposed to the read-only INSPECT role (ADR-007), always ALIGN per the module's
     own contract."""
     for spec in ALIGN_SPECS:
         assert spec.mutating is True, spec.name
-        assert spec.roles == (ToolRole.REFINE,), spec.name
+        assert spec.roles == (ToolRole.ALIGN,), spec.name
 
 
 def test_align_specs_cover_exactly_the_seven_mutating_operations() -> None:

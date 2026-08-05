@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 
 import pytest
-from mcp import SERVER_INFO, serve_http, serve_stdio
+from mcp_server import SERVER_INFO, serve_http, serve_stdio
 
 
 def _assert_real_runtime_error(excinfo: pytest.ExceptionInfo) -> None:

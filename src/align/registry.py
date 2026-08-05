@@ -29,7 +29,7 @@ ALIGN_SPECS: tuple[ToolSpec, ...] = (
             "unlike a parallel_to constraint, this does not re-solve if the target "
             "moves afterwards."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.ALIGN,),
         input_schema={
             "type": "object",
             "properties": {
@@ -48,7 +48,7 @@ ALIGN_SPECS: tuple[ToolSpec, ...] = (
             "Rotate an object so its forward axis (or a named local axis) lands at "
             "exactly 90 degrees from a target object's same axis."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.ALIGN,),
         input_schema={
             "type": "object",
             "properties": {
@@ -68,7 +68,7 @@ ALIGN_SPECS: tuple[ToolSpec, ...] = (
             "target's face plane. Optionally names which of the target's planar faces "
             "by index; defaults to the target's own default face."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.ALIGN,),
         input_schema={
             "type": "object",
             "properties": {
@@ -88,7 +88,7 @@ ALIGN_SPECS: tuple[ToolSpec, ...] = (
             "consequential alignment in the product, the difference between a vertical "
             "railing post and one leaning at a stair's rake angle."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.ALIGN,),
         input_schema={
             "type": "object",
             "properties": {"object_id": {"type": "string"}},
@@ -104,7 +104,7 @@ ALIGN_SPECS: tuple[ToolSpec, ...] = (
             "a plane with a target's — no gap, no overlap. The other two position axes "
             "and all rotation are left untouched."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.ALIGN,),
         input_schema={
             "type": "object",
             "properties": {
@@ -123,7 +123,7 @@ ALIGN_SPECS: tuple[ToolSpec, ...] = (
             "Quantise an object's world bounds to regular multiples of a grid spacing, "
             "and optionally its yaw to the nearest multiple of a rotation step."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.ALIGN,),
         input_schema={
             "type": "object",
             "properties": {
@@ -143,7 +143,7 @@ ALIGN_SPECS: tuple[ToolSpec, ...] = (
             "from a target object's forward axis. 0 degrees is make_parallel; 90 is one "
             "of make_perpendicular's two valid results."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.ALIGN,),
         input_schema={
             "type": "object",
             "properties": {

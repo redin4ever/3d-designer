@@ -11,7 +11,7 @@ import json
 
 import pytest
 from contracts import LockContention, Phase, ToolError, ToolRole, WriteLease
-from mcp import dispatch
+from mcp_server import dispatch
 from raw import RAW_TOOL_SPEC
 
 _ADD_PRIMITIVE_PARAMS = {"object_id": "box1", "kind": "cube", "size": [1, 1, 1]}

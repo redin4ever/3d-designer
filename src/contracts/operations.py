@@ -288,7 +288,23 @@ class ToolRole(StrEnum):
     """
 
     BLOCKOUT = "blockout"
+
     REFINE = "refine"
+    """Construction that changes what the model *is* — openings, stairs, railings."""
+
+    REPAIR = "repair"
+    """Fixing what is broken: holes, welds, normals, shells, visual gaps.
+
+    Split out of ``REFINE`` during integration. Construction, repair and alignment are all
+    refine-phase work, so all three modules correctly declared ``REFINE`` — and the
+    combined set reached 19 tools, more than double the accuracy-optimal bound. The
+    registry's fair-capping fallback then silently hid ``repair``, ``make_plumb`` and
+    ``close_visual_gap``, which are core operations. Three roles inside one phase is the
+    real fix; capping was the symptom.
+    """
+
+    ALIGN = "align"
+    """Angle and alignment snaps — parallel, perpendicular, coplanar, plumb, flush, grid."""
     DETAIL = "detail"
     POLISH = "polish"
     INSPECT = "inspect"

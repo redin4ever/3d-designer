@@ -1,4 +1,4 @@
-# mcp
+# mcp_server
 
 The MCP server: registry policy, dispatch, both transports, image downscaling (ADR-003).
 This is the module through which everything the rest of the product builds becomes
@@ -17,7 +17,7 @@ costs 15-25k tokens instead of ~1,600 — lives here.
 
 ## Public interface
 
-Everything importable from `mcp` is declared in `mcp/__init__.py`:
+Everything importable from `mcp_server` is declared in `mcp/__init__.py`:
 
 ```python
 def build_registry(*, include_raw: bool = True) -> dict[ToolRole, tuple[ToolSpec, ...]]
@@ -70,7 +70,7 @@ One file per responsibility:
 - **The HTTP transport binds loopback by default; a non-loopback bind logs a warning
   naming ADR-009** before the transport SDK is ever imported, so it fires even when the
   SDK is absent.
-- **The registry and `dispatch` are fully usable without the `mcp` Python SDK installed.**
+- **The registry and `dispatch` are fully usable without the `mcp_server` Python SDK installed.**
   Only `serve_stdio`/`serve_http` need it, imported lazily inside the function body; its
   absence raises one clear `RuntimeError`, never a bare `ModuleNotFoundError` from three
   frames inside someone else's package.
@@ -91,7 +91,7 @@ than taking the first 8 in source-priority order — the latter would zero out w
 source happens to be declared last (`align`, in the current source order) entirely. Excluded
 tools are logged once, by name and source, and are not deleted anywhere — they remain fully
 present in `gaps.GAPS_SPECS`/`align.ALIGN_SPECS` themselves, just not all simultaneously
-visible through `mcp`'s default REFINE slice.
+visible through `mcp_server`'s default REFINE slice.
 
 This is a stopgap, not a resolution. Recorded as a real finding (see this task's
 `assumptions` output) with three candidate real fixes, none of which this module can make
@@ -104,16 +104,16 @@ boundary):
    already exactly this pattern for six of its eight tools.
 3. Tool visibility is chosen per session/sub-agent rather than statically per `ToolRole`.
 
-## The `mcp` package name collision
+## The `mcp_server` package name collision
 
 `pyproject.toml` already lists `mcp>=1.2.0` as a real dependency — the official MCP Python
-SDK, imported by users as `import mcp`. This package *is* `src/mcp/`, imported the same way.
+SDK, imported by users as `import mcp`. This package *is* `src/mcp_server/`, imported the same way.
 Because the root `conftest.py` puts `src/` first on `sys.path`, `import mcp` from anywhere
 in this codebase — including from inside this very package's own `transports.py` —resolves
 to **this** package (already cached in `sys.modules` under that name), never the installed
 SDK, regardless of install order. `serve_stdio`/`serve_http`'s lazy `import mcp.server` is
 written the way it will need to work once this is resolved, but cannot fix it from inside
-`src/mcp/` — see `transports.py`'s module docstring and this task's `assumptions` output for
+`src/mcp_server/` — see `transports.py`'s module docstring and this task's `assumptions` output for
 the two ways out (alias the SDK into `sys.modules` under another name before importing this
 package at process start, or rename this package).
 
@@ -124,7 +124,7 @@ package at process start, or rename this package).
   mutating tool and marks it opaque.
 - No real image codec (PNG/JPEG). `downscale_image` operates on binary PPM (`P6`) bytes —
   this codebase has no Pillow dependency; see `images.py`'s module docstring.
-- No live, verified wiring against the `mcp` Python SDK — it is not installed in this
+- No live, verified wiring against the `mcp_server` Python SDK — it is not installed in this
   environment (nor, per the name collision above, cleanly importable from inside this
   package yet). `serve_stdio`/`serve_http`'s SDK-present code paths are best-effort and
   explicitly flagged as unverified in their own docstrings.

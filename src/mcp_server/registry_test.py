@@ -9,7 +9,7 @@ next pass implements them.
 from __future__ import annotations
 
 from contracts import ToolRole
-from mcp import build_registry, tools_for
+from mcp_server import build_registry, tools_for
 
 
 # ------------------------------------------------------------------- visible-set bounds
@@ -71,7 +71,7 @@ def test_build_registry_does_not_crash_when_a_sibling_module_exists_but_fails_to
     ``ImportError``/``AttributeError`` alone is not defensive enough for that: any
     exception while importing an optional source must be treated as "not available yet",
     never allowed to crash registry construction for every other already-working tool."""
-    import mcp.registry as registry_module
+    import mcp_server.registry as registry_module
 
     def _always_raises(name: str):
         raise SyntaxError(f"simulated mid-edit failure importing {name!r}")

@@ -106,7 +106,7 @@
       "backlogItems": [
         "B-021"
       ],
-      "status": "planned",
+      "status": "green",
       "note": "Quaternion internally, Euler at the parameter surface. A genuine gap in stock bpy."
     },
     {
@@ -124,7 +124,7 @@
       "backlogItems": [
         "B-011"
       ],
-      "status": "planned",
+      "status": "green",
       "note": "Repair only. Detection lives in measure."
     },
     {
@@ -160,7 +160,7 @@
       "backlogItems": [
         "B-025"
       ],
-      "status": "planned",
+      "status": "green",
       "note": "Highest-risk area in scope. Primary user of engine's subprocess fallback (bake may need a window)."
     },
     {
@@ -264,9 +264,9 @@
       "id": "mcp",
       "owner": "agent:mcp",
       "paths": [
-        "src/mcp/**"
+        "src/mcp_server/**"
       ],
-      "publicInterface": "src/mcp/__init__.py",
+      "publicInterface": "src/mcp_server/__init__.py",
       "dependsOn": [
         "contracts",
         "orchestration",
@@ -283,8 +283,8 @@
       "backlogItems": [
         "B-009"
       ],
-      "status": "planned",
-      "note": "Registry POLICY lives here (transports, role-partitioning into 5-8, image downscaling). Registry CONTENT is declared beside each operation as a ToolSpec."
+      "status": "green",
+      "note": "Renamed from src/mcp: the package name shadowed the mcp PyPI SDK, so `import mcp` inside our own transports resolved to us and the SDK was permanently unreachable. Registry POLICY lives here (transports, role-partitioning into 5-8, image downscaling). Registry CONTENT is declared beside each operation as a ToolSpec."
     },
     {
       "id": "frontend",

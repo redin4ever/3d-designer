@@ -29,7 +29,7 @@ the pass/fail count alone; see `transports_test.py`'s module docstring.
 python -m pytest src/mcp -q
 
 # one file
-python -m pytest src/mcp/dispatch_test.py -q
+python -m pytest src/mcp_server/dispatch_test.py -q
 
 # whole decision layer (sanity check you haven't broken a neighbour)
 python -m pytest src -q
@@ -42,7 +42,7 @@ way.
 
 ## Boundaries
 
-- Write only inside `src/mcp/**`. Everything else — `src/contracts/`, `src/ops/`,
+- Write only inside `src/mcp_server/**`. Everything else — `src/contracts/`, `src/ops/`,
   `src/export/`, `src/raw/`, `src/gaps/`, `src/align/`, `src/uv/`, `src/measure/`,
   `src/detail/`, `src/orchestration/` — is a frozen or sibling-owned surface (Rule 5):
   read freely, never edit.
@@ -83,15 +83,15 @@ way.
   (see the git history of this file if the reversion is still there). If a sibling module
   ships new `REFINE` (or any other role's) content later and a role's count changes,
   `_cap.py` requires no change — it reacts to whatever `_sources()` collects.
-- **The `mcp` package name collision is real and already load-bearing**:
+- **The `mcp_server` package name collision is real and already load-bearing**:
   `pyproject.toml` lists `mcp>=1.2.0` as a dependency — the same top-level import name as
   this package. `transports.py`'s `_load_sdk` cannot resolve this from inside
-  `src/mcp/**` (Rule 5 — outside this module's write boundary is also outside its power to
+  `src/mcp_server/**` (Rule 5 — outside this module's write boundary is also outside its power to
   fix via import tricks alone, since the conflict is in `sys.path` ordering set by the
   root `conftest.py` / whatever process starts the real server). Flagged, not worked
   around; see `README.md`.
 - **`serve_stdio`/`serve_http`'s SDK-present code paths are unverified.** The SDK is not
-  installed in this environment (`pip list` has no `mcp` package despite
+  installed in this environment (`pip list` has no `mcp_server` package despite
   `pyproject.toml` naming it — the environment has not run `pip install -e .[dev]`
   against the current `pyproject.toml`). Every test that can run without the SDK does;
   the two that would need it do not exist, rather than being written against a guess and
@@ -139,7 +139,7 @@ just what it checks.
   + `align` are all counted together (19 declared, 8 visible by default after this
   module's cap). See `README.md`'s "The REFINE-role cap" for the three candidate real
   fixes; none of them are this module's to make alone.
-- **Package name collision**: `src/mcp/` and the `mcp>=1.2.0` PyPI dependency share a
+- **Package name collision**: `src/mcp_server/` and the `mcp>=1.2.0` PyPI dependency share a
   top-level import name, and `src/`-first `sys.path` ordering means this package always
   wins. Needs a decision at a gate (rename this package, or alias the SDK at process
   start) before `serve_stdio`/`serve_http` can be exercised against a real install.

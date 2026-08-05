@@ -5,7 +5,7 @@ Real ``ToolSpec`` values, not stubs: constructing them runs ``ToolSpec.__post_in
 the read-only INSPECT role (ADR-007) — whether or not ``src/mcp/`` has wired a handler up
 yet. ``handler=None`` here is that placeholder, skipped at registration, the same
 convention ``src/export/registry.py`` uses. Every repair in this package mutates the
-engine, so every entry below is ``mutating=True`` and visible only to ``ToolRole.REFINE``
+engine, so every entry below is ``mutating=True`` and visible only to ``ToolRole.REPAIR``
 — never ``INSPECT``, whose entire concurrency guarantee (ADR-007) depends on none of its
 tools being able to write.
 """
@@ -22,7 +22,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="fill_boundary_holes",
         description="Triangulate boundary loops (DefectClass.BOUNDARY_HOLE).",
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {
@@ -44,7 +44,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
         description=(
             "Merge coincident vertices (DefectClass.LOOSE_OR_DUPLICATE, duplicate half)."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {**_OBJECT_ID, "tolerance": {"type": "number", "exclusiveMinimum": 0}},
@@ -59,7 +59,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
             "Delete vertices referenced by no face (DefectClass.LOOSE_OR_DUPLICATE, "
             "loose half)."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {**_OBJECT_ID},
@@ -74,7 +74,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
             "Reverse the winding of faces flagged as flipped relative to their "
             "neighbours (DefectClass.FLIPPED_NORMAL)."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {**_OBJECT_ID},
@@ -90,7 +90,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
             "NON_MANIFOLD_VERTEX). Detection only — see CLAUDE.md for why this package "
             "cannot yet repair them."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {**_OBJECT_ID},
@@ -102,7 +102,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="merge_shells",
         description="Weld vertices across an object's separate shells within max_distance.",
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {
@@ -117,7 +117,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="close_visual_gap",
         description="Translate one part to touch another (DefectClass.VISUAL_GAP).",
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {
@@ -137,7 +137,7 @@ GAPS_SPECS: tuple[ToolSpec, ...] = (
             "re-measuring between tiers so the result reflects what is actually left "
             "rather than what was attempted."
         ),
-        roles=(ToolRole.REFINE,),
+        roles=(ToolRole.REPAIR,),
         input_schema={
             "type": "object",
             "properties": {

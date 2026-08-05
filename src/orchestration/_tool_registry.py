@@ -40,6 +40,16 @@ TOOLS_BY_ROLE: dict[ToolRole, tuple[ToolSpec, ...]] = {
         _spec("close_gap", "Close a visual gap between two parts.", ToolRole.REFINE, mutating=True),
         _spec("fix_normals", "Recalculate face winding.", ToolRole.REFINE, mutating=True),
     ),
+    ToolRole.REPAIR: (
+        _spec("fill_holes", "Triangulate boundary holes in a mesh.", ToolRole.REPAIR, mutating=True),
+        _spec("weld_duplicates", "Weld coincident vertices.", ToolRole.REPAIR, mutating=True),
+        _spec("repair", "Run the tiered repair pass, re-measuring between tiers.", ToolRole.REPAIR, mutating=True),
+    ),
+    ToolRole.ALIGN: (
+        _spec("make_plumb", "Snap an object's local +Z to world up.", ToolRole.ALIGN, mutating=True),
+        _spec("make_parallel", "Rotate an object parallel to another.", ToolRole.ALIGN, mutating=True),
+        _spec("make_flush", "Remove the gap on one named axis.", ToolRole.ALIGN, mutating=True),
+    ),
     ToolRole.DETAIL: (
         _spec("bevel_edges", "Bevel a selected edge set.", ToolRole.DETAIL, mutating=True),
         _spec("add_greeble", "Scatter small detail geometry.", ToolRole.DETAIL, mutating=True),

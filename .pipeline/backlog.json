@@ -8,6 +8,22 @@
     "source": "orchestration GREEN agent contract request, 2026-08-06"
   },
   {
+    "id": "B-00A",
+    "type": "defect",
+    "module": "mcp_server",
+    "priority": "P0",
+    "status": "fixed",
+    "title": "src/mcp shadowed the mcp PyPI SDK so `import mcp` in our own transports resolved to us — the SDK was permanently unreachable and no subscription client could ever connect. Renamed to src/mcp_server."
+  },
+  {
+    "id": "B-00B",
+    "type": "defect",
+    "module": "contracts+gaps+align",
+    "priority": "P0",
+    "status": "fixed",
+    "title": "ops+gaps+align all correctly declared ToolRole.REFINE, totalling 19 tools in one role against an 8-tool bound. The registrys fair-cap fallback then silently hid repair, make_plumb and close_visual_gap. Split REPAIR and ALIGN into their own roles; every role now sits inside 1-8 with nothing hidden."
+  },
+  {
     "id": "B-001",
     "type": "feature",
     "module": "scene",

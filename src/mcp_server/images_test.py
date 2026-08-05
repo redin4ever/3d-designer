@@ -14,7 +14,7 @@ it.
 
 from __future__ import annotations
 
-from mcp import downscale_image
+from mcp_server import downscale_image
 
 
 def _ppm(width: int, height: int, color: tuple[int, int, int] = (120, 40, 200)) -> bytes:
