@@ -1,10 +1,12 @@
 # Project instructions
 
 <!-- PIPELINE:PROJECT-SUMMARY -->
-A tool that lets AI agents author and refine 3D models live — filling geometric gaps,
-raising detail and realism past "stitched-together boxes", fixing angles and clipping,
-and coordinating multiple sub-agents on one scene. Built on Blender/`bpy` as the geometry
-engine. Phase 1 research pending.
+A tool that lets AI agents author and refine 3D models live — filling gaps, raising detail
+past "stitched-together boxes", fixing angles and part clipping, coordinating sub-agents.
+Research settled its shape: VLMs score 34–56% where humans score 79–99% on exactly the
+spatial judgements this needs, so the tool **computes every spatial fact and hands the model
+verified numbers**, takes declarative constraints over raw coordinates, and verifies results
+programmatically — never on the model's own say-so.
 <!-- /PIPELINE:PROJECT-SUMMARY -->
 
 ## Rules

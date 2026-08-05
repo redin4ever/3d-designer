@@ -26,3 +26,52 @@ this is a hard constraint on how the product can be tested here.
 **Queued for Gate A:** nothing yet — Phase 1 populates the backlog.
 
 **Repo now:** empty of source, fully instrumented, `state.json` at `phase: 1, pass: 1`.
+
+## Phase 1 — Research (2026-08-05)
+
+**Ran:** five concurrent read-and-report agents (`landscape`, `flows`, `domain`, `technical`,
+`agent-ergonomics`), all synchronous. `inventory` was skipped — the repo had no source. The
+fifth agent is not in the standard phase-1 set; it was added because the brief's actual thesis
+("skyrocket the model's accuracy, detail attention and spatial awareness") is an agent-ergonomics
+question, not a 3D one, and would otherwise have gone unresearched.
+
+**Produced:** `docs/research/{landscape,flows,domain,technical,agent-ergonomics}.md` and
+`docs/research/SUMMARY.md`. 50 raw "decisions for the user" deduped into 38 backlog questions
+across 10 waves.
+
+**The finding that reframed the product:** across seven independent spatial benchmarks (BLINK,
+What'sUp, VSI-Bench, 3DSRBench, EmbSpatial, VisFactor, SpatialVLM), frontier VLMs score 34–56%
+where humans score 79–99% — and the gap is worst on left/right, near/far, distance, occlusion and
+viewpoint change, which is precisely what a 3D authoring loop asks of them. Every existing tool
+hands the model a screenshot and asks it to place things by eye. That is the architecture, and it
+is also why the output looks like glued boxes. The tool must compute the spatial facts.
+
+**Other load-bearing findings:**
+- No shipped product closes the render→critique→edit loop. It exists in BlenderAlchemy (ECCV'24),
+  SceneCraft (ICML'24, +45.1%/+40.9% CLIP over one-shot) and LL3M (2025) — all papers.
+- Raw coordinates vs constraints is measurable: SpatialVLM lands within 2× of truth 37% of the
+  time; LayoutGPT/NSR-1K constraint+solver measures 91–95%.
+- Agents falsely report success 13–89% of the time; LLM judges catch it at AUROC ≤0.65. So
+  definition-of-done must be a re-run measurement, not a claim.
+- Multi-agent: Anthropic +90.2% at ~15× tokens; Cognition's counter-case is specifically shared
+  mutable state — which a live 3D scene is. Both converge on many readers, one writer.
+- Tool-count optimum is K≈2.3–7.4 visible tools; RAG-MCP measured 13.62%→43.13% with retrieval.
+- blender-mcp, the de-facto bridge, has an open CVSS 9.0 RCE (issue #304) via unsandboxed `exec()`.
+- Bevel-every-plausible-edge is the most-cited realism lever but is practitioner consensus, not a
+  measured study — and uniform beveling is itself an artificiality tell. Recorded honestly.
+
+**Hard constraints found:** no Blender and no Python on this machine (`bpy` 5.2 needs exactly
+Python 3.13, 338 MB wheel); `bpy` is GPL-3.0 with the `import`-into-your-process case genuinely
+unsettled; Blender's Python API breaks between versions with no deprecation policy; many `bpy.ops`
+operators fail headless on `poll()`; MCP `ImageContent` costs 15–25k tokens per image on clients
+that mishandle it; non-convex mesh-mesh penetration depth is unsolved (FCL returns 0 on real
+contact); no production-ready incremental glTF/USD streaming format exists.
+
+**Decided:** nothing about the product. Phase 1 gathers and asks.
+
+**Assumed:** nothing yet — no unknown forced a choice, because no code was written.
+
+**Queued for Gate A:** 38 questions, `.pipeline/question-backlog.json`, waves 1–10.
+
+**Repo now:** six research files under `docs/research/`, `CLAUDE.md` summary replaced,
+`state.json` at `phase: 2`.
