@@ -102,3 +102,39 @@ answer is no, the design pick is moot and the wave collapses.
 
 **Repo now:** three candidate files plus previews under `.pipeline/design-candidates/`,
 `state.json` at `phase: 3`. No root `DESIGN.md` — correct; it is written only after the user picks.
+
+## Phase 3 — Gate A (2026-08-05)
+
+**Ran:** 12 waves, 48 decisions. Waves 1–10 from the backlog, then two follow-up waves on what
+the answers opened up. Recorded verbatim in `docs/decisions/gate-A.md`.
+
+**The four answers that shaped everything:**
+- *"i will use this to make for example game designs"* — the use case. Engine-ready export,
+  polygon budgets, LODs, modular pieces and axis/handedness conversion became first-class.
+- *"make sure it supports my subscriptions eg: chatgpt subscription"* — forced MCP with both
+  stdio and streamable-HTTP transports, since that is the only path a consumer subscription
+  reaches the tool without per-token billing on top.
+- Blender as the engine **plus** a full-toolchain test suite — a blocker, since neither existed.
+  Resolved by asking; the user approved installing both.
+- *"it should manage for all as i might use roblox's engine usually"* — four export profiles,
+  Roblox primary. Roblox was not one of the offered options.
+
+**Two answers were flagged as contradicting the research and stand as chosen.** 8.1 and 8.2 gave
+verification to the agent's visual judgement and to a reviewing agent — the two options with
+adverse published measurements (self-correction blind spot; false-success 13–89%; judges at AUROC
+≤0.65). This was raised at the time and reconciled at 11.3 rather than overridden: measurement
+decides hard facts (manifold, clipping, scale, transforms), the agent decides appearance. 7.2 and
+7.4 chose unrestricted code execution and full disk access with the CVSS 9.0 precedent stated in
+the option text; built as asked, documented in ADR-009 and `docs/SECURITY.md`.
+
+**Toolchain installed and verified:** Blender **5.2.0 LTS** (build 2026-07-14), Python **3.13.14**,
+and `bpy` **5.2.0** importing in-process (`import bpy` → live `bpy.data`). This last result decided
+ADR-008 — the geometry core holds live Blender state rather than shelling out per operation.
+
+**Design:** `linear.app` chosen from a shortlist of three. `runwayml` had been the first "sharper"
+candidate and was rejected in Phase 2 for shipping no token frontmatter. Root `DESIGN.md` written.
+
+**Recorded:** `docs/decisions/gate-A.md`; 10 ADRs (001–011, no 012); `docs/ASSUMPTIONS.md` with 10
+entries decided without asking; `.pipeline/backlog.json` with 31 priority-ordered work items.
+
+**Repo now:** `DESIGN.md` at root, decisions and ADRs written, `state.json` at `phase: 4, pass: 1`.
