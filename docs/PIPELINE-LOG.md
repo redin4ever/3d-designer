@@ -75,3 +75,30 @@ contact); no production-ready incremental glTF/USD streaming format exists.
 
 **Repo now:** six research files under `docs/research/`, `CLAUDE.md` summary replaced,
 `state.json` at `phase: 2`.
+
+## Phase 2 — Design candidates (2026-08-05)
+
+**Ran:** no `DESIGN.md` at root, no `--design` flag, no system named in the brief — so the
+shortlist path. Register read as *dense professional tool with a live 3D canvas at its centre*,
+watched by either a non-artist operator or a supervising artist.
+
+**Fetched:** `linear.app` (safe), `figma` (contrast), `nvidia` (sharper). All HTTP 200, all parse
+with `colors`/`typography`/`rounded`/`spacing`/`components`. Previews in
+`.pipeline/design-candidates/previews.md`.
+
+**One fetch rejected:** `runwayml` was the first "sharper" pick and returned 200 but ships prose
+only — no YAML token frontmatter, so it could not generate a token file or be linted against.
+Swapped for `nvidia`, which is also the better spread: linear and runway are both dark
+cinematic-dev aesthetics, and a shortlist of three dark tools has one real option in it.
+
+**Decided:** nothing. Phase 2 prepares; the user picks at Gate A. The wave message will say they
+can name any of the other 71 slugs, supply a file or URL, or describe a brand to author from.
+
+**Assumed:** nothing.
+
+**Queued for Gate A:** wave 5 now carries the three previews plus density/motion/dark-mode/copy
+personality. Q-017 ("is there a browser UI in v1 at all") is asked **first** in that wave — if the
+answer is no, the design pick is moot and the wave collapses.
+
+**Repo now:** three candidate files plus previews under `.pipeline/design-candidates/`,
+`state.json` at `phase: 3`. No root `DESIGN.md` — correct; it is written only after the user picks.
