@@ -138,3 +138,76 @@ candidate and was rejected in Phase 2 for shipping no token frontmatter. Root `D
 entries decided without asking; `.pipeline/backlog.json` with 31 priority-ordered work items.
 
 **Repo now:** `DESIGN.md` at root, decisions and ADRs written, `state.json` at `phase: 4, pass: 1`.
+
+## Phase 4 — Build, pass 1 (2026-08-05) — IN PROGRESS
+
+**4.1 Architecture, by panel.** Three architects worked independently on the gate decisions and
+the backlog. Architect 3 won on one idea: **`EngineProtocol` frozen in contracts with a
+`FakeEngine` injected at the composition root**, which makes every module except `engine` testable
+with no Blender and turns `dependsOn` into an integration order rather than a build queue. Grafted
+architect 1's split of `frontend` from `viewer` (different languages, different toolchains,
+therefore different owners under Rule 5), and folded architect 1's thin `verify` module into
+`orchestration`, which two of the three had independently placed there. Result: 16 modules,
+`docs/ARCHITECTURE.md`, `.pipeline/modules.json`.
+
+**4.2 Contracts frozen, then reviewed.** Wrote `src/contracts/` (10 files) plus `src/testing/`
+(a real in-memory engine, not a call-recording mock — a mock lets a wrong implementation pass
+because the test asserts on the conversation rather than the outcome).
+
+Then the barrier. Two independent reviewers — a *consumer* who tried to express four gate journeys
+using only these types, and an *adversary* who tried to reach states that must not exist —
+returned **47 findings, 15 of them blockers**. Every one would have been multiplied by sixteen
+modules. The most expensive:
+
+- `AABB` could be constructed inverted, which short-circuits `overlaps()` to False on the first
+  inverted axis — a *false negative* in the broad-phase test that feeds clipping detection.
+- `MeshSnapshot` had no canonical edge ordering, but `bevel_edges` takes bare edge indices. A
+  detail pass selecting "exposed convex edges" would have handed the engine integers meaning
+  something else, and the wrong edges would have been bevelled with no error at all.
+- `SceneDocument.head` could go negative, which slices from the end — an undo that silently drops
+  the last operation instead of raising.
+- An opaque (non-replayable) operation could exist with no undo barrier, letting rollback attempt
+  a replay across code that cannot be replayed.
+- Appending after an undo did not truncate, so a later redo would replay stale work ahead of the
+  new operation.
+- `WriteLease` was freely constructible, so "exactly one writer" — the safety property the whole
+  multi-agent design rests on — was unenforceable. Two agents each holding a lease they built
+  themselves is not a lock.
+- `export_gltf` took only `y_up`, with no way to express `mirror_x` or `negate_rotation`. A
+  left-handed target needs both together; the only remaining route would have been mutating live
+  transforms before the call and reverting after.
+- No `OperationHandler` protocol, so five separately-owned modules would each have invented a
+  calling convention and `scene` would have needed five adapters.
+- No path for a mid-run operator redirect to reach the agent at all.
+- Three types defaulted three different tolerances for the same geometry, so one reading could be
+  simultaneously "not a defect" and "acceptance-failing".
+
+All fixed, each with a regression test named after the failure. 72 contract tests green.
+
+**4.3 Ready queue.** Ten modules RED (601 failing tests, every failure `NotImplementedError`,
+none `ImportError`). Two audit agents then asked the question that matters — *what wrong
+implementation would still pass?* — and found six:
+
+- `spatial.invalidate` could be a no-op, because every query re-read bounds anyway.
+- `measure.gap_width` could simply delegate to `distance` (only the zero case was tested).
+- `find_clipping` could apply any joinery intent globally instead of to the pair it names.
+- `engine.reset` could clear a private ledger and never touch the live bpy scene, leaving
+  Blender's default cube behind forever.
+- `export_gltf` could drop the handedness flags and still write a valid file.
+- `raw.execute` could text-scan the source instead of diffing real engine state.
+
+Those gaps are now closed: spatial 15→18, measure 39→52, engine 25→54 conformance checks, raw
+11→13. The engine suite runs the *same* check functions against both `FakeEngine` and real bpy, so
+the fake cannot drift from the thing it stands in for.
+
+**GREEN so far:** `spatial` (18), `measure` (52), `raw` (13), `constraints` (37) — 120 tests,
+verified by running them, not by an agent's report.
+
+**Still RED, awaiting implementers:** `engine`, `detail`, `ops`, `scene`, `export`,
+`orchestration`. **Still planned:** `gaps`, `uv`, `align`, `viewer`, `mcp`, `frontend`.
+
+**Assumed:** recorded per module in each agent's return and in `.pipeline/contract-requests.json`
+(6 open requests, mostly `orchestration` needing `scene`'s real interface and a tool-registry
+injection point).
+
+**Repo now:** on branch `build/pass-1`, 10 commits, `state.json` at `phase: 4, pass: 1`.

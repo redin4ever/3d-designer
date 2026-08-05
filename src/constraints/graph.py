@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from contracts import ConstraintSet
+from contracts import CYCLE_RULE, ConstraintError, ConstraintSet
 
 __all__ = ["dependency_order"]
 
@@ -29,5 +29,35 @@ def dependency_order(sets: Sequence[ConstraintSet]) -> tuple[str, ...]:
     A diamond — two nodes independently depending on the same shared target — is not a
     cycle: this orders a DAG, it does not require the dependency graph to be a single
     chain.
+
+    Only dependencies on ids that are themselves present in ``sets`` are ordered; a
+    constraint targeting an object outside the batch being solved is not something this
+    function can (or needs to) sequence.
     """
-    raise NotImplementedError("constraints.dependency_order: not implemented")
+    by_id = {cs.object_id: cs for cs in sets}
+    order: list[str] = []
+    state: dict[str, int] = {}  # 0 = unvisited (absent), 1 = visiting, 2 = done
+
+    def visit(object_id: str) -> None:
+        status = state.get(object_id, 0)
+        if status == 2:
+            return
+        if status == 1:
+            raise ConstraintError(
+                rule=CYCLE_RULE,
+                detail=f"constraint dependency cycle detected at {object_id!r}",
+                suggestion="break the cycle by removing or redirecting one of the constraints involved",
+            )
+        state[object_id] = 1
+        cs = by_id.get(object_id)
+        if cs is not None:
+            for dep in sorted(cs.depends_on()):
+                if dep in by_id:
+                    visit(dep)
+        state[object_id] = 2
+        order.append(object_id)
+
+    for cs in sets:
+        visit(cs.object_id)
+
+    return tuple(order)

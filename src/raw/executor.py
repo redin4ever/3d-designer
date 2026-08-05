@@ -23,6 +23,7 @@ the module that breaks the concurrency guarantee every other module depends on.
 
 from __future__ import annotations
 
+import types
 from dataclasses import dataclass
 
 from contracts import EngineProtocol, ToolRole, ToolSpec
@@ -102,7 +103,62 @@ def execute(engine: EngineProtocol, source: str, *, namespace: dict | None = Non
     already owns the write lock and the operation log applies that machinery around every
     call to this one, using ``RAW_TOOL_SPEC.mutating`` to know it must.
     """
-    raise NotImplementedError(_NOT_IMPLEMENTED.format(name="execute"))
+    if not source or not source.strip():
+        return RawResult(
+            ok=False,
+            objects_before=(),
+            objects_after=(),
+            created=(),
+            removed=(),
+            returned={},
+            error_rule="raw.empty_script",
+            error_detail="source is empty or whitespace-only; nothing was executed",
+        )
+
+    # Names already in scope before `source` runs — the injected `engine` handle and
+    # anything the caller pre-seeded — are not "bound by the script" and are excluded
+    # from `returned` below, however the run turns out.
+    pre_existing = set(namespace or {}) | {"engine"}
+
+    objects_before = tuple(engine.list_objects())
+    ns: dict | None = None
+    ok = True
+    error_rule = ""
+    error_detail = ""
+    try:
+        ns = engine.execute(source, namespace)
+    except Exception as exc:  # noqa: BLE001 — arbitrary code raises arbitrary exceptions
+        ok = False
+        error_rule = "raw.execution_failed"
+        error_detail = f"{type(exc).__name__}: {exc}"
+    objects_after = tuple(engine.list_objects())
+
+    created = tuple(oid for oid in objects_after if oid not in objects_before)
+    removed = tuple(oid for oid in objects_before if oid not in objects_after)
+
+    returned: dict = {}
+    if ns is not None:
+        for key, value in ns.items():
+            if key in pre_existing:
+                continue
+            if key.startswith("__") and key.endswith("__"):
+                continue
+            if isinstance(value, types.ModuleType):
+                continue
+            if callable(value):
+                continue
+            returned[key] = value
+
+    return RawResult(
+        ok=ok,
+        objects_before=objects_before,
+        objects_after=objects_after,
+        created=created,
+        removed=removed,
+        returned=returned,
+        error_rule=error_rule,
+        error_detail=error_detail,
+    )
 
 
 def describe_risk() -> str:
@@ -114,7 +170,14 @@ def describe_risk() -> str:
     than no note at all, because it reads as reassurance to exactly the caller who most
     needs to understand there is none.
     """
-    raise NotImplementedError(_NOT_IMPLEMENTED.format(name="describe_risk"))
+    return (
+        "raw execution runs arbitrary Python against the live engine with no sandbox and "
+        "no allowlist — there is no security boundary of any kind. It also places no "
+        "restriction on which filesystem paths a script may read or write: a script run "
+        "through this tool can read, write, or delete anything on the filesystem that the "
+        "user running this process can. This is unrestricted code execution on the user's "
+        "own machine (ADR-009), not a sandboxed or otherwise contained capability."
+    )
 
 
 RAW_TOOL_SPEC = ToolSpec(

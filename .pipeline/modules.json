@@ -32,7 +32,7 @@
       "backlogItems": [
         "B-005"
       ],
-      "status": "red",
+      "status": "green",
       "note": "BVH invalidation is a silent-wrong-answer risk (ADR-011): needs direct tests, not integration coverage."
     },
     {
@@ -51,7 +51,7 @@
         "B-004",
         "B-006"
       ],
-      "status": "red",
+      "status": "green",
       "note": "7 metric queries + 8 defect classes incl. clipping. Pure functions over MeshSnapshot. One file per defect class."
     },
     {
@@ -68,7 +68,7 @@
       "backlogItems": [
         "B-007"
       ],
-      "status": "red",
+      "status": "green",
       "note": "The 12-type vocabulary (A-006). Must hard-fail on cycles."
     },
     {
@@ -238,7 +238,7 @@
       "backlogItems": [
         "B-026"
       ],
-      "status": "red",
+      "status": "green",
       "note": "ADR-009. Deliberately tiny so it gets its own security review. Takes the write lock; logs an opaque undo barrier."
     },
     {

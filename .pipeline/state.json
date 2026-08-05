@@ -15,10 +15,10 @@
     "A": "docs/decisions/gate-A.md"
   },
   "suites": {
-    "backend": "red-by-design",
+    "backend": "green-where-implemented",
     "frontend": "none"
   },
-  "next": "Phase 4 pass 1 / 4.3. RED+audited: engine spatial measure raw. RED: constraints detail ops scene export orchestration. STILL PLANNED (need RED): gaps uv align viewer mcp frontend. NEXT ACTION: GREEN implementers, cap 4-6 concurrent, leaves first (spatial, measure, raw, constraints), then remaining RED, then module reviews, then node .pipeline/check.mjs --phase 4.",
+  "next": "Phase 4 pass 1 / 4.3 — GREEN wave 2. GREEN+verified: spatial(18) measure(52) raw(13) constraints(37). RED awaiting implementers: engine(54 checks) detail(34) ops(47) scene(31) export(36) orchestration(25). PLANNED, need RED first: gaps uv align viewer mcp frontend. THEN: module reviewers (read-only, one per green module, must not have written it), then node .pipeline/check.mjs --phase 4, then Phase 5 QA.",
   "status": "running",
   "blocked": null,
   "branch": "build/pass-1"

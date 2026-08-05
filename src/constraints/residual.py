@@ -6,11 +6,19 @@ without re-solving, which is how a caller distinguishes "still valid" from "need
 re-solve" at close to zero cost. Constraints are stored, not just applied (ADR-002), and
 this function is half of what storing them buys — the other half is
 :func:`constraints.solve` re-running from scratch.
+
+Reuses the same per-kind requirement functions ``solver.py`` applies (``_position.py``,
+``_orientation.py``) so a placement ``solve`` just produced can never fail its own
+``satisfies`` check — the two would otherwise be two independent opinions about what a
+constraint means, free to drift apart.
 """
 
 from __future__ import annotations
 
 from contracts import ConstraintSet, EngineProtocol, Placement
+
+from ._orientation import FORWARD_KINDS, UP_KINDS, forward_for, up_for
+from ._position import POSITION_KINDS, position_effect, position_residual
 
 __all__ = ["satisfies"]
 
@@ -27,4 +35,23 @@ def satisfies(
     value a caller could misread as "which way to move it", matching
     :attr:`contracts.Placement.residuals`.
     """
-    raise NotImplementedError("constraints.satisfies: not implemented")
+    if cs.uses_escape_hatch:
+        return ()
+
+    residuals: list[tuple[str, float]] = []
+    for c in cs.constraints:
+        if c.kind in POSITION_KINDS:
+            effect = position_effect(engine, cs.object_id, c, placement.position)
+            diff = position_residual(placement.position, effect)
+        elif c.kind in FORWARD_KINDS:
+            required = forward_for(engine, c)
+            diff = (required - placement.forward.normalized()).length()
+        elif c.kind in UP_KINDS:
+            required = up_for(engine, c)
+            diff = (required - placement.up.normalized()).length()
+        else:  # pragma: no cover - every ConstraintKind is one of the above families
+            diff = 0.0
+        if diff > c.tolerance:
+            residuals.append((f"{c.kind.value} -> {c.target.key()}", diff))
+
+    return tuple(residuals)
