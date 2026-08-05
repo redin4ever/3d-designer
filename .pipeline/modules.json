@@ -257,7 +257,7 @@
         "B-017",
         "B-018"
       ],
-      "status": "planned",
+      "status": "green",
       "note": "Python WebSocket half only. Subscribes to scene; the arrow never points back."
     },
     {
@@ -300,7 +300,7 @@
         "B-017",
         "B-018"
       ],
-      "status": "planned",
+      "status": "green",
       "note": "Static three.js + Puppeteer. Depends only on the wire-protocol contract; runs against fixtures with no Python and no Blender."
     }
   ]

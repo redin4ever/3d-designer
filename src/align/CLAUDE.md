@@ -86,7 +86,7 @@ guaranteed to match any particular "which face is 0" intuition (it is not, e.g.,
 +Z face) — a caller that cares which physical face a given index means should resolve it
 once and reuse the index, not assume a fixed mapping.
 
-**Cross-module note, not an `align` defect:** `src/mcp/_cap.py` documents that `ops` (4) +
+**Cross-module note, not an `align` defect:** `src/mcp_server/_cap.py` documents that `ops` (4) +
 `gaps` (8) + `align` (7) REFINE-role tools sum to 19, past the 8-tool accuracy-optimal
 visible-set bound (ADR-003). `mcp.registry.cap_fairly` already handles this — round-robin
 trimming with a logged warning, not a crash — and `mcp`'s own module docstring calls this
