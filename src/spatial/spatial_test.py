@@ -129,6 +129,46 @@ def test_invalidate_makes_a_newly_created_overlap_detectable(engine: FakeEngine)
     assert "a" in index.nearby("b"), "a real, newly-created overlap was not reported"
 
 
+def test_stale_count_reflects_a_pending_invalidation_until_the_next_query_resolves_it(
+    engine: FakeEngine,
+) -> None:
+    """``stale_count`` is the one signal that distinguishes "invalidated but not yet
+    re-read" from "already fresh" without inspecting query results. A scoped revalidation
+    pass that polls this count to decide whether there is work left to resolve either
+    spins forever on a count that never clears, or skips real staleness it was never told
+    about — both are the silent-wrong-answer failure ADR-011 exists to prevent."""
+    _cube(engine, "a")
+    index = SpatialIndex(engine)
+    index.rebuild()
+    assert index.stale_count == 0
+
+    engine.set_transform("a", Transform(translation=Vec3(100, 100, 100)))
+    index.invalidate("a")
+
+    assert index.stale_count == 1, "invalidate() marked nothing stale"
+
+    index.bounds_of("a")
+
+    assert index.stale_count == 0, "the resolving query did not clear staleness"
+
+
+def test_rebuild_clears_all_pending_staleness(engine: FakeEngine) -> None:
+    """Rebuild is the operator's "start over, be safe" action — if stale bookkeeping from
+    before the rebuild survives it, that action lies about the state it just fixed, and a
+    caller trusting ``stale_count == 0`` after an explicit rebuild is trusting a fiction."""
+    _cube(engine, "a")
+    _cube(engine, "b", at=Vec3(50, 50, 50))
+    index = SpatialIndex(engine)
+    index.rebuild()
+    index.invalidate("a")
+    index.invalidate("b")
+    assert index.stale_count == 2
+
+    index.rebuild()
+
+    assert index.stale_count == 0
+
+
 # ---------------------------------------------------------------------------- lifecycle
 
 def test_insert_makes_a_newly_created_object_immediately_queryable(engine: FakeEngine) -> None:
@@ -238,6 +278,22 @@ def test_in_region_with_nothing_inside_returns_empty(engine: FakeEngine) -> None
     result = index.in_region(AABB(Vec3(500, 500, 500), Vec3(501, 501, 501)))
 
     assert result == ()
+
+
+def test_in_region_returns_exactly_the_objects_overlapping_it(engine: FakeEngine) -> None:
+    """A selection box or camera-frustum query is only useful if it returns exactly what
+    is inside it. An implementation that returns every known id regardless of the region
+    buries a targeted query in irrelevant results; one that tests centre-point containment
+    instead of AABB overlap silently drops an object whose bulk overlaps the region but
+    whose centre happens to sit just outside it."""
+    _cube(engine, "inside", at=Vec3(0, 0, 0))
+    _cube(engine, "outside", at=Vec3(50, 50, 50))
+    index = SpatialIndex(engine)
+    index.rebuild()
+
+    result = index.in_region(AABB(Vec3(-1, -1, -1), Vec3(1, 1, 1)))
+
+    assert set(result) == {"inside"}
 
 
 # -------------------------------------------------------------------------- determinism

@@ -18,7 +18,8 @@
     "backend": "none",
     "frontend": "none"
   },
-  "next": "Phase 4 build — pass 1",
+  "next": "Phase 4 pass 1, section 4.3. RED done: engine, spatial, measure, raw, constraints, detail. Audits applied to round A via SendMessage (in flight). NEXT: RED for gaps, uv, ops, align, scene, orchestration, export, viewer, mcp, frontend; then GREEN implementers per module (cap 4-6 concurrent); then module reviews; then node .pipeline/check.mjs --phase 4.",
   "status": "running",
-  "blocked": null
+  "blocked": null,
+  "branch": "build/pass-1"
 }

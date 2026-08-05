@@ -68,7 +68,7 @@
       "backlogItems": [
         "B-007"
       ],
-      "status": "planned",
+      "status": "red",
       "note": "The 12-type vocabulary (A-006). Must hard-fail on cycles."
     },
     {
@@ -143,7 +143,7 @@
         "B-013",
         "B-014"
       ],
-      "status": "planned",
+      "status": "red",
       "note": "The answer to the user's stated deal-breaker. Heuristic bevel is the top lever."
     },
     {
