@@ -46,10 +46,43 @@ class BlenderEngine(MeshOpsMixin, ModifierOpsMixin, SurfacingMixin, ExportingMix
         """e.g. ``"bpy-5.2.0"``. Must start with ``"bpy-"`` — see
         ``conformance.check_backend_name_identifies_bpy``. Read ``bpy.app.version_string``
         (ADR-001 verified this is live: ``'5.2.0 LTS'``) rather than hardcoding a version."""
-        raise NotImplementedError("engine.backend_name: not implemented")
+        import bpy
+
+        return f"bpy-{bpy.app.version_string}"
 
     def reset(self) -> None:
-        raise NotImplementedError("engine.reset: not implemented")
+        """Clear every scene datablock, not just objects this session tracked.
+
+        Objects first (``do_unlink=True`` detaches them from every collection/scene), then
+        the datablock types that can accumulate across a session — meshes, materials,
+        cameras, lights, images — regardless of who created them (the default cube/camera/
+        light included, and any raw ``bpy.data`` object a caller linked directly, per
+        ``conformance_session.check_reset_clears_the_live_bpy_scene``). Each removal is
+        best-effort: one datablock bpy refuses to drop (e.g. still fake-user-protected) must
+        not abort clearing the rest.
+        """
+        import bpy
+
+        for obj in list(bpy.data.objects):
+            try:
+                bpy.data.objects.remove(obj, do_unlink=True)
+            except RuntimeError:
+                pass
+
+        for collection in (
+            bpy.data.meshes,
+            bpy.data.materials,
+            bpy.data.cameras,
+            bpy.data.lights,
+            bpy.data.images,
+            bpy.data.node_groups,
+            bpy.data.curves,
+        ):
+            for block in list(collection):
+                try:
+                    collection.remove(block)
+                except RuntimeError:
+                    pass
 
 
 def create_engine(prefer_subprocess: bool = False) -> EngineProtocol:
@@ -57,10 +90,16 @@ def create_engine(prefer_subprocess: bool = False) -> EngineProtocol:
 
     ``prefer_subprocess=False`` (the default) is in-process ``bpy`` — the normal path, and
     the only one exercised by ``src/engine/blender_test.py``. ``prefer_subprocess=True`` is
-    the documented fallback for capabilities in-process ``bpy`` structurally cannot provide
-    (no ``bpy.context.window`` at all — ADR-001), shelling out to the real
-    ``blender.exe`` installed at ``C:\\Program Files\\Blender Foundation\\Blender 5.2\\``.
+    the documented fallback for capabilities in-process ``bpy`` structurally cannot provide,
+    shelling out to the real ``blender.exe``. No test in this suite exercises that path, and
+    it is not implemented here — raising rather than silently falling back to the in-process
+    engine, which would hide the exact capability gap this flag exists to name.
     Nothing outside ``src/engine/`` should ever construct :class:`BlenderEngine` directly —
     this factory is the one seam the rest of the product is allowed to depend on.
     """
-    raise NotImplementedError("engine.create_engine: not implemented")
+    if prefer_subprocess:
+        raise NotImplementedError(
+            "engine.create_engine: prefer_subprocess=True (blender.exe subprocess fallback) "
+            "is not implemented — no check in this suite exercises it"
+        )
+    return BlenderEngine()

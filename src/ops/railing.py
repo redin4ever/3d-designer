@@ -10,31 +10,44 @@ between — one call, four required named parameters, one re-runnable acceptance
 Four things define a *correct* railing, and each is a documented naive-generator failure
 mode this operation exists to prevent:
 
-1. **Posts are plumb in world +Z, regardless of the path's slope.** A post normal to a
-   stair rake — aligned to the path tangent instead of world up — is *the* classic
-   naive-generator error (``contracts.ConstraintKind.PLUMB``,
-   ``testing.mesh_helpers.rotation_from_up_to``). Every post stands vertical even where the
-   path it follows does not.
-2. **Posts are additionally forced at every direction change**, not just at the fixed
-   pitch. A regular spacing with no corner resampling leaves a corner either short a post
-   (a gap) or straddled by two overlapping ones (a doubled post) — both invisible in a
-   render, both a real defect.
-3. **The top rail terminates at post centrelines**, not at an arbitrary parametric
-   interval — a rail that stops short of or past the outer posts leaves either a stub with
-   nothing to fix to, or a gap at the exact point someone is most likely to grab.
-4. **Balusters are spaced to a clear opening, not a centre-to-centre pitch.** ``baluster_gap``
-   names the gap a code-required sphere must not pass through — the surface-to-surface
-   distance between neighbours, always narrower than their centre-to-centre pitch by the
-   balusters' own width. Confusing the two is a real, common modelling bug.
+1. **Posts are plumb in world +Z, regardless of the path's slope.** Delegated to
+   ``engine.array_along_curve(..., keep_upright=True)`` — the engine's own contract for
+   ``keep_upright`` is exactly "each instance's own +Z parallel to world up", so every post
+   stands vertical even on a 31-degree rake.
+2. **Posts are additionally forced at every direction change**, via
+   ``array_along_curve``'s ``extra_points`` — every interior path vertex, in addition to
+   the regular pitch.
+3. **The top rail terminates at post centrelines.** ``array_along_curve``'s own pacing
+   always samples the path's first and last point exactly (see
+   ``testing.mesh_helpers.sample_polyline``), so the first/last post sits exactly at
+   ``path[0]``/``path[-1]`` — the rail is swept along that same ``path`` (elevated by
+   ``height``), so its endpoints coincide with those same points by construction.
+4. **Balusters are spaced to a clear opening, not a centre-to-centre pitch.** The
+   centre-to-centre pitch handed to ``array_along_curve`` is computed as
+   ``baluster_gap + baluster_size[0]`` — the gap plus the balusters' own footprint along
+   the spacing axis — so the measured *surface* gap between neighbours comes out to
+   exactly ``baluster_gap``.
 """
 
 from __future__ import annotations
 
-from contracts import EngineProtocol, Operation, OperationResult
+from contracts import EngineProtocol, Operation, OperationResult, Vec3
+
+from ._geom import box_mesh, oriented_box_between
+from .validation import validate_params
 
 __all__ = ["add_railing"]
 
-_NOT_IMPLEMENTED = "ops.{name}: not implemented"
+
+def _array_source(
+    engine: EngineProtocol, src_id: str, footprint: tuple[float, float], rise: float
+) -> str:
+    """A box source mesh spanning z in [0, rise], centred on x/y — so once
+    ``array_along_curve`` translates a duplicate to a path point, that point is the
+    instance's own base (walking-surface level), not its vertical centre."""
+    w, d = footprint
+    verts, faces = box_mesh(Vec3(-w / 2.0, -d / 2.0, 0.0), Vec3(w / 2.0, d / 2.0, rise))
+    return engine.create_mesh(src_id, verts, faces)
 
 
 def add_railing(engine: EngineProtocol, op: Operation) -> OperationResult:
@@ -43,41 +56,62 @@ def add_railing(engine: EngineProtocol, op: Operation) -> OperationResult:
     posts' centrelines, and balusters plumb through slope changes holding ``baluster_gap``
     of clear opening between neighbours.
 
-    Required params:
+    See the module docstring for how each of the four defining properties maps onto
+    ``engine.array_along_curve``. Returns ``produced_objects`` naming every part with an id
+    predictable from ``op.op_id`` and its index:
 
-    - ``object_id`` (str) — base id every produced part's name is derived from.
-    - ``path`` (list of >= 2 ``Vec3``) — the walking surface's outer edge, in order. A
-      vertex where the direction changes is a corner and must receive a post regardless of
-      where the regular pitch would otherwise fall.
-    - ``height`` (float, > 0) — top rail height above the walking surface (i.e. above
-      ``path``'s own z at each point, not a fixed world z — the rail rises and falls with
-      the path).
-    - ``post_spacing`` (float, > 0) — nominal pitch between posts, measured along the
-      path's own arc length, never along its horizontal projection. On a rake this is a
-      materially larger number than the horizontal run, and using the wrong one under-
-      counts posts.
-    - ``baluster_gap`` (float, > 0) — the required *clear* opening between adjacent
-      baluster surfaces. Not the same number as the centre-to-centre pitch, which is wider
-      by the balusters' own width (``baluster_size``).
-
-    Optional: ``post_size`` ((width, depth), default ``(0.05, 0.05)``), ``baluster_size``
-    (default ``(0.03, 0.03)``), ``rail_size`` (default ``(0.05, 0.05)``).
-
-    Must call ``validate_params("add_railing", op.params)`` first.
-
-    Every post's local +Z, transformed by its own placed rotation, must equal world +Z —
-    checked directly on ``engine.snapshot(post_id).transform``, on a level path and on a
-    sloped one alike. This is the one property that must never regress: it is the exact
-    thing ADR-004 names as the reason this operation exists rather than a raw
-    ``array_along_curve`` call with ``keep_upright`` left to the caller to remember.
-
-    Returns ``produced_objects`` naming every part with an id predictable from ``op.op_id``
-    and its index, so a later constraint can reference one baluster without re-deriving
-    which array position it was:
-
-    - posts: ``f"{op.op_id}_post_{i:03d}"``, ``i`` in path order (arc-length order,
-      corners included), zero-padded to 3 digits.
+    - posts: ``f"{op.op_id}_post_{i:03d}"``, arc-length order, corners included.
     - balusters: ``f"{op.op_id}_baluster_{i:03d}"``, same ordering convention.
     - top rail: ``f"{op.op_id}_top_rail"`` — exactly one, spanning the full path.
     """
-    raise NotImplementedError(_NOT_IMPLEMENTED.format(name="add_railing"))
+    params = validate_params("add_railing", op.params)
+    path = list(params["path"])
+    height = params["height"]
+    post_spacing = params["post_spacing"]
+    baluster_gap = params["baluster_gap"]
+    post_w, post_d = params.get("post_size", (0.05, 0.05))
+    bal_w, bal_d = params.get("baluster_size", (0.03, 0.03))
+    rail_w, rail_d = params.get("rail_size", (0.05, 0.05))
+
+    corners = list(path[1:-1])  # every direction change forces a post/baluster here too
+
+    # -- posts: plumb, forced at corners, arc-length pitch -----------------------------
+    post_src_id = _array_source(engine, f"{op.op_id}_post_src", (post_w, post_d), height)
+    post_ids = engine.array_along_curve(
+        post_src_id,
+        path,
+        post_spacing,
+        keep_upright=True,
+        extra_points=corners,
+        name_template=f"{op.op_id}_post_{{index:03d}}",
+    )
+    engine.delete(post_src_id)
+
+    # -- balusters: same pacing machinery, pitch derived from the CLEAR gap ------------
+    baluster_pitch = baluster_gap + bal_w
+    bal_src_id = _array_source(engine, f"{op.op_id}_baluster_src", (bal_w, bal_d), height)
+    baluster_ids = engine.array_along_curve(
+        bal_src_id,
+        path,
+        baluster_pitch,
+        keep_upright=True,
+        extra_points=corners,
+        name_template=f"{op.op_id}_baluster_{{index:03d}}",
+    )
+    engine.delete(bal_src_id)
+
+    # -- top rail: swept along the path, elevated by `height`, one segment per leg ----
+    elevated = [p + Vec3(0.0, 0.0, height) for p in path]
+    rail_name = f"{op.op_id}_top_rail"
+    first_verts, first_faces = oriented_box_between(elevated[0], elevated[1], rail_w, rail_d)
+    rail_id = engine.create_mesh(rail_name, first_verts, first_faces)
+
+    extra_rail_ids = []
+    for a, b in zip(elevated[1:], elevated[2:]):
+        verts, faces = oriented_box_between(a, b, rail_w, rail_d)
+        extra_rail_ids.append(engine.create_mesh(f"{op.op_id}_rail_part", verts, faces))
+    if extra_rail_ids:
+        engine.join(rail_id, extra_rail_ids)
+
+    produced = tuple(post_ids) + tuple(baluster_ids) + (rail_id,)
+    return OperationResult(op_id=op.op_id, ok=True, produced_objects=produced)

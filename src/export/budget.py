@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from contracts import AssetClass, Defect, EngineProtocol, ExportProfile
+from contracts import AssetClass, Defect, DefectClass, EngineProtocol, ExportProfile
 
 __all__ = ["check_budget"]
 
@@ -36,4 +36,23 @@ def check_budget(
     selected threshold is ``None`` (no ceiling declared for this profile, or this class has
     none), no object checked against it can ever be flagged, however heavy its mesh is.
     """
-    raise NotImplementedError("export.check_budget: not implemented")
+    threshold = (
+        profile.budgets.get(asset_class) if asset_class is not None else profile.max_triangles_per_mesh
+    )
+    if threshold is None:
+        return ()
+
+    defects: list[Defect] = []
+    for object_id in object_ids:
+        triangle_count = engine.snapshot(object_id).triangle_count
+        if triangle_count > threshold:
+            defects.append(
+                Defect.of(
+                    DefectClass.BUDGET_EXCEEDED,
+                    object_id,
+                    f"{triangle_count} triangles exceeds the {threshold}-triangle budget",
+                    magnitude=triangle_count - threshold,
+                    unit="tris",
+                )
+            )
+    return tuple(defects)

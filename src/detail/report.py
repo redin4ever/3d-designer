@@ -24,7 +24,11 @@ does not block on this gap.
 
 from __future__ import annotations
 
-from contracts import EngineProtocol, Measurement
+import math
+
+from contracts import EngineProtocol, Measurement, MeshSnapshot, MetricKind
+
+from .edges import select_bevel_edges
 
 __all__ = ["realism_report"]
 
@@ -52,4 +56,84 @@ def realism_report(engine: EngineProtocol, object_id: str) -> tuple[Measurement,
     "does this look real" score — see ``report_test.py`` for the exact check. This function
     is read-only: it must never call a mutating ``EngineProtocol`` method.
     """
-    raise NotImplementedError("detail.realism_report: not implemented")
+    snapshot = engine.snapshot(object_id)
+
+    return (
+        Measurement(
+            kind=MetricKind.ANGLE,
+            value=_sharp_edge_ratio(snapshot),
+            unit="",
+            subject=object_id,
+            detail="sharp-edge ratio: fraction of edges at or above a 30-degree dihedral fold",
+        ),
+        Measurement(
+            kind=MetricKind.DISTANCE,
+            value=_triangle_aspect_ratio(snapshot),
+            unit="",
+            subject=object_id,
+            detail="triangle aspect ratio: mean longest/shortest edge length per triangle",
+        ),
+        Measurement(
+            kind=MetricKind.GAP_WIDTH,
+            value=_edge_length_uniformity(snapshot),
+            unit="",
+            subject=object_id,
+            detail="edge-length uniformity: coefficient of variation of edge lengths",
+        ),
+        Measurement(
+            kind=MetricKind.TRIANGLE_COUNT,
+            value=len(snapshot.triangles),
+            unit="",
+            subject=object_id,
+            detail="triangle count of the evaluated mesh",
+        ),
+    )
+
+
+def _sharp_edge_ratio(snapshot: MeshSnapshot) -> float:
+    """Fraction of ``snapshot.edges()`` whose two adjacent faces fold at >= 30 degrees.
+
+    Reuses :func:`detail.select_bevel_edges`'s own dihedral-angle computation with the
+    convexity and hidden filters switched off — a read-only echo of the same formula, not
+    a re-derivation (see this module's docstring).
+    """
+    edges = snapshot.edges()
+    if not edges:
+        return 0.0
+    sharp = select_bevel_edges(snapshot, min_dihedral_deg=30.0, convex_only=False, exclude_hidden=False)
+    return len(sharp.edge_indices) / len(edges)
+
+
+def _triangle_aspect_ratio(snapshot: MeshSnapshot) -> float:
+    """Mean, over every triangle, of its longest edge length over its shortest."""
+    verts = snapshot.world_vertices()
+    triangles = snapshot.triangles
+    if not triangles:
+        return 0.0
+    ratios: list[float] = []
+    for tri in triangles:
+        a, b, c = verts[tri[0]], verts[tri[1]], verts[tri[2]]
+        lengths = [(b - a).length(), (c - b).length(), (a - c).length()]
+        shortest, longest = min(lengths), max(lengths)
+        if shortest > 1e-9:
+            ratios.append(longest / shortest)
+    return sum(ratios) / len(ratios) if ratios else 0.0
+
+
+def _edge_length_uniformity(snapshot: MeshSnapshot) -> float:
+    """Coefficient of variation (stdev / mean) of world-space edge lengths.
+
+    ``0`` means every edge is exactly the same length; a naive generator's wildly
+    inconsistent edge lengths push this well above the value a hand-authored or
+    well-retopologised mesh would show.
+    """
+    verts = snapshot.world_vertices()
+    edges = snapshot.edges()
+    if not edges:
+        return 0.0
+    lengths = [(verts[a] - verts[b]).length() for a, b in edges]
+    mean = sum(lengths) / len(lengths)
+    if mean < 1e-9:
+        return 0.0
+    variance = sum((length - mean) ** 2 for length in lengths) / len(lengths)
+    return math.sqrt(variance) / mean

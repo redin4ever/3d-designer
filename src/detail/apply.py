@@ -12,12 +12,8 @@ from __future__ import annotations
 
 from contracts import EngineProtocol
 
+from .edges import bevel_width_for, select_bevel_edges
 from .results import DetailResult
-
-# Once implemented, this function calls detail.edges.select_bevel_edges and
-# detail.edges.bevel_width_for — not imported yet because a throwing stub never calls them
-# (see src/measure/report.py for the same pattern: its docstring names sibling functions by
-# cross-reference without importing them until there is a body that actually calls them).
 
 __all__ = ["apply_edge_treatment"]
 
@@ -64,4 +60,36 @@ def apply_edge_treatment(
     module that already owns the write lock and operation log applies that machinery around
     every call to this one.
     """
-    raise NotImplementedError("detail.apply_edge_treatment: not implemented")
+    snapshot = engine.snapshot(object_id)
+    triangles_before = snapshot.triangle_count
+
+    selection = select_bevel_edges(
+        snapshot,
+        min_dihedral_deg=min_dihedral_deg,
+        convex_only=convex_only,
+        exclude_hidden=exclude_hidden,
+    )
+
+    if not selection.edge_indices:
+        return DetailResult(
+            object_id=object_id,
+            changed=False,
+            triangles_before=triangles_before,
+            triangles_after=triangles_before,
+            detail="no edge qualified for a bevel — nothing exposed, convex and sharp enough",
+        )
+
+    width = bevel_width_for(snapshot, fraction=fraction, minimum=minimum, maximum=maximum)
+
+    # Deliberately not caught: an EngineError here (e.g. unapplied non-uniform scale) must
+    # reach the caller unchanged — see this function's docstring and apply_test.py.
+    engine.bevel_edges(object_id, width, segments, selection.edge_indices)
+
+    triangles_after = engine.snapshot(object_id).triangle_count
+    return DetailResult(
+        object_id=object_id,
+        changed=True,
+        triangles_before=triangles_before,
+        triangles_after=triangles_after,
+        detail=f"bevelled {len(selection.edge_indices)} edge(s) at width={width:.5f}m",
+    )

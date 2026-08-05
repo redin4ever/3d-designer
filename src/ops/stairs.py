@@ -8,11 +8,12 @@ addressable parts.
 
 from __future__ import annotations
 
-from contracts import EngineProtocol, Operation, OperationResult
+from contracts import EngineProtocol, Operation, OperationResult, Vec3
+
+from ._geom import box_mesh
+from .validation import validate_params
 
 __all__ = ["add_staircase"]
-
-_NOT_IMPLEMENTED = "ops.{name}: not implemented"
 
 
 def add_staircase(engine: EngineProtocol, op: Operation) -> OperationResult:
@@ -20,20 +21,29 @@ def add_staircase(engine: EngineProtocol, op: Operation) -> OperationResult:
     starting at ``origin`` (default the world origin — tread 0's rise is measured from
     there).
 
-    Required params: ``object_id`` (str), ``treads`` (int, >= 1), ``rise`` (float, > 0),
-    ``run`` (float, > 0), ``width`` (float, > 0). Optional: ``origin`` (``Vec3``, default
-    ``Vec3()``).
-
-    Must call ``validate_params("add_staircase", op.params)`` first — ``treads == 0`` is a
-    request for a staircase that goes nowhere, not an empty-but-valid result.
-
-    Every tread's own top surface must land exactly ``rise`` above the tread below it, and
-    the top of the highest tread must sit at exactly ``treads * rise`` above ``origin`` —
-    both checked by the test suite on the built geometry's *world bounds*, never on the
-    ``rise``/``treads`` parameters handed in, because a handler can validate a parameter
-    and still build the wrong thing.
+    Each tread is built as a solid block reaching down to ``origin.z`` — tread ``i``'s top
+    surface therefore sits at exactly ``origin.z + (i + 1) * rise``, which is what makes
+    both "each tread is one rise above the one below" and "the highest tread is
+    ``treads * rise`` up" hold simultaneously and exactly, on the built geometry's own
+    world bounds.
 
     Returns ``produced_objects`` naming exactly the treads, in climb order:
     ``f"{op.op_id}_tread_{i:03d}"`` for ``i`` in ``range(treads)``, tread 0 the lowest.
     """
-    raise NotImplementedError(_NOT_IMPLEMENTED.format(name="add_staircase"))
+    params = validate_params("add_staircase", op.params)
+    treads, rise, run, width = (
+        params["treads"], params["rise"], params["run"], params["width"]
+    )
+    origin = params.get("origin", Vec3())
+
+    produced = []
+    for i in range(treads):
+        mins = Vec3(origin.x + i * run, origin.y - width / 2.0, origin.z)
+        maxs = Vec3(
+            origin.x + (i + 1) * run, origin.y + width / 2.0, origin.z + (i + 1) * rise
+        )
+        verts, faces = box_mesh(mins, maxs)
+        tread_id = engine.create_mesh(f"{op.op_id}_tread_{i:03d}", verts, faces)
+        produced.append(tread_id)
+
+    return OperationResult(op_id=op.op_id, ok=True, produced_objects=tuple(produced))

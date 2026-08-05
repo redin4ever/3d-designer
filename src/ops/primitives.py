@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from contracts import EngineProtocol, Operation, OperationResult
 
-__all__ = ["add_primitive"]
+from .validation import validate_params
 
-_NOT_IMPLEMENTED = "ops.{name}: not implemented"
+__all__ = ["add_primitive"]
 
 
 def add_primitive(engine: EngineProtocol, op: Operation) -> OperationResult:
@@ -24,12 +24,16 @@ def add_primitive(engine: EngineProtocol, op: Operation) -> OperationResult:
     torus, per ``contracts.EngineProtocol.create_primitive``), ``size`` (``Vec3``, every
     component > 0). Optional: ``transform`` (``Transform``).
 
-    Must call ``validate_params("add_primitive", op.params)`` before touching the engine —
-    a zero or negative size component must never reach ``engine.create_primitive`` to fail
-    there as an opaque engine error instead of a named ``ToolError``.
-
     Returns ``produced_objects == (created_id,)`` where ``created_id`` is whatever
     ``engine.create_primitive`` actually returned — which may differ from the requested
     ``object_id`` if that id was already taken (see ``FakeEngine._unique``).
     """
-    raise NotImplementedError(_NOT_IMPLEMENTED.format(name="add_primitive"))
+    params = validate_params("add_primitive", op.params)
+    object_id = params["object_id"]
+    prim_kind = params["kind"]
+    size = params["size"]
+    transform = params.get("transform")
+
+    created_id = engine.create_primitive(object_id, prim_kind, size, transform)
+
+    return OperationResult(op_id=op.op_id, ok=True, produced_objects=(created_id,))

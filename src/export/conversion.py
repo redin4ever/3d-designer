@@ -15,7 +15,7 @@ the body.
 
 from __future__ import annotations
 
-from contracts import ExportProfile, Quat, Vec3
+from contracts import ExportProfile, Quat, UpAxis, Vec3
 
 __all__ = ["convert_point", "convert_quaternion", "convert_scalar", "round_trip"]
 
@@ -36,7 +36,17 @@ def convert_point(p: Vec3, profile: ExportProfile) -> Vec3:
     Units: the result is scaled by ``profile.to_target_units`` — equivalent to
     :func:`convert_scalar` applied to each component.
     """
-    raise NotImplementedError("export.convert_point: not implemented")
+    if profile.up_axis is UpAxis.Y:
+        x, y, z = p.x, p.z, -p.y
+    else:
+        x, y, z = p.x, p.y, p.z
+    if profile.flip_x:
+        x = -x
+    return Vec3(
+        profile.to_target_units(x),
+        profile.to_target_units(y),
+        profile.to_target_units(z),
+    )
 
 
 def convert_quaternion(q: Quat, profile: ExportProfile) -> Quat:
@@ -50,7 +60,15 @@ def convert_quaternion(q: Quat, profile: ExportProfile) -> Quat:
     and counter-clockwise in a right-handed one, so mirroring position alone leaves every
     rotation inverted.
     """
-    raise NotImplementedError("export.convert_quaternion: not implemented")
+    if profile.up_axis is UpAxis.Y:
+        x, y, z = q.x, q.z, -q.y
+    else:
+        x, y, z = q.x, q.y, q.z
+    if profile.flip_x:
+        x = -x
+    if profile.negate_rotation:
+        x, y, z = -x, -y, -z
+    return Quat(q.w, x, y, z)
 
 
 def convert_scalar(metres: float, profile: ExportProfile) -> float:
@@ -61,7 +79,7 @@ def convert_scalar(metres: float, profile: ExportProfile) -> float:
     caller converting a whole scene reaches one place (``export``) for every conversion it
     needs, rather than reaching past this module into ``contracts`` for units alone.
     """
-    raise NotImplementedError("export.convert_scalar: not implemented")
+    return profile.to_target_units(metres)
 
 
 def round_trip(p: Vec3, profile: ExportProfile) -> Vec3:
@@ -72,4 +90,15 @@ def round_trip(p: Vec3, profile: ExportProfile) -> Vec3:
     asymmetric point (one where ``x != y != z`` and at least one component is negative — a
     symmetric point would pass even with two axes silently swapped).
     """
-    raise NotImplementedError("export.round_trip: not implemented")
+    converted = convert_point(p, profile)
+
+    # True inverse, worked from the forward transform above — not a second forward call
+    # with a hand-picked profile: un-scale, then un-mirror, then un-remap the axes.
+    x = profile.from_target_units(converted.x)
+    y = profile.from_target_units(converted.y)
+    z = profile.from_target_units(converted.z)
+    if profile.flip_x:
+        x = -x
+    if profile.up_axis is UpAxis.Y:
+        return Vec3(x, -z, y)
+    return Vec3(x, y, z)

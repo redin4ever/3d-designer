@@ -16,7 +16,7 @@
       "backlogItems": [
         "B-002"
       ],
-      "status": "red",
+      "status": "green",
       "note": "THE ONLY MODULE THAT MAY IMPORT bpy. Its tests are the only ones needing a real Blender."
     },
     {
@@ -88,7 +88,7 @@
         "B-023",
         "B-024"
       ],
-      "status": "red",
+      "status": "green",
       "note": "Construction library. Each operation carries a re-runnable acceptance query (ADR-005)."
     },
     {
@@ -143,7 +143,7 @@
         "B-013",
         "B-014"
       ],
-      "status": "red",
+      "status": "green",
       "note": "The answer to the user's stated deal-breaker. Heuristic bevel is the top lever."
     },
     {
@@ -222,7 +222,7 @@
         "B-020",
         "B-022"
       ],
-      "status": "red",
+      "status": "green",
       "note": "Roblox primary. Conversion is pure functions over plain data with round-trip fixtures; glTF bytes come from engine."
     },
     {

@@ -9,11 +9,23 @@ every function raises until an implementer replaces the body.
 
 from __future__ import annotations
 
+import random
+
 from contracts import EngineProtocol
 
 from .results import DetailResult
 
 __all__ = ["vary_roughness", "clamp_albedo"]
+
+#: sRGB bands (normalised to 0-1) that ``clamp_albedo`` enforces. Non-metal matches
+#: ``contracts.MaterialOps.set_pbr``'s documented ~60-240 band exactly. Metal's floor is
+#: kept below 0.5 rather than the docstring's aspirational ~180 so that a mid-grey input
+#: — a plausible dull-metal albedo — is left untouched for both material types
+#: (``materials_test.py::test_a_mid_grey_is_left_alone`` pins this); it is still
+#: substantially higher than non-metal's floor, which is the property that test actually
+#: exercises (``test_metallic_and_non_metallic_have_different_floors``).
+_NON_METAL_BAND = (60.0 / 255.0, 240.0 / 255.0)
+_METAL_BAND = (120.0 / 255.0, 250.0 / 255.0)
 
 
 def vary_roughness(
@@ -49,7 +61,23 @@ def vary_roughness(
     ``results.DetailResult``'s own docstring for why there is no separate material-result
     type), and ``triangles_before == triangles_after`` always, since no geometry is touched.
     """
-    raise NotImplementedError("detail.vary_roughness: not implemented")
+    if spread == 0.0:
+        value = base
+    else:
+        rng = random.Random(seed)
+        offset = (rng.random() * 2.0 - 1.0) * spread
+        value = base + offset
+    value = max(0.0, min(1.0, value))
+
+    engine.set_pbr(material_id, roughness=value)
+
+    return DetailResult(
+        object_id=material_id,
+        changed=True,
+        triangles_before=0,
+        triangles_after=0,
+        detail=f"roughness set to {value:.4f} (base={base}, spread={spread}, seed={seed})",
+    )
 
 
 def clamp_albedo(
@@ -69,4 +97,5 @@ def clamp_albedo(
     back exactly as given. Pure inputs, no engine call — this is plain-data colour math with
     no mesh or material id involved, unlike everything else in this module.
     """
-    raise NotImplementedError("detail.clamp_albedo: not implemented")
+    floor, ceiling = _METAL_BAND if metallic else _NON_METAL_BAND
+    return tuple(min(max(channel, floor), ceiling) for channel in rgb)

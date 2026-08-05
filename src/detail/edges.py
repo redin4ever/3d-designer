@@ -20,9 +20,10 @@ geometry already in hand, never from a live mutation.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
-from contracts import MeshSnapshot
+from contracts import MeshSnapshot, Vec3
 
 __all__ = ["EdgeSelection", "select_bevel_edges", "bevel_width_for"]
 
@@ -103,7 +104,79 @@ def select_bevel_edges(
     Every edge that was a candidate (had two adjacent faces) but failed one of the *enabled*
     filters counts toward ``EdgeSelection.rejected``.
     """
-    raise NotImplementedError("detail.select_bevel_edges: not implemented")
+    edges = snapshot.edges()
+    verts = snapshot.world_vertices()
+    adjacency = _build_adjacency(snapshot.triangles)
+    normals = [_triangle_normal(verts, tri) for tri in snapshot.triangles]
+
+    selected: list[int] = []
+    reasons: list[str] = []
+    rejected = 0
+
+    for idx, (u, v) in enumerate(edges):
+        occurrences = adjacency.get((u, v), ())
+        if len(occurrences) != 2:
+            # A boundary edge (one adjacent face) has no dihedral angle to measure and
+            # was never a candidate — it must not inflate `rejected` (see docstring).
+            continue
+
+        (t1, _opp1), (t2, opp2) = occurrences
+        n1, n2 = normals[t1], normals[t2]
+        cosine = max(-1.0, min(1.0, n1.dot(n2)))
+        dihedral_deg = math.degrees(math.acos(cosine))
+
+        if dihedral_deg < min_dihedral_deg:
+            rejected += 1
+            continue
+
+        if convex_only:
+            edge_point = verts[u]
+            other_vertex = verts[opp2]
+            is_convex = n1.dot(other_vertex - edge_point) < 0.0
+            if not is_convex:
+                rejected += 1
+                continue
+
+        if exclude_hidden:
+            average_z = (n1.z + n2.z) / 2.0
+            if average_z < 0.0:
+                rejected += 1
+                continue
+
+        selected.append(idx)
+        tags = [f"dihedral={dihedral_deg:.1f}deg"]
+        if convex_only:
+            tags.append("convex")
+        if exclude_hidden:
+            tags.append("exposed")
+        reasons.append(" ".join(tags))
+
+    return EdgeSelection(edge_indices=tuple(selected), reasons=tuple(reasons), rejected=rejected)
+
+
+def _triangle_normal(verts: list[Vec3], tri: tuple[int, int, int]) -> Vec3:
+    a, b, c = verts[tri[0]], verts[tri[1]], verts[tri[2]]
+    return (b - a).cross(c - a).normalized()
+
+
+def _build_adjacency(
+    triangles,
+) -> dict[tuple[int, int], list[tuple[int, int]]]:
+    """Edge -> the (triangle index, opposite-vertex index) pairs that touch it.
+
+    Built once per call over ``triangles`` rather than recomputed per edge — the same
+    guidance ``CLAUDE.md`` gives for this file.
+    """
+    adjacency: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for ti, tri in enumerate(triangles):
+        for a, b, opposite in (
+            (tri[0], tri[1], tri[2]),
+            (tri[1], tri[2], tri[0]),
+            (tri[2], tri[0], tri[1]),
+        ):
+            key = (a, b) if a < b else (b, a)
+            adjacency.setdefault(key, []).append((ti, opposite))
+    return adjacency
 
 
 def bevel_width_for(
@@ -134,5 +207,13 @@ def bevel_width_for(
     ``edges_test.py::test_a_fixed_width_regardless_of_size_is_rejected`` and its two
     neighbours, which pin a tiny and a huge object to the ``minimum``/``maximum`` clamps
     respectively. A constant cannot equal both.
+
+    Characteristic size chosen here: the longest axis of ``snapshot.world_bounds()``. A
+    doorknob and a warehouse wall differ enormously on this measure while an axis-aligned
+    box's diagonal or cube-root-of-volume would land in the same place for these examples
+    — any of the three satisfies this contract (see docstring above).
     """
-    raise NotImplementedError("detail.bevel_width_for: not implemented")
+    size = snapshot.world_bounds().size
+    characteristic = max(size.x, size.y, size.z)
+    width = fraction * characteristic
+    return max(minimum, min(maximum, width))
