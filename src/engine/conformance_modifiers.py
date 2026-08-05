@@ -26,6 +26,7 @@ __all__ = [
     "check_fill_holes_closes_an_open_box",
     "check_fill_holes_reports_what_it_could_not_do",
     "check_separate_loose_splits_disconnected_shells",
+    "check_bevel_edges_moves_only_the_selected_edges_geometry",
 ]
 
 
@@ -206,3 +207,64 @@ def check_separate_loose_splits_disconnected_shells(engine: EngineProtocol) -> N
 
     assert len(parts) == 2
     assert not engine.exists(oid)
+
+
+def _disjoint_edge_pair(edges: list[tuple[int, int]]) -> tuple[tuple[int, int], tuple[int, int]]:
+    """Two edges sharing no vertex, so bevelling one cannot legitimately move a vertex the
+    other touches. Searched rather than hardcoded to ``edges[0]``/``edges[4]`` because
+    ``MeshSnapshot.edges()``'s exact ordering (which diagonal a quad's triangulation picks)
+    is an engine-specific implementation detail this check must not assume."""
+    first = edges[0]
+    for other in edges[1:]:
+        if not set(first) & set(other):
+            return first, other
+    raise AssertionError("could not find two vertex-disjoint edges on this mesh")
+
+
+def _has_close(positions, target, tol: float = 1e-6) -> bool:
+    return any((p - target).length() < tol for p in positions)
+
+
+def check_bevel_edges_moves_only_the_selected_edges_geometry(engine: EngineProtocol) -> None:
+    """Blender-only, added in response to a conformance audit. The two triangle-count
+    checks above both pass for an implementation that ignores WHICH edges were selected and
+    always bevels a fixed number of edges regardless of ``edge_indices`` — enabling exactly
+    the blanket-bevel behaviour the ``ModifierOps.bevel_edges`` docstring calls an
+    artificiality tell. This bevels two different single-edge selections on two fresh,
+    identical cubes and checks that a vertex touching only the UNselected edge stays
+    exactly put in each, while a vertex touching the selected edge moves. Blender-only
+    because ``FakeEngine.bevel_edges`` never touches ``vertices`` at all — it only extends
+    the face list with duplicates of the first face to approximate triangle-count growth
+    (see its own source) — so no vertex ever moves on the fake side regardless of
+    selection; this check's premise cannot hold against it."""
+    verts, faces = unit_cube()
+    oid_a = engine.create_mesh("bevel_sel_a", verts, faces)
+    oid_b = engine.create_mesh("bevel_sel_b", verts, faces)
+
+    edges = engine.snapshot(oid_a).edges()
+    edge_a, edge_b = _disjoint_edge_pair(edges)
+
+    pre = engine.snapshot(oid_a).world_vertices()
+    point_a0, point_a1 = pre[edge_a[0]], pre[edge_a[1]]
+    point_b0, point_b1 = pre[edge_b[0]], pre[edge_b[1]]
+
+    engine.bevel_edges(oid_a, width=0.05, segments=2, edge_indices=[edge_a])
+    engine.bevel_edges(oid_b, width=0.05, segments=2, edge_indices=[edge_b])
+
+    post_a = engine.snapshot(oid_a).world_vertices()
+    post_b = engine.snapshot(oid_b).world_vertices()
+
+    assert not (_has_close(post_a, point_a0) and _has_close(post_a, point_a1)), (
+        "bevelling edge_a left both its endpoints exactly where they started"
+    )
+    assert _has_close(post_a, point_b0) and _has_close(post_a, point_b1), (
+        "bevelling edge_a moved a vertex that only touches the UNselected edge_b — "
+        "selection is being ignored"
+    )
+    assert not (_has_close(post_b, point_b0) and _has_close(post_b, point_b1)), (
+        "bevelling edge_b left both its endpoints exactly where they started"
+    )
+    assert _has_close(post_b, point_a0) and _has_close(post_b, point_a1), (
+        "bevelling edge_b moved a vertex that only touches the UNselected edge_a — "
+        "selection is being ignored"
+    )

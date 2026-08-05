@@ -36,8 +36,23 @@ pytest src/engine -q -m "not needs_blender"  # fake-only, fast, no Blender neede
 Follow the existing seams when a file grows — don't pile more onto `mesh.py` because it's
 convenient; a new bpy concern gets a new file, mixed into `BlenderEngine` in `session.py`
 the same way the existing five are. Same for `conformance_*.py`: a new check goes in the file
-matching the `Ops` group it tests, and gets added to `conformance.py`'s `UNIVERSAL_CHECKS` or
-`BLENDER_ONLY_CHECKS` tuple and to both `*_test.py` files.
+matching the `Ops` group it tests (or a new `conformance_*.py` for a concern with no actor
+file of its own, e.g. `conformance_validation.py` for error-rule checks), and gets added to
+`conformance.py`'s `UNIVERSAL_CHECKS`, `BLENDER_ONLY_CHECKS` or `FAKE_ONLY_CHECKS` tuple.
+
+**Three registries, not two.** `FAKE_ONLY_CHECKS` exists for checks that can only run
+against `FakeEngine` — e.g. because the only observable signal is `engine.calls` or another
+non-`Protocol` `FakeEngine` accessor with no real-engine equivalent, or because the check
+needs the root conftest's `engine_without_bake` fixture, which has no real-engine
+counterpart. A check goes here only when it *cannot* be made to hold against `BlenderEngine`
+even in principle — not as a shortcut. Register a new check in exactly one of the three
+tuples and add exactly one wrapper test, in the one `*_test.py` file that tuple belongs to:
+`UNIVERSAL_CHECKS` → both `conformance_test.py` and `blender_test.py`; `BLENDER_ONLY_CHECKS`
+→ `blender_test.py` only; `FAKE_ONLY_CHECKS` → `conformance_test.py` only. Before writing a
+new check as universal, actually run it against `FakeEngine` — `FakeEngine`'s crude
+approximations (e.g. `bevel_edges` never moves a vertex; `boolean`'s `difference`/
+`intersect` modes don't touch target geometry at all) have caught more than one
+plausible-looking universal check that turned out to only hold for a real CSG/mesh engine.
 
 ## Conventions specific to this module
 

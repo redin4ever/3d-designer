@@ -95,6 +95,23 @@ def test_duplicate_coincident_vertices_are_counted_correctly(engine) -> None:
     assert all(d.object_id == "dup" for d in result)
 
 
+def test_loose_vertex_with_no_attached_face_is_reported(engine) -> None:
+    """Every case above is a duplicate that is still attached to a face; a detector that
+    only walks coincidence candidates and never checks face attachment would miss a
+    genuinely disconnected vertex entirely — the other half of this defect class's own
+    name (``LOOSE_OR_DUPLICATE``)."""
+    verts, faces = unit_cube()
+    verts = list(verts) + [Vec3(9, 9, 9)]  # vertex 8: referenced by no face, far from any other
+
+    engine.create_mesh("loose", verts, faces)
+
+    result = find_loose_or_duplicate(engine, "loose")
+
+    assert len(result) == 1
+    assert result[0].defect_class is DefectClass.LOOSE_OR_DUPLICATE
+    assert result[0].object_id == "loose"
+
+
 def test_unit_scale_has_no_unapplied_transform(engine) -> None:
     """A false positive here would flag every ordinary object in a scene as broken,
     teaching an agent to ignore the one warning that actually matters."""
@@ -139,3 +156,18 @@ def test_one_reversed_face_reports_a_flipped_normal(engine) -> None:
     assert len(result) >= 1
     assert all(d.defect_class is DefectClass.FLIPPED_NORMAL for d in result)
     assert all(d.object_id == "flipped" for d in result)
+
+
+def test_one_reversed_face_reports_exactly_one_flipped_normal(engine) -> None:
+    """A detector that flags every face in the mesh once it finds any winding
+    inconsistency — rather than isolating the one face that is actually wrong — makes the
+    defect list useless for per-face repair: an agent asked to fix "the" flipped face has
+    no way to tell which of six reported faces is the real one."""
+    verts, faces = unit_cube()
+    faces = list(faces)
+    faces[0] = tuple(reversed(faces[0]))
+    engine.create_mesh("flipped_exact", verts, faces)
+
+    result = find_flipped_normals(engine, "flipped_exact")
+
+    assert len(result) == 1

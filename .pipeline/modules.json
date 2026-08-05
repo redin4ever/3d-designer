@@ -88,7 +88,7 @@
         "B-023",
         "B-024"
       ],
-      "status": "planned",
+      "status": "red",
       "note": "Construction library. Each operation carries a re-runnable acceptance query (ADR-005)."
     },
     {
@@ -183,7 +183,7 @@
         "B-010",
         "B-027"
       ],
-      "status": "planned",
+      "status": "red",
       "note": "Operation log + deterministic replay + per-op cache + undo-by-pointer + checkpoints. Emits SceneChangeEvent; never imports viewer."
     },
     {
@@ -202,7 +202,7 @@
         "B-015",
         "B-016"
       ],
-      "status": "planned",
+      "status": "red",
       "note": "Phase machine + single-writer lock + conflict flagging + check cadence policy + action-report assembly."
     },
     {
@@ -222,7 +222,7 @@
         "B-020",
         "B-022"
       ],
-      "status": "planned",
+      "status": "red",
       "note": "Roblox primary. Conversion is pure functions over plain data with round-trip fixtures; glTF bytes come from engine."
     },
     {

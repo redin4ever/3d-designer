@@ -192,3 +192,147 @@ def test_create_engine_returns_a_conforming_backend() -> None:
     eng = create_engine()
     assert isinstance(eng, EngineProtocol)
     assert eng.backend_name.startswith("bpy-")
+
+
+# ---------------------------------------------------------- added by a conformance audit
+
+def test_duplicate_produces_an_independent_copy(engine) -> None:
+    """If wrong: moving a duplicated object also moves the source it was copied from."""
+    conformance.check_duplicate_produces_an_independent_copy(engine)
+
+
+def test_delete_removes_exactly_the_named_object(engine) -> None:
+    """If wrong: delete removes the wrong object, or more than one — silent data loss."""
+    conformance.check_delete_removes_exactly_the_named_object(engine)
+
+
+def test_join_brings_source_vertices_into_the_targets_local_space(engine) -> None:
+    """If wrong: joined geometry appears offset by the source object's old transform."""
+    conformance.check_join_brings_source_vertices_into_the_targets_local_space(engine)
+
+
+def test_bevel_edges_moves_only_the_selected_edges_geometry(engine) -> None:
+    """If wrong: bevel_edges ignores which edges were selected and always bevels a fixed
+    set, enabling the blanket-bevel artificiality tell the Protocol docstring warns about."""
+    conformance.check_bevel_edges_moves_only_the_selected_edges_geometry(engine)
+
+
+def test_boolean_difference_removes_the_cutter(engine) -> None:
+    """If wrong: the cutter lingers after a difference and renders a second time."""
+    conformance.check_boolean_difference_removes_the_cutter(engine)
+
+
+def test_boolean_intersect_removes_the_cutter(engine) -> None:
+    """If wrong: the cutter lingers after an intersect and renders a second time."""
+    conformance.check_boolean_intersect_removes_the_cutter(engine)
+
+
+def test_solidify_thickens_by_the_requested_amount(engine) -> None:
+    """If wrong: a no-op or wrongly-scaled solidify ships a wall with no real thickness."""
+    conformance.check_solidify_thickens_by_the_requested_amount(engine)
+
+
+def test_decimate_reduces_the_polygon_count(engine) -> None:
+    """If wrong: a LOD request silently produces no LOD at all."""
+    conformance.check_decimate_reduces_the_polygon_count(engine)
+
+
+def test_recalculate_normals_inside_flips_the_winding(engine) -> None:
+    """If wrong: recalculate_normals(inside=True) is a no-op and produces no way to
+    deliberately generate inside-out geometry, with the render coming back wrong."""
+    conformance.check_recalculate_normals_inside_flips_the_winding(engine)
+
+
+def test_create_material_and_assign_material_reach_the_snapshot(engine) -> None:
+    """If wrong: an assigned material never reaches the object; the export ships bare."""
+    conformance.check_create_material_and_assign_material_reach_the_snapshot(engine)
+
+
+def test_export_gltf_threads_the_full_conversion_through(engine, tmp_path) -> None:
+    """If wrong: mirror_x/negate_rotation/scale are silently dropped before reaching the
+    exporter — the exact round-trip mirroring bug those parameters exist to prevent."""
+    conformance.check_export_gltf_threads_the_full_conversion_through(engine, tmp_path)
+
+
+def test_create_mesh_rejects_an_empty_vertex_list(engine) -> None:
+    """If wrong: a zero-vertex mesh is silently accepted and crashes something downstream,
+    far from where the bad input was actually supplied."""
+    conformance.check_create_mesh_rejects_an_empty_vertex_list(engine)
+
+
+def test_create_primitive_rejects_an_unknown_kind(engine) -> None:
+    """If wrong: a typo'd primitive kind is silently accepted instead of rejected."""
+    conformance.check_create_primitive_rejects_an_unknown_kind(engine)
+
+
+def test_boolean_rejects_an_unknown_mode(engine) -> None:
+    """If wrong: an invalid boolean mode is silently coerced to a default the caller never
+    asked for."""
+    conformance.check_boolean_rejects_an_unknown_mode(engine)
+
+
+def test_boolean_rejects_an_unknown_solver(engine) -> None:
+    """If wrong: an invalid solver is silently coerced, hiding the choice a caller made to
+    avoid a known solver bug."""
+    conformance.check_boolean_rejects_an_unknown_solver(engine)
+
+
+def test_solidify_rejects_non_positive_thickness(engine) -> None:
+    """If wrong: a zero/negative thickness silently produces a degenerate shell."""
+    conformance.check_solidify_rejects_non_positive_thickness(engine)
+
+
+def test_array_along_curve_rejects_non_positive_spacing(engine) -> None:
+    """If wrong: zero spacing hangs or silently produces one instance instead of erroring."""
+    conformance.check_array_along_curve_rejects_non_positive_spacing(engine)
+
+
+def test_array_along_curve_rejects_a_curve_with_fewer_than_two_points(engine) -> None:
+    """If wrong: a single-point "curve" silently places one instance instead of erroring."""
+    conformance.check_array_along_curve_rejects_a_curve_with_fewer_than_two_points(engine)
+
+
+def test_decimate_rejects_a_ratio_outside_the_unit_interval(engine) -> None:
+    """If wrong: an out-of-range ratio is silently clamped instead of rejected."""
+    conformance.check_decimate_rejects_a_ratio_outside_the_unit_interval(engine)
+
+
+def test_export_gltf_rejects_an_empty_object_list(engine, tmp_path) -> None:
+    """If wrong: an export with nothing selected silently reports success."""
+    conformance.check_export_gltf_rejects_an_empty_object_list(engine, tmp_path)
+
+
+def test_export_gltf_rejects_non_positive_scale(engine, tmp_path) -> None:
+    """If wrong: a zero/negative scale silently collapses or inverts the exported asset."""
+    conformance.check_export_gltf_rejects_non_positive_scale(engine, tmp_path)
+
+
+def test_set_pbr_rejects_an_unknown_material(engine) -> None:
+    """If wrong: writing PBR values to a nonexistent material silently does nothing."""
+    conformance.check_set_pbr_rejects_an_unknown_material(engine)
+
+
+def test_reset_clears_the_live_bpy_scene(engine) -> None:
+    """The naive-implementation catcher, direct-bpy edition: if list_objects() reads a
+    private Python-side ledger instead of bpy.data, reset() can clear that ledger and never
+    touch the live scene at all — every other check in this suite would still pass while
+    objects sit in bpy.data forever."""
+    conformance.check_reset_clears_the_live_bpy_scene(engine)
+
+
+def test_mark_seams_changes_the_subsequent_unwrap(engine) -> None:
+    """If wrong: a no-op mark_seams passes every other UV check, and the UV layout is wrong
+    for anything but the trivial default projection, with no error anywhere to catch it."""
+    conformance.check_mark_seams_changes_the_subsequent_unwrap(engine)
+
+
+def test_boolean_difference_bounds_stay_within_the_original_target(engine) -> None:
+    """If wrong: a difference operation grows the target instead of only ever cutting
+    material away from it — a real CSG solver must never do this."""
+    conformance.check_boolean_difference_bounds_stay_within_the_original_target(engine)
+
+
+def test_boolean_intersect_matches_the_geometric_overlap_bounds(engine) -> None:
+    """If wrong: intersect does not actually shrink to the geometric overlap of the two
+    inputs — the defining property of the operation."""
+    conformance.check_boolean_intersect_matches_the_geometric_overlap_bounds(engine)

@@ -59,6 +59,23 @@ def test_inspect_finds_the_hole_a_single_finder_would_find(engine) -> None:
     assert any(d.defect_class is DefectClass.BOUNDARY_HOLE for d in result)
 
 
+def test_inspect_finds_self_intersections_not_just_boundary_holes(engine) -> None:
+    """The only composition test above uses a boundary hole; an inspect() that composes
+    six of the seven single-object checks and silently forgets find_self_intersections
+    would still pass it, while dropping the one check that is a BLOCKER on import into an
+    engine or a slicer and is invisible to a render-based review either way."""
+    verts = [
+        Vec3(0, 0, 0), Vec3(4, 0, 0), Vec3(0, 4, 0),
+        Vec3(1, 1, -2), Vec3(1, 1, 2), Vec3(3, 1, 0),
+    ]
+    faces = [(0, 1, 2), (3, 4, 5)]
+    engine.create_mesh("cross", verts, faces)
+
+    result = inspect(engine, "cross")
+
+    assert any(d.defect_class is DefectClass.SELF_INTERSECTION for d in result)
+
+
 # ----------------------------------------------------------------------- is_watertight
 
 
@@ -77,6 +94,18 @@ def test_box_missing_a_face_is_not_watertight(engine) -> None:
     engine.create_mesh("open", verts, faces[:-1])
 
     assert is_watertight(engine, "open") is False
+
+
+def test_non_manifold_edge_makes_an_object_not_watertight(engine) -> None:
+    """Both existing is_watertight tests are decided purely by boundary holes; a version
+    that checks only find_boundary_holes and ignores find_non_manifold_edges would pass
+    both and still tell an agent a mesh is safe to export when it will fail on import into
+    an engine or a slicer — non-manifold edges are a BLOCKER for exactly that reason."""
+    verts = [Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(0, 1, 0), Vec3(0, -1, 0), Vec3(0, 0, 1)]
+    faces = [(0, 1, 2), (0, 1, 3), (0, 1, 4)]
+    engine.create_mesh("fan", verts, faces)
+
+    assert is_watertight(engine, "fan") is False
 
 
 # ------------------------------------------------------------------------------ report
@@ -124,6 +153,21 @@ def test_report_scope_covers_every_object_it_actually_examined(engine) -> None:
 
     assert "a" in rpt.scope
     assert "b" in rpt.scope
+
+
+def test_report_with_pairs_actually_runs_the_clipping_check(engine) -> None:
+    """The scope test above only checks scope membership, never rpt.defects. An
+    implementation that widens its declared scope textually to satisfy
+    MeasurementReport's validation but never actually calls find_clipping would pass that
+    test while reporting a clipping scene as clean — the exact silent-wrong-answer failure
+    ADR-005 exists to prevent."""
+    engine.create_primitive("a", "cube", Vec3(1, 1, 1))
+    engine.create_primitive("b", "cube", Vec3(1, 1, 1), Transform(translation=Vec3(0.5, 0, 0)))
+
+    rpt = report(engine, scope=("a",), pairs=[("a", "b")])
+
+    assert any(d.defect_class is DefectClass.PART_CLIPPING for d in rpt.defects)
+    assert rpt.is_clean is False
 
 
 # ---------------------------------------------------------------------------- evaluate
@@ -190,6 +234,57 @@ def test_evaluate_passes_when_the_forbidden_defect_is_absent(engine) -> None:
     result = evaluate(engine, query)
 
     assert result.passed is True
+
+
+def test_evaluate_lte_comparison_passes_when_actual_is_under_expected(engine) -> None:
+    """Budget-style "at most N" queries (Gate A 12.2's polygon budgets) are the main real
+    use of Comparison.LTE; if it is never exercised, an implementation that only handles
+    EQ, or that silently treats LTE as GTE, would ship undetected and every polygon-budget
+    acceptance check would pass or fail for the wrong reason."""
+    engine.create_primitive("box", "cube", Vec3(1, 1, 1))
+    actual_tris = engine.snapshot("box").triangle_count
+    query = AcceptanceQuery(
+        query_id="q-lte", description="triangle budget", metric=MetricKind.TRIANGLE_COUNT,
+        subject="box", expected=float(actual_tris + 100), tolerance=1e-6,
+        comparison=Comparison.LTE,
+    )
+
+    result = evaluate(engine, query)
+
+    assert result.passed is True
+
+
+def test_evaluate_gte_comparison_fails_when_actual_is_under_expected(engine) -> None:
+    """The mirror image of LTE — a "must be at least N" floor (a minimum detail level or
+    volume) is only meaningful if falling below the floor is actually detected rather than
+    silently reported as passing by a comparison that is never exercised."""
+    engine.create_primitive("box", "cube", Vec3(1.0, 1.0, 1.0))
+    query = AcceptanceQuery(
+        query_id="q-gte", description="volume floor", metric=MetricKind.VOLUME,
+        subject="box", expected=5.0, tolerance=1e-6, comparison=Comparison.GTE,
+    )
+
+    result = evaluate(engine, query)
+
+    assert result.passed is False
+
+
+def test_evaluate_pairwise_metric_resolves_the_subject_split_on_pipe(engine) -> None:
+    """AcceptanceQuery.subject follows Measurement.subject's own "a|b" convention for a
+    pairwise metric; an evaluate() that only knows how to look up a single-object subject
+    would mis-resolve "a|b" as one unknown object id instead of a pair, breaking every
+    acceptance query written against distance, angle, or gap_width."""
+    engine.create_primitive("a", "cube", Vec3(1, 1, 1))
+    engine.create_primitive("b", "cube", Vec3(1, 1, 1), Transform(translation=Vec3(1.5, 0, 0)))
+    query = AcceptanceQuery(
+        query_id="q-pairwise", description="a and b are 0.5m apart", metric=MetricKind.DISTANCE,
+        subject="a|b", expected=0.5, tolerance=1e-3, comparison=Comparison.EQ,
+    )
+
+    result = evaluate(engine, query)
+
+    assert result.passed is True
+    assert result.actual == pytest.approx(0.5, abs=1e-3)
 
 
 # ------------------------------------------------------------------------------ purity

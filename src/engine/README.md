@@ -30,9 +30,16 @@ engine/
   exporting.py             ExportOps     — glTF/GLB via Blender's own exporter
   raw.py                   RawOps        — execute() (ADR-009)
   conformance.py            barrel for the shared behavioural checks below
-  conformance_*.py          one check-file per actor, same split as above
-  conformance_test.py       every universal check, run against FakeEngine — no marker
-  blender_test.py           every check, run against real BlenderEngine — needs_blender
+  conformance_mesh.py        conformance_modifiers.py    conformance_boolean.py
+  conformance_shape.py       conformance_surfacing.py    conformance_materials.py
+  conformance_exporting.py   conformance_raw.py          conformance_session.py
+  conformance_validation.py  one check-file per actor (or, for conformance_boolean.py,
+                              conformance_shape.py, conformance_materials.py and
+                              conformance_validation.py, per a concern with no actor file
+                              of its own — see conformance.py's docstring)
+  conformance_test.py       every universal + fake-only check, against FakeEngine — no marker
+  blender_test.py           every universal + Blender-only check, against real BlenderEngine
+                             — needs_blender
 ```
 
 `BlenderEngine` is `MeshOpsMixin` + `ModifierOpsMixin` + `SurfacingMixin` + `ExportingMixin`
@@ -42,16 +49,25 @@ construction, `backend_name`, `reset()`.
 ## The conformance suite
 
 `FakeEngine` is the specification. Every behavioural assertion in `conformance_*.py` is
-written once as a plain function taking an `engine: EngineProtocol`, then run twice:
+written once as a plain function taking an `engine: EngineProtocol`, then run against one or
+both engines depending on which of three registries in `conformance.py` it belongs to:
 
-- `conformance_test.py` — against `FakeEngine`, always, on any machine.
-- `blender_test.py` — against the real `BlenderEngine`, `@pytest.mark.needs_blender`,
-  skipped automatically (by the root `conftest.py`) when `bpy` is not importable.
+- `UNIVERSAL_CHECKS` — run from both `conformance_test.py` (against `FakeEngine`, always, on
+  any machine) and `blender_test.py` (against the real `BlenderEngine`,
+  `@pytest.mark.needs_blender`, skipped automatically by the root `conftest.py` when `bpy`
+  is not importable).
+- `BLENDER_ONLY_CHECKS` — run only from `blender_test.py`. `FakeEngine` does not simulate
+  the behaviour faithfully enough for the check to mean anything against it (e.g.
+  `backend_name` format, `export_gltf`'s actual file output, a real CSG solver's exact
+  bounds on `boolean`'s `difference`/`intersect` modes, `bevel_edges` actually moving the
+  selected edge's vertices — `FakeEngine`'s bevel only inflates a face count).
+- `FAKE_ONLY_CHECKS` — run only from `conformance_test.py`. The check depends on something
+  only `FakeEngine` has: `.calls` introspection, a test-only accessor, or the root
+  conftest's `engine_without_bake` fixture.
 
-If `BlenderEngine` disagrees with `FakeEngine` on one of these checks, every module tested
-against the fake is testing a lie. A handful of checks are Blender-only (`backend_name`
-format, `export_gltf`'s actual file output) because `FakeEngine` does not simulate them —
-see the module docstring in `conformance.py` for exactly which, and why.
+If `BlenderEngine` disagrees with `FakeEngine` on a universal check, every module tested
+against the fake is testing a lie. See the module docstring in `conformance.py` for exactly
+which checks are in each of the other two registries, and why.
 
 ## Working here (ADR-001 constraints, verified in this environment)
 
@@ -64,7 +80,9 @@ see the module docstring in `conformance.py` for exactly which, and why.
   `blender.exe`).
 - **A fresh `bpy` scene is not empty.** It holds a default cube, camera and light. `reset()`
   must clear all of it, not just objects this session created — see
-  `conformance_session.check_reset_leaves_zero_objects`.
+  `conformance_session.check_reset_leaves_zero_objects` and, more pointedly,
+  `check_reset_clears_the_live_bpy_scene`, which reads `bpy.data.objects` directly rather
+  than through `list_objects()` so a private Python-side ledger cannot fake its way past it.
 - **Blender stores UV coordinates per face-corner, not per vertex.** `MeshSnapshot` requires
   exactly one UV per vertex; satisfying that across a seam may mean splitting vertices in
   `snapshot()`.

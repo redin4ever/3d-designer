@@ -1,4 +1,4 @@
-"""Runs every universal conformance check against ``FakeEngine``.
+"""Runs every universal + fake-only conformance check against ``FakeEngine``.
 
 No ``needs_blender`` marker: this file always runs, on any machine, with no Blender
 installed. It is the "control" side of the conformance suite (``src/engine/
@@ -9,6 +9,9 @@ touched) or a check's own assumption about the shared contract is wrong.
 
 Uses the root ``engine`` fixture from ``conftest.py`` — a fresh ``FakeEngine()`` per test —
 rather than defining its own, so it cannot drift from what every other module's suite uses.
+The three fake-only checks at the bottom of this file (``conformance.FAKE_ONLY_CHECKS``) run
+only here, never from ``blender_test.py`` — see ``conformance.py``'s module docstring for
+why each depends on something only ``FakeEngine`` has.
 """
 
 from __future__ import annotations
@@ -152,3 +155,142 @@ def test_execute_propagates_a_raising_source(engine: FakeEngine) -> None:
     """If wrong: execute() swallows or rewraps the caller's exception, breaking every call
     site's own wrapper, which expects the original exception as __cause__."""
     conformance.check_execute_propagates_a_raising_source(engine)
+
+
+# ---------------------------------------------------------- added by a conformance audit
+
+def test_duplicate_produces_an_independent_copy(engine: FakeEngine) -> None:
+    """If wrong: moving a duplicated object also moves the source it was copied from."""
+    conformance.check_duplicate_produces_an_independent_copy(engine)
+
+
+def test_delete_removes_exactly_the_named_object(engine: FakeEngine) -> None:
+    """If wrong: delete removes the wrong object, or more than one — silent data loss."""
+    conformance.check_delete_removes_exactly_the_named_object(engine)
+
+
+def test_join_brings_source_vertices_into_the_targets_local_space(engine: FakeEngine) -> None:
+    """If wrong: joined geometry appears offset by the source object's old transform."""
+    conformance.check_join_brings_source_vertices_into_the_targets_local_space(engine)
+
+
+def test_boolean_difference_removes_the_cutter(engine: FakeEngine) -> None:
+    """If wrong: the cutter lingers after a difference and renders a second time."""
+    conformance.check_boolean_difference_removes_the_cutter(engine)
+
+
+def test_boolean_intersect_removes_the_cutter(engine: FakeEngine) -> None:
+    """If wrong: the cutter lingers after an intersect and renders a second time."""
+    conformance.check_boolean_intersect_removes_the_cutter(engine)
+
+
+def test_solidify_thickens_by_the_requested_amount(engine: FakeEngine) -> None:
+    """If wrong: a no-op or wrongly-scaled solidify ships a wall with no real thickness."""
+    conformance.check_solidify_thickens_by_the_requested_amount(engine)
+
+
+def test_decimate_reduces_the_polygon_count(engine: FakeEngine) -> None:
+    """If wrong: a LOD request silently produces no LOD at all."""
+    conformance.check_decimate_reduces_the_polygon_count(engine)
+
+
+def test_recalculate_normals_inside_flips_the_winding(engine: FakeEngine) -> None:
+    """If wrong: recalculate_normals(inside=True) is a no-op and produces no way to
+    deliberately generate inside-out geometry, with the render coming back wrong."""
+    conformance.check_recalculate_normals_inside_flips_the_winding(engine)
+
+
+def test_create_material_and_assign_material_reach_the_snapshot(engine: FakeEngine) -> None:
+    """If wrong: an assigned material never reaches the object; the export ships bare."""
+    conformance.check_create_material_and_assign_material_reach_the_snapshot(engine)
+
+
+def test_export_gltf_threads_the_full_conversion_through(engine: FakeEngine, tmp_path) -> None:
+    """If wrong: mirror_x/negate_rotation/scale are silently dropped before reaching the
+    exporter — the exact round-trip mirroring bug those parameters exist to prevent."""
+    conformance.check_export_gltf_threads_the_full_conversion_through(engine, tmp_path)
+
+
+def test_create_mesh_rejects_an_empty_vertex_list(engine: FakeEngine) -> None:
+    """If wrong: a zero-vertex mesh is silently accepted and crashes something downstream,
+    far from where the bad input was actually supplied."""
+    conformance.check_create_mesh_rejects_an_empty_vertex_list(engine)
+
+
+def test_create_primitive_rejects_an_unknown_kind(engine: FakeEngine) -> None:
+    """If wrong: a typo'd primitive kind is silently accepted instead of rejected."""
+    conformance.check_create_primitive_rejects_an_unknown_kind(engine)
+
+
+def test_boolean_rejects_an_unknown_mode(engine: FakeEngine) -> None:
+    """If wrong: an invalid boolean mode is silently coerced to a default the caller never
+    asked for."""
+    conformance.check_boolean_rejects_an_unknown_mode(engine)
+
+
+def test_boolean_rejects_an_unknown_solver(engine: FakeEngine) -> None:
+    """If wrong: an invalid solver is silently coerced, hiding the choice a caller made to
+    avoid a known solver bug."""
+    conformance.check_boolean_rejects_an_unknown_solver(engine)
+
+
+def test_solidify_rejects_non_positive_thickness(engine: FakeEngine) -> None:
+    """If wrong: a zero/negative thickness silently produces a degenerate shell."""
+    conformance.check_solidify_rejects_non_positive_thickness(engine)
+
+
+def test_array_along_curve_rejects_non_positive_spacing(engine: FakeEngine) -> None:
+    """If wrong: zero spacing hangs or silently produces one instance instead of erroring."""
+    conformance.check_array_along_curve_rejects_non_positive_spacing(engine)
+
+
+def test_array_along_curve_rejects_a_curve_with_fewer_than_two_points(
+    engine: FakeEngine,
+) -> None:
+    """If wrong: a single-point "curve" silently places one instance instead of erroring."""
+    conformance.check_array_along_curve_rejects_a_curve_with_fewer_than_two_points(engine)
+
+
+def test_decimate_rejects_a_ratio_outside_the_unit_interval(engine: FakeEngine) -> None:
+    """If wrong: an out-of-range ratio is silently clamped instead of rejected."""
+    conformance.check_decimate_rejects_a_ratio_outside_the_unit_interval(engine)
+
+
+def test_export_gltf_rejects_an_empty_object_list(engine: FakeEngine, tmp_path) -> None:
+    """If wrong: an export with nothing selected silently reports success."""
+    conformance.check_export_gltf_rejects_an_empty_object_list(engine, tmp_path)
+
+
+def test_export_gltf_rejects_non_positive_scale(engine: FakeEngine, tmp_path) -> None:
+    """If wrong: a zero/negative scale silently collapses or inverts the exported asset."""
+    conformance.check_export_gltf_rejects_non_positive_scale(engine, tmp_path)
+
+
+def test_set_pbr_rejects_an_unknown_material(engine: FakeEngine) -> None:
+    """If wrong: writing PBR values to a nonexistent material silently does nothing."""
+    conformance.check_set_pbr_rejects_an_unknown_material(engine)
+
+
+def test_boolean_solver_choice_is_threaded_through(engine: FakeEngine) -> None:
+    """Fake-only (see conformance.py): the only way to catch a solver argument silently
+    coerced to a fixed default, since two trivial cubes cannot show a geometric difference
+    between fast/exact/manifold."""
+    conformance.check_boolean_solver_choice_is_threaded_through(engine)
+
+
+def test_set_pbr_updates_roughness_observably(engine: FakeEngine) -> None:
+    """Fake-only (see conformance.py): no Protocol-level accessor reads PBR values back,
+    so a no-op set_pbr would otherwise be invisible to this whole suite."""
+    conformance.check_set_pbr_updates_roughness_observably(engine)
+
+
+def test_bake_raises_engine_unavailable_when_capability_is_absent(
+    engine_without_bake: FakeEngine,
+) -> None:
+    """Fake-only (see conformance.py): the deterministic complement to
+    check_bake_succeeds_or_raises_capability_error, which is permissive because the plain
+    engine fixture always supports bake. Uses the root conftest's engine_without_bake
+    fixture, which simulates 'no windowed context' unconditionally."""
+    conformance.check_bake_raises_engine_unavailable_when_capability_is_absent(
+        engine_without_bake
+    )

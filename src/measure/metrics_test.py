@@ -49,6 +49,20 @@ def test_bounds_reports_the_right_metric_kind_and_subject(engine) -> None:
     assert m.subject == "box"
 
 
+def test_bounds_value_differs_between_objects_at_different_positions(engine) -> None:
+    """A hardcoded or local-space bounds() would report the same value for every object
+    regardless of where it actually sits in the scene — silently breaking every
+    broad-phase clipping and gap query that trusts this number to place the object in the
+    world rather than at the origin."""
+    engine.create_primitive("a", "cube", Vec3(1, 1, 1), Transform(translation=Vec3(0, 0, 0)))
+    engine.create_primitive("b", "cube", Vec3(1, 1, 1), Transform(translation=Vec3(10, 0, 0)))
+
+    m_a = bounds(engine, "a")
+    m_b = bounds(engine, "b")
+
+    assert m_a.value != m_b.value
+
+
 def test_distance_between_separated_boxes(engine) -> None:
     """This is the number that replaces a human eyeballing "0.5m apart" from a render —
     get it wrong and every spacing decision downstream is built on a guess."""
@@ -98,6 +112,19 @@ def test_gap_width_of_overlapping_parts_is_zero(engine) -> None:
     assert m.value >= 0.0
 
 
+def test_gap_width_of_separated_boxes_matches_the_actual_gap(engine) -> None:
+    """Every existing gap_width test uses the overlapping case, where the correct answer
+    is 0 — exactly the value a stub that just forwards to distance() (or one that is
+    simply hardcoded to 0) would also produce. This is the case that actually exercises
+    the metric a "close every gap under 5mm" task is defined against."""
+    engine.create_primitive("a", "cube", Vec3(1, 1, 1))
+    engine.create_primitive("b", "cube", Vec3(1, 1, 1), Transform(translation=Vec3(1.5, 0, 0)))
+
+    m = gap_width(engine, "a", "b")
+
+    assert m.value == pytest.approx(0.5, abs=1e-6)
+
+
 def test_triangle_count_matches_the_snapshot(engine) -> None:
     """A wrong triangle count corrupts every polygon-budget check downstream (Gate A 12.2)
     — the export banner would understate or overstate the exact thing it exists to warn
@@ -120,6 +147,26 @@ def test_volume_of_a_unit_cube_is_one(engine) -> None:
 
     assert m.kind is MetricKind.VOLUME
     assert m.value == pytest.approx(1.0, rel=1e-3)
+
+
+def test_volume_of_a_pyramid_is_not_its_bounding_box(engine) -> None:
+    """Enclosed volume and bounding-box volume are identical on an axis-aligned cube, so
+    the test above cannot tell a correct implementation apart from one that just multiplies
+    the AABB's extents. A square pyramid can: true volume is 8/3, its bounding box's is
+    8.0 — three times too large — so a bbox-volume stub is caught here."""
+    verts = [
+        Vec3(-1, -1, 0), Vec3(1, -1, 0), Vec3(1, 1, 0), Vec3(-1, 1, 0),  # base, wound for -Z
+        Vec3(0, 0, 2),  # apex
+    ]
+    faces = [
+        (0, 3, 2, 1),  # base quad, outward normal -Z
+        (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4),  # four outward-wound side faces
+    ]
+    engine.create_mesh("pyramid", verts, faces)
+
+    m = volume(engine, "pyramid")
+
+    assert m.value == pytest.approx(8.0 / 3.0, rel=1e-3)
 
 
 def test_angle_between_identical_upright_posts_is_zero(engine) -> None:

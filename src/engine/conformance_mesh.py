@@ -20,6 +20,9 @@ __all__ = [
     "check_create_primitive_returns_the_actual_assigned_id",
     "check_apply_transform_bakes_scale_into_vertices",
     "check_unknown_object_error_names_what_exists",
+    "check_duplicate_produces_an_independent_copy",
+    "check_delete_removes_exactly_the_named_object",
+    "check_join_brings_source_vertices_into_the_targets_local_space",
 ]
 
 
@@ -83,3 +86,60 @@ def check_unknown_object_error_names_what_exists(engine: EngineProtocol) -> None
 
     assert exc.value.rule == "engine.unknown_object"
     assert "floor" in exc.value.suggestion, "the error should say what does exist"
+
+
+def check_duplicate_produces_an_independent_copy(engine: EngineProtocol) -> None:
+    """Added in response to a conformance audit: ``duplicate`` was never called directly,
+    only reached incidentally inside ``array_along_curve``. If the copy shares vertex or
+    transform state with the source, moving one moves both — invisible until an agent asks
+    why every post it duplicated also moved."""
+    oid = engine.create_primitive("post", "cube", Vec3(0.1, 0.1, 0.5))
+    copy_id = engine.duplicate(oid, "post_copy")
+
+    engine.set_transform(copy_id, Transform(translation=Vec3(5, 5, 5)))
+
+    original_centre = engine.world_bounds(oid).centre
+    assert original_centre.x == pytest.approx(0.0, abs=1e-6)
+    assert original_centre.y == pytest.approx(0.0, abs=1e-6)
+    assert original_centre.z == pytest.approx(0.0, abs=1e-6)
+    copy_centre = engine.world_bounds(copy_id).centre
+    assert copy_centre.x == pytest.approx(5.0, abs=1e-6)
+
+
+def check_delete_removes_exactly_the_named_object(engine: EngineProtocol) -> None:
+    """Added in response to a conformance audit: ``delete`` was never called directly. A
+    delete that removes the wrong object, or more than one, is a silent data-loss bug no
+    other check would surface."""
+    keep = engine.create_primitive("keep", "cube", Vec3(1, 1, 1))
+    doomed = engine.create_primitive("doomed", "cube", Vec3(1, 1, 1))
+
+    engine.delete(doomed)
+
+    assert not engine.exists(doomed)
+    assert engine.exists(keep)
+
+
+def check_join_brings_source_vertices_into_the_targets_local_space(
+    engine: EngineProtocol,
+) -> None:
+    """Added in response to a conformance audit: ``join`` was never called directly, only
+    reached incidentally inside ``boolean``'s union mode. If it naively concatenates each
+    source's local-space vertices without accounting for that source's own transform, the
+    joined geometry appears in the wrong place — offset by whatever the source's transform
+    used to be."""
+    target = engine.create_primitive("join_target", "cube", Vec3(1, 1, 1))
+    source = engine.create_primitive(
+        "join_source", "cube", Vec3(1, 1, 1), Transform(translation=Vec3(3, 0, 0))
+    )
+    target_bounds_before = engine.world_bounds(target)
+    source_bounds_before = engine.world_bounds(source)
+
+    engine.join(target, [source])
+
+    assert not engine.exists(source)
+    joined_bounds = engine.world_bounds(target)
+    # the joined result must span at least both original world extents — if source
+    # vertices landed un-translated (still in their own local space), the result would be
+    # too small to reach the source's original position.
+    assert joined_bounds.maximum.x >= source_bounds_before.maximum.x - 1e-6
+    assert joined_bounds.minimum.x <= target_bounds_before.minimum.x + 1e-6

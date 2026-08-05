@@ -71,6 +71,26 @@ def test_overlap_deeper_than_declared_intent_still_reports(engine) -> None:
     assert result[0].defect_class is DefectClass.PART_CLIPPING
 
 
+def test_joinery_intent_only_covers_the_pair_it_names(engine) -> None:
+    """An implementation that applies any declared intent's depth to every overlapping
+    pair in the batch — instead of checking which two specific objects the intent names —
+    would silence real clipping anywhere in the scene the moment a single joint is
+    declared legitimate. Two independent pairs prove the intent is matched per-pair, not
+    applied globally: the pair it does not name must still report."""
+    _box(engine, "a", 0.0)
+    _box(engine, "b", 0.97)  # a-b overlap 0.03, NOT covered by the intent below
+    _box(engine, "c", 5.0)
+    _box(engine, "d", 5.97)  # c-d overlap 0.03, matches the intent below exactly
+    intent = JoineryIntent(object_id="d", into_object_id="c", depth=0.05)
+
+    result = find_clipping(engine, [("a", "b"), ("c", "d")], joinery=[intent])
+
+    assert len(result) == 1
+    found = result[0]
+    assert found.defect_class is DefectClass.PART_CLIPPING
+    assert {found.object_id, found.other_object_id} == {"a", "b"}
+
+
 def test_touching_objects_report_no_clipping(engine) -> None:
     """A false positive on mere contact would flag every ordinary abutting joint in a scene
     as a defect, burying the genuine clipping cases in noise."""
@@ -108,6 +128,18 @@ def test_visual_gap_above_max_gap_threshold_is_not_reported(engine) -> None:
     _box(engine, "b", 1.005)  # same 5mm gap
 
     assert find_visual_gaps(engine, [("a", "b")], max_gap=0.001) == ()
+
+
+def test_visual_gap_is_not_reported_for_objects_that_touch(engine) -> None:
+    """The docstring requires a gap strictly greater than zero; an implementation using
+    ``0 <= gap <= max_gap`` instead of ``0 < gap <= max_gap`` would flag every ordinary
+    abutting joint in a scene as a visual gap, burying the genuine ones in noise — exactly
+    the touching case ``find_clipping`` already has a dedicated test for, but
+    ``find_visual_gaps`` does not."""
+    _box(engine, "a", 0.0)  # spans [-0.5, 0.5]
+    _box(engine, "b", 1.0)  # spans [0.5, 1.5] -> touches a at x=0.5, zero gap
+
+    assert find_visual_gaps(engine, [("a", "b")], max_gap=0.5) == ()
 
 
 def test_clean_mesh_has_no_self_intersections(engine) -> None:

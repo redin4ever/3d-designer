@@ -7,10 +7,10 @@ python -m pytest src/raw
 ```
 
 No markers, no `bpy`, no fixtures beyond the root `engine` fixture (`conftest.py` at the
-repo root — do not redefine it here). Currently 11 tests, 2 green (`RAW_TOOL_SPEC` checks
-— it is real, constructed data, not a stub) and 9 red with `NotImplementedError` until
+repo root — do not redefine it here). Currently 13 tests, 2 green (`RAW_TOOL_SPEC` checks
+— it is real, constructed data, not a stub) and 11 red with `NotImplementedError` until
 `execute`/`describe_risk` are implemented. A change that makes the red count anything
-other than 0 or 9 needs an explanation in the commit message.
+other than 0 or 11 needs an explanation in the commit message.
 
 ## Ownership
 

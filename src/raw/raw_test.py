@@ -81,6 +81,28 @@ def test_objects_before_and_after_bracket_the_change_accurately(engine: FakeEngi
     assert "new" in result.objects_after and "new" not in result.objects_before
 
 
+def test_an_object_created_then_deleted_within_the_same_script_is_reported_in_neither(
+    engine: FakeEngine,
+) -> None:
+    """A transient object never appears in ``objects_before`` or ``objects_after``, so a
+    diff-based implementation reports it in neither ``created`` nor ``removed``. A
+    text-scanning implementation — one that greps ``source`` for
+    ``create_primitive(``/``delete(`` calls and their literal string arguments instead of
+    diffing real engine state — would report this object as created, because the create
+    call is textually present. A caller acting on that would look for geometry that was
+    never actually left behind in the scene."""
+    result = execute(
+        engine,
+        "engine.create_primitive('temp', 'cube', Vec3(1, 1, 1))\nengine.delete('temp')",
+        namespace={"Vec3": Vec3},
+    )
+
+    assert result.ok is True
+    assert "temp" not in result.created
+    assert "temp" not in result.removed
+    assert not engine.exists("temp")
+
+
 def test_returned_carries_only_plain_values_the_script_newly_bound(
     engine: FakeEngine,
 ) -> None:
@@ -150,6 +172,32 @@ def test_a_script_that_raises_partway_through_keeps_what_it_already_created(
     assert engine.exists("half")
     assert "half" in result.created
     assert "half" in result.objects_after
+
+
+def test_partial_application_and_failure_are_both_reported_accurately_together(
+    engine: FakeEngine,
+) -> None:
+    """The realistic failure case is not "created something" or "deleted something" or
+    "raised" in isolation — a long script that fails partway through is likely to have done
+    some of each at once. Object ``a`` genuinely exists that did not before the call,
+    object ``b`` genuinely no longer exists, and the call still did not complete. A report
+    that gets any one of those three facts wrong while accurately reporting the other two
+    is exactly the report an agent would trust and act on incorrectly."""
+    engine.create_primitive("b", "cube", Vec3(1, 1, 1))
+
+    result = execute(
+        engine,
+        "engine.create_primitive('a', 'cube', Vec3(1, 1, 1))\n"
+        "engine.delete('b')\n"
+        "raise RuntimeError('stop')",
+        namespace={"Vec3": Vec3},
+    )
+
+    assert result.ok is False
+    assert "a" in result.created
+    assert "b" in result.removed
+    assert engine.exists("a")
+    assert not engine.exists("b")
 
 
 def test_empty_or_whitespace_only_script_is_rejected_without_executing(
