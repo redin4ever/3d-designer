@@ -1,0 +1,150 @@
+"""Material, UV, bake and export halves of :class:`FakeEngine`.
+
+Split from the mesh/modifier core because it is a distinct actor — surfacing rather than
+geometry — and because it is where the one interesting failure lives: ``bake`` can raise
+:class:`EngineUnavailable`, since baking generally needs a windowed Blender context that
+in-process ``bpy`` does not have. Tests that need to exercise that path construct the
+engine with ``bake_supported=False``.
+"""
+
+from __future__ import annotations
+
+from typing import Sequence
+
+from contracts import EngineError, EngineUnavailable
+
+__all__ = ["FakeSurfacingMixin"]
+
+
+class FakeSurfacingMixin:
+    """Requires ``_get``, ``_record``, ``world_bounds`` and ``_bake_supported`` from the
+    core. Kept as a mixin rather than a collaborator because these operations mutate the
+    same object records the core owns; a collaborator would need the core's internals,
+    which is the definition of a false seam."""
+
+    # -------------------------------------------------------------- materials
+
+    def create_material(self, name: str, base_color: tuple[float, float, float]) -> str:
+        self._materials[name] = {"base_color": base_color, "roughness": 0.5, "metallic": 0.0}
+        self._record("create_material", name)
+        return name
+
+    def set_pbr(
+        self,
+        material_id: str,
+        *,
+        base_color: tuple[float, float, float] | None = None,
+        roughness: float | None = None,
+        metallic: float | None = None,
+    ) -> None:
+        if material_id not in self._materials:
+            raise EngineError(
+                "engine.unknown_material",
+                f"no material named {material_id!r}",
+                f"known: {', '.join(sorted(self._materials)) or '(none)'}",
+            )
+        mat = self._materials[material_id]
+        if base_color is not None:
+            mat["base_color"] = base_color
+        if roughness is not None:
+            mat["roughness"] = roughness
+        if metallic is not None:
+            mat["metallic"] = metallic
+        self._record("set_pbr", material_id)
+
+    def material(self, material_id: str) -> dict:
+        """Test-only accessor — not part of ``EngineProtocol``. Lets a detail-pass test
+        assert that roughness actually varies across a surface rather than asserting that
+        ``set_pbr`` was called."""
+        return dict(self._materials[material_id])
+
+    def assign_material(self, object_id: str, material_id: str, slot: int = 0) -> None:
+        obj = self._get(object_id)
+        if material_id not in self._materials:
+            raise EngineError("engine.unknown_material", f"no material named {material_id!r}")
+        while len(obj.materials) <= slot:
+            obj.materials.append("")
+        obj.materials[slot] = material_id
+        self._record("assign_material", object_id, material_id, slot)
+
+    # -------------------------------------------------------------- uv and bake
+
+    def unwrap(self, object_id: str, *, method: str = "angle_based", margin: float = 0.001) -> None:
+        obj = self._get(object_id)
+        bounds = self.world_bounds(object_id)
+        size = bounds.size
+        sx = size.x if size.x > 1e-9 else 1.0
+        sy = size.y if size.y > 1e-9 else 1.0
+        # A planar XY projection. Enough for tests asserting UVs exist and stay in [0,1];
+        # nothing should assert on the exact layout, which is Blender's business.
+        obj.uvs = [
+            (
+                (obj.transform.apply(v).x - bounds.minimum.x) / sx,
+                (obj.transform.apply(v).y - bounds.minimum.y) / sy,
+            )
+            for v in obj.vertices
+        ]
+        obj.unwrapped = True
+        self._record("unwrap", object_id, method, margin)
+
+    def mark_seams(self, object_id: str, edge_indices: Sequence[int]) -> None:
+        obj = self._get(object_id)
+        obj.seams.update(edge_indices)
+        self._record("mark_seams", object_id, tuple(edge_indices))
+
+    def bake(
+        self, object_id: str, channels: Sequence[str], resolution: int, output_dir: str
+    ) -> dict[str, str]:
+        if not self._bake_supported:
+            raise EngineUnavailable("bake")
+        obj = self._get(object_id)
+        if not obj.unwrapped:
+            raise EngineError(
+                "engine.not_unwrapped",
+                f"{object_id} has no UVs",
+                "call unwrap() before bake()",
+            )
+        if resolution <= 0 or resolution & (resolution - 1):
+            raise EngineError(
+                "engine.bad_resolution",
+                f"resolution {resolution} is not a positive power of two",
+                "use 512, 1024, 2048 or 4096",
+            )
+        self._record("bake", object_id, tuple(channels), resolution)
+        return {c: f"{output_dir}/{object_id}_{c}.png" for c in channels}
+
+    # -------------------------------------------------------------- export
+
+    def export_gltf(
+        self,
+        object_ids: Sequence[str],
+        path: str,
+        *,
+        y_up: bool,
+        apply_modifiers: bool = True,
+    ) -> str:
+        if not object_ids:
+            raise EngineError(
+                "engine.nothing_to_export",
+                "no objects were selected for export",
+                "pass at least one object id",
+            )
+        for oid in object_ids:
+            self._get(oid)
+        self._record("export_gltf", tuple(object_ids), path, y_up)
+        return path
+
+    # -------------------------------------------------------------- raw
+
+    def execute(self, source: str, namespace: dict | None = None) -> dict:
+        """Unrestricted, by explicit decision (ADR-009). No sandbox, no allowlist.
+
+        The fake behaves exactly like the real thing here on purpose: a test that proves
+        raw execution is recorded as an undo barrier must run against something that
+        actually executes.
+        """
+        ns = dict(namespace or {})
+        ns.setdefault("engine", self)
+        exec(source, ns)  # noqa: S102 — this is the module's entire purpose
+        self._record("execute", source[:64])
+        return ns

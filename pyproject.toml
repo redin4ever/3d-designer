@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forge3d"
+version = "0.1.0"
+description = "Live 3D authoring for AI agents — computes spatial truth so the model never has to guess it"
+requires-python = "==3.13.*"
+dependencies = [
+  "mcp>=1.2.0",
+  "starlette>=0.37",
+  "uvicorn>=0.30",
+  "websockets>=13",
+  "numpy>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "pytest-timeout>=2.3",
+]
+# bpy is NOT listed here on purpose. It is a 338 MB wheel locked to exactly Python 3.13
+# and is installed separately (`pip install bpy`). Only src/engine/ imports it, and only
+# engine's own tests need it — see docs/TESTING.md.
+
+[project.scripts]
+forge3d = "forge3d_cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["src"]
+python_files = ["*_test.py", "test_*.py"]
+addopts = "-q --strict-markers --timeout=60"
+markers = [
+  "needs_blender: requires a real bpy import; skipped automatically when bpy is unavailable",
+]
+filterwarnings = ["error::DeprecationWarning"]

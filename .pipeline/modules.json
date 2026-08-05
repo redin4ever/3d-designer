@@ -1,1 +1,167 @@
-{ "version": 1, "modules": [] }
+{
+  "version": 1,
+  "iteration": 1,
+  "note": "dependsOn governs INTEGRATION order, not start order. Every module compiles against frozen protocols in src/contracts/ and is testable against FakeEngine, so modules may be built in parallel. See docs/ARCHITECTURE.md.",
+  "modules": [
+    {
+      "id": "engine",
+      "owner": "agent:engine",
+      "paths": ["src/engine/**"],
+      "publicInterface": "src/engine/__init__.py",
+      "dependsOn": ["contracts"],
+      "backlogItems": ["B-002"],
+      "status": "planned",
+      "note": "THE ONLY MODULE THAT MAY IMPORT bpy. Its tests are the only ones needing a real Blender."
+    },
+    {
+      "id": "spatial",
+      "owner": "agent:spatial",
+      "paths": ["src/spatial/**"],
+      "publicInterface": "src/spatial/__init__.py",
+      "dependsOn": ["contracts"],
+      "backlogItems": ["B-005"],
+      "status": "planned",
+      "note": "BVH invalidation is a silent-wrong-answer risk (ADR-011): needs direct tests, not integration coverage."
+    },
+    {
+      "id": "measure",
+      "owner": "agent:measure",
+      "paths": ["src/measure/**"],
+      "publicInterface": "src/measure/__init__.py",
+      "dependsOn": ["contracts", "spatial"],
+      "backlogItems": ["B-003", "B-004", "B-006"],
+      "status": "planned",
+      "note": "7 metric queries + 8 defect classes incl. clipping. Pure functions over MeshSnapshot. One file per defect class."
+    },
+    {
+      "id": "constraints",
+      "owner": "agent:constraints",
+      "paths": ["src/constraints/**"],
+      "publicInterface": "src/constraints/__init__.py",
+      "dependsOn": ["contracts", "measure"],
+      "backlogItems": ["B-007"],
+      "status": "planned",
+      "note": "The 12-type vocabulary (A-006). Must hard-fail on cycles."
+    },
+    {
+      "id": "ops",
+      "owner": "agent:ops",
+      "paths": ["src/ops/**"],
+      "publicInterface": "src/ops/__init__.py",
+      "dependsOn": ["contracts", "constraints", "measure"],
+      "backlogItems": ["B-008", "B-023", "B-024"],
+      "status": "planned",
+      "note": "Construction library. Each operation carries a re-runnable acceptance query (ADR-005)."
+    },
+    {
+      "id": "align",
+      "owner": "agent:align",
+      "paths": ["src/align/**"],
+      "publicInterface": "src/align/__init__.py",
+      "dependsOn": ["contracts", "constraints", "measure"],
+      "backlogItems": ["B-021"],
+      "status": "planned",
+      "note": "Quaternion internally, Euler at the parameter surface. A genuine gap in stock bpy."
+    },
+    {
+      "id": "gaps",
+      "owner": "agent:gaps",
+      "paths": ["src/gaps/**"],
+      "publicInterface": "src/gaps/__init__.py",
+      "dependsOn": ["contracts", "measure", "constraints"],
+      "backlogItems": ["B-011"],
+      "status": "planned",
+      "note": "Repair only. Detection lives in measure."
+    },
+    {
+      "id": "detail",
+      "owner": "agent:detail",
+      "paths": ["src/detail/**"],
+      "publicInterface": "src/detail/__init__.py",
+      "dependsOn": ["contracts", "measure"],
+      "backlogItems": ["B-012", "B-013", "B-014"],
+      "status": "planned",
+      "note": "The answer to the user's stated deal-breaker. Heuristic bevel is the top lever."
+    },
+    {
+      "id": "uv",
+      "owner": "agent:uv",
+      "paths": ["src/uv/**"],
+      "publicInterface": "src/uv/__init__.py",
+      "dependsOn": ["contracts", "measure"],
+      "backlogItems": ["B-025"],
+      "status": "planned",
+      "note": "Highest-risk area in scope. Primary user of engine's subprocess fallback (bake may need a window)."
+    },
+    {
+      "id": "scene",
+      "owner": "agent:scene",
+      "paths": ["src/scene/**"],
+      "publicInterface": "src/scene/__init__.py",
+      "dependsOn": ["contracts", "ops", "align", "gaps", "detail", "uv"],
+      "backlogItems": ["B-001", "B-010", "B-027"],
+      "status": "planned",
+      "note": "Operation log + deterministic replay + per-op cache + undo-by-pointer + checkpoints. Emits SceneChangeEvent; never imports viewer."
+    },
+    {
+      "id": "orchestration",
+      "owner": "agent:orchestration",
+      "paths": ["src/orchestration/**"],
+      "publicInterface": "src/orchestration/__init__.py",
+      "dependsOn": ["contracts", "scene", "measure"],
+      "backlogItems": ["B-015", "B-016"],
+      "status": "planned",
+      "note": "Phase machine + single-writer lock + conflict flagging + check cadence policy + action-report assembly."
+    },
+    {
+      "id": "export",
+      "owner": "agent:export",
+      "paths": ["src/export/**"],
+      "publicInterface": "src/export/__init__.py",
+      "dependsOn": ["contracts", "scene", "measure"],
+      "backlogItems": ["B-019", "B-020", "B-022"],
+      "status": "planned",
+      "note": "Roblox primary. Conversion is pure functions over plain data with round-trip fixtures; glTF bytes come from engine."
+    },
+    {
+      "id": "raw",
+      "owner": "agent:raw",
+      "paths": ["src/raw/**"],
+      "publicInterface": "src/raw/__init__.py",
+      "dependsOn": ["contracts"],
+      "backlogItems": ["B-026"],
+      "status": "planned",
+      "note": "ADR-009. Deliberately tiny so it gets its own security review. Takes the write lock; logs an opaque undo barrier."
+    },
+    {
+      "id": "viewer",
+      "owner": "agent:viewer",
+      "paths": ["src/viewer/**"],
+      "publicInterface": "src/viewer/__init__.py",
+      "dependsOn": ["contracts", "scene", "orchestration"],
+      "backlogItems": ["B-017", "B-018"],
+      "status": "planned",
+      "note": "Python WebSocket half only. Subscribes to scene; the arrow never points back."
+    },
+    {
+      "id": "mcp",
+      "owner": "agent:mcp",
+      "paths": ["src/mcp/**"],
+      "publicInterface": "src/mcp/__init__.py",
+      "dependsOn": ["contracts", "orchestration", "scene", "measure", "ops", "align", "gaps", "detail", "uv", "export", "raw"],
+      "backlogItems": ["B-009"],
+      "status": "planned",
+      "note": "Registry POLICY lives here (transports, role-partitioning into 5-8, image downscaling). Registry CONTENT is declared beside each operation as a ToolSpec."
+    },
+    {
+      "id": "frontend",
+      "owner": "agent:frontend",
+      "paths": ["frontend/**"],
+      "publicInterface": "frontend/src/main.js",
+      "dependsOn": ["contracts"],
+      "backlogItems": ["B-017", "B-018"],
+      "status": "planned",
+      "note": "Static three.js + Puppeteer. Depends only on the wire-protocol contract; runs against fixtures with no Python and no Blender."
+    }
+  ]
+}
