@@ -1,0 +1,28 @@
+{
+  "$comment": "Two rules enforced by hooks rather than by an agent remembering them. See .claude/hooks/.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "$comment": "Rule 2 — file size. Advisory: it reports, it never blocks.",
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-file-size.mjs\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "$comment": "Rule 3 — do not hand control back mid-phase. Fails open: no .pipeline/state.json, a gate, a finished run, or three nudges in one phase all let the turn end.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pipeline-continue.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "idea": "A tool/app that lets AI models create 3D models live: assists with blank/gap filling, raises design detail and realism beyond stitched-together cubes, handles angle adjustments and part clipping (e.g. railings), supports multi-agent/sub-agent task assignment, and is built to raise model accuracy, detail attention and spatial awareness. Blender/bpy acceptable as a base.",
+  "phase": 1,
+  "pass": 1,
+  "final": false,
+  "startedAt": "2026-08-05",
+  "design": null,
+  "gates": {},
+  "suites": { "backend": "none", "frontend": "none" },
+  "next": "Phase 1 research fan-out, then Phase 2 design candidates, then Gate A",
+  "status": "running",
+  "blocked": null
+}

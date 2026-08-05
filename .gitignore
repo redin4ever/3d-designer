@@ -1,0 +1,31 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Blender
+*.blend1
+*.blend2
+
+# Pipeline internals — only state.json, modules.json and backlog.json are tracked
+.pipeline/*
+!.pipeline/state.json
+!.pipeline/modules.json
+!.pipeline/backlog.json
+
+# Generated artefacts
+artifacts/
+.tmp/

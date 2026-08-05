@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+coverage/
+.venv/
+venv/
+__pycache__/
+artifacts/
+.pipeline/qa/
+*.blend
+*.blend1
+*.png
+*.jpg
+*.exr
+package-lock.json
