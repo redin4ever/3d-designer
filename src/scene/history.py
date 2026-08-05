@@ -12,7 +12,7 @@ Nothing here is implemented yet.
 
 from __future__ import annotations
 
-from contracts import ChangeKind, Checkpoint
+from contracts import ChangeKind, Checkpoint, SceneChangeEvent
 
 __all__ = ["HistoryMixin"]
 
@@ -44,7 +44,14 @@ class HistoryMixin:
         5. Emit one ``contracts.SceneChangeEvent(kind=<that ChangeKind>,
            head=self._document.head)`` via ``self._emit`` and return the ``ChangeKind``.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="undo"))
+        old_head = self._document.head
+        new_head = old_head - steps
+        self._document.set_head(new_head)
+        crossed = any(new_head <= b.index < old_head for b in self._document.barriers)
+        kind = ChangeKind.FULL_RESYNC if crossed else ChangeKind.ROLLBACK
+        self.replay()
+        self._emit(SceneChangeEvent(kind=kind, head=self._document.head))
+        return kind
 
     def redo(self, steps: int = 1) -> ChangeKind:
         """The mirror of :meth:`undo`: ``new_head = self._document.head + steps``, the
@@ -56,7 +63,14 @@ class HistoryMixin:
         ``old_head <= b.index < new_head``. Same ``replay`` + emit + return shape as
         :meth:`undo`.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="redo"))
+        old_head = self._document.head
+        new_head = old_head + steps
+        self._document.set_head(new_head)
+        crossed = any(old_head <= b.index < new_head for b in self._document.barriers)
+        kind = ChangeKind.FULL_RESYNC if crossed else ChangeKind.ROLLBACK
+        self.replay()
+        self._emit(SceneChangeEvent(kind=kind, head=self._document.head))
+        return kind
 
     def rollback_to(self, checkpoint: str) -> ChangeKind:
         """Move the head directly to a named checkpoint, in either direction.
@@ -68,7 +82,15 @@ class HistoryMixin:
         ``self._document.set_head(cp.index)``, ``self.replay()``, emit, return — the
         identical shape to :meth:`undo`/:meth:`redo`.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="rollback_to"))
+        cp = self._document.checkpoint(checkpoint)
+        old_head = self._document.head
+        lo, hi = min(old_head, cp.index), max(old_head, cp.index)
+        crossed = any(lo <= b.index < hi for b in self._document.barriers)
+        kind = ChangeKind.FULL_RESYNC if crossed else ChangeKind.ROLLBACK
+        self._document.set_head(cp.index)
+        self.replay()
+        self._emit(SceneChangeEvent(kind=kind, head=self._document.head))
+        return kind
 
     def checkpoint(self, name: str, note: str = "") -> Checkpoint:
         """Name the current head.
@@ -79,4 +101,6 @@ class HistoryMixin:
         head=self._document.head)`` via ``self._emit`` before returning the new
         ``Checkpoint``.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="checkpoint"))
+        cp = self._document.add_checkpoint(name, note)
+        self._emit(SceneChangeEvent(kind=ChangeKind.CHECKPOINT, head=self._document.head))
+        return cp

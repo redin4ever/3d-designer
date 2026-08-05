@@ -16,13 +16,12 @@ responsibility mixins, one per file, each covering a distinct decision (Rule 2):
 | ``run.py`` | pause / resume / run state |
 | ``scene_port.py`` | the typed slice of ``scene``'s future interface this module depends on |
 
-Every method on every mixin raises ``NotImplementedError`` (Rule 4 — tests come first).
 See ``CLAUDE.md`` for status and ``README.md`` for the full contract.
 """
 
 from __future__ import annotations
 
-from contracts import CheckCadence
+from contracts import CheckCadence, Proposal, RunState
 
 from .locking import LockingMixin
 from .phases import PhaseMixin
@@ -39,14 +38,16 @@ class Orchestrator(PhaseMixin, LockingMixin, ProposalsMixin, ReportingMixin, Run
     of the five mixins owns, and ``README.md`` for the full public contract.
 
     Constructed with the ``scene`` module's public surface (``ScenePort``) and a starting
-    check cadence. A real implementation will need more instance state than is stored
-    here (pending proposals, the operator-note queue, the run state flag) — deliberately
-    not added by this stub (Rule 4: no implementation before a failing test), so the
-    fields below are exactly the two constructor arguments and nothing else.
+    check cadence. Instance state beyond the two constructor arguments (pending proposals,
+    the operator-note queue, the run state flag) lives here too, initialised once, so each
+    mixin's methods have exactly one place to find it.
     """
 
     def __init__(
         self, scene: ScenePort, *, cadence: CheckCadence = CheckCadence.EVERY_GEOMETRY_CHANGE
     ) -> None:
-        self._scene = scene  # retained only so the stub's signature is exact
+        self._scene = scene
         self._cadence = cadence
+        self._pending: list[Proposal] = []
+        self._operator_notes: list[str] = []
+        self._state: RunState = RunState.RUNNING

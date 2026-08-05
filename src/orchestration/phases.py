@@ -12,7 +12,11 @@ the body (Rule 4 — tests come first).
 
 from __future__ import annotations
 
-from contracts import AcceptanceResult, Phase, ToolRole, ToolSpec
+import uuid
+
+from contracts import PHASE_ORDER, AcceptanceResult, Operation, Phase, ToolRole, ToolSpec
+
+from ._tool_registry import TOOLS_BY_ROLE
 
 _NOT_IMPLEMENTED = "orchestration.{name}: not implemented"
 
@@ -25,7 +29,7 @@ class PhaseMixin:
         """The current phase. Once implemented, reads
         ``self._scene.document().phase`` — ``contracts.SceneDocument`` already carries
         this field, so orchestration is not a second source of truth for it."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="phase"))
+        return self._scene.document().phase
 
     def can_promote(self) -> tuple[bool, tuple[AcceptanceResult, ...]]:
         """Whether the current phase's acceptance queries all pass right now, and the
@@ -33,7 +37,25 @@ class PhaseMixin:
         too. The boolean and the results must agree: ``False`` with every
         ``AcceptanceResult.passed`` ``True`` would itself be a bug in whatever computes
         this."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="can_promote"))
+        doc = self._scene.document()
+        current_phase = self.phase
+        produced_this_phase = [
+            op
+            for op in doc.active_operations
+            if op.phase == current_phase.value and op.kind != "phase_promotion"
+        ]
+        passed = len(produced_this_phase) > 0
+        result = AcceptanceResult(
+            query_id=f"{current_phase.value}.has_recorded_output",
+            passed=passed,
+            actual=float(len(produced_this_phase)),
+            reason=(
+                ""
+                if passed
+                else f"no operations recorded yet for phase {current_phase.value!r}"
+            ),
+        )
+        return passed, (result,)
 
     def promote(self, *, force: bool = False) -> Phase:
         """Advance to the phase immediately after the current one in
@@ -63,7 +85,39 @@ class PhaseMixin:
         - Only ever moves one step — there is no parameter to name a target phase, so
           "skip a phase" is structurally unreachable, not merely refused.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="promote"))
+        current_phase = self.phase
+        idx = PHASE_ORDER.index(current_phase)
+        if idx == len(PHASE_ORDER) - 1:
+            raise ValueError(
+                f"{current_phase} is the last phase in PHASE_ORDER; there is nothing to "
+                "promote to, and force does not change that"
+            )
+
+        can, results = self.can_promote()
+        if not can and not force:
+            failing = ", ".join(r.query_id for r in results if not r.passed)
+            raise ValueError(
+                f"cannot promote from {current_phase}: failing acceptance queries "
+                f"({failing}); pass force=True to override (the override is recorded, "
+                "not silent)"
+            )
+
+        new_phase = PHASE_ORDER[idx + 1]
+        promotion_op = Operation(
+            op_id=f"phase_promotion-{current_phase.value}-{new_phase.value}-{uuid.uuid4().hex[:8]}",
+            kind="phase_promotion",
+            phase=new_phase.value,
+            author="orchestrator",
+            params={
+                "from": current_phase.value,
+                "to": new_phase.value,
+                "forced": force,
+                "failing": tuple(r.query_id for r in results if not r.passed),
+            },
+        )
+        self._scene.apply(promotion_op)
+        self._scene.document().phase = new_phase
+        return new_phase
 
     def tools_for(self, role: ToolRole) -> tuple[ToolSpec, ...]:
         """The tools visible to ``role`` right now.
@@ -83,4 +137,4 @@ class PhaseMixin:
         other way than the constructor shown in this module's brief — flagged in this
         task's ``contractRequests`` output rather than decided here.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="tools_for"))
+        return TOOLS_BY_ROLE[role]

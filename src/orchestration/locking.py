@@ -16,7 +16,9 @@ exactly one place "is this lease live" is decided.
 
 from __future__ import annotations
 
-from contracts import Phase, WriteLease
+import uuid
+
+from contracts import LockContention, Phase, WriteLease
 
 _NOT_IMPLEMENTED = "orchestration.{name}: not implemented"
 
@@ -45,7 +47,20 @@ class LockingMixin:
           must be held in exactly that one place. A lease value an agent builds itself
           proves nothing (``contracts.WriteLease``'s own docstring).
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="acquire"))
+        doc = self._scene.document()
+        current = doc.active_lease
+        if current is not None and not current.is_stale(doc.head) and current.holder != holder:
+            raise LockContention(holder=current.holder, expires_at_op=current.expires_at_op)
+
+        lease = WriteLease(
+            holder=holder,
+            phase=phase,
+            lease_id=uuid.uuid4().hex,
+            granted_at_op=doc.head,
+            expires_at_op=doc.head + ttl_ops,
+        )
+        doc.active_lease = lease
+        return lease
 
     def release(self, lease: WriteLease) -> None:
         """Give up the lock.
@@ -56,13 +71,15 @@ class LockingMixin:
         its actual holder would not be, and must never happen from a mismatched
         ``lease``.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="release"))
+        doc = self._scene.document()
+        if doc.active_lease is not None and doc.active_lease.lease_id == lease.lease_id:
+            doc.active_lease = None
 
     def current(self) -> WriteLease | None:
         """The live lease, or ``None``. Once implemented, read straight from
         ``self._scene.document().active_lease`` — one field, one truth, never a second
         copy this class keeps of its own."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="current"))
+        return self._scene.document().active_lease
 
     def verify(self, lease: WriteLease) -> None:
         """Raise :class:`contracts.LockContention` unless ``lease`` is the live one.
@@ -72,4 +89,4 @@ class LockingMixin:
         delegate to ``self._scene.document().require_lease(lease)``, which already
         implements exactly this comparison and this error shape.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="verify"))
+        self._scene.document().require_lease(lease)

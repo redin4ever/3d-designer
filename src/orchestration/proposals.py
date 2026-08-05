@@ -57,11 +57,17 @@ class ProposalsMixin:
         ``contracts.SceneDocument.append``'s duplicate ``op_id`` check — ids key state
         that a duplicate would silently clobber).
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="propose"))
+        if any(existing.proposal_id == p.proposal_id for existing in self._pending):
+            raise ValueError(
+                f"proposal id {p.proposal_id!r} is already pending; ids key state a "
+                "duplicate would silently clobber"
+            )
+        self._pending.append(p)
+        return p.proposal_id
 
     def pending(self) -> tuple[Proposal, ...]:
         """Every proposal not yet accepted or dropped, in submission order."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="pending"))
+        return tuple(self._pending)
 
     def find_conflicts(self) -> tuple[Conflict, ...]:
         """Pair up pending proposals whose ``target_objects`` overlap and return one
@@ -74,7 +80,59 @@ class ProposalsMixin:
         build one for a lone proposal, or with no genuinely shared object, fails loudly
         at construction rather than shipping a phantom conflict.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="find_conflicts"))
+        parent: dict[str, str] = {p.proposal_id: p.proposal_id for p in self._pending}
+
+        def find(x: str) -> str:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a: str, b: str) -> None:
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[ra] = rb
+
+        owners_by_object: dict[str, list[str]] = {}
+        for p in self._pending:
+            for obj in p.target_objects:
+                owners_by_object.setdefault(obj, []).append(p.proposal_id)
+
+        for owners in owners_by_object.values():
+            for other in owners[1:]:
+                union(owners[0], other)
+
+        groups: dict[str, list[Proposal]] = {}
+        for p in self._pending:
+            groups.setdefault(find(p.proposal_id), []).append(p)
+
+        conflicts: list[Conflict] = []
+        for group in groups.values():
+            if len(group) < 2:
+                continue
+            group_ids = {p.proposal_id for p in group}
+            overlapping = tuple(
+                sorted(
+                    obj
+                    for obj, owners in owners_by_object.items()
+                    if len(set(owners) & group_ids) >= 2
+                )
+            )
+            if not overlapping:
+                continue
+            conflicts.append(
+                Conflict(
+                    conflict_id="conflict-" + "-".join(sorted(group_ids)),
+                    proposals=tuple(group),
+                    overlapping_objects=overlapping,
+                    detail=(
+                        f"{len(group)} pending proposals from "
+                        f"{', '.join(sorted({p.author for p in group}))} touch "
+                        f"{', '.join(overlapping)}"
+                    ),
+                )
+            )
+        return tuple(conflicts)
 
     def accept(self, proposal_id: str, lease: WriteLease) -> ActionReport:
         """Apply the named proposal as an operation and return the standard report.
@@ -91,4 +149,22 @@ class ProposalsMixin:
         caller must resolve the conflict (drop one side, or submit a merged proposal)
         before either proposal can be accepted.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="accept"))
+        proposal = next((p for p in self._pending if p.proposal_id == proposal_id), None)
+        if proposal is None:
+            raise KeyError(f"no pending proposal named {proposal_id!r}")
+
+        for conflict in self.find_conflicts():
+            if any(p.proposal_id == proposal_id for p in conflict.proposals):
+                raise ProposalConflict(
+                    rule="orchestration.proposal_conflict",
+                    detail=conflict.describe(),
+                    suggestion=(
+                        "resolve the conflict (drop one side or submit a merged "
+                        "proposal) before accepting either"
+                    ),
+                )
+
+        op = proposal.to_operation(op_id=proposal_id, phase=self.phase.value)
+        report = self.perform(op, lease)
+        self._pending = [p for p in self._pending if p.proposal_id != proposal_id]
+        return report

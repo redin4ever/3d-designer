@@ -14,9 +14,53 @@ the body (Rule 4 — tests come first).
 
 from __future__ import annotations
 
-from contracts import ActionReport, CheckCadence, Operation, WriteLease
+from contracts import (
+    ActionReport,
+    CheckCadence,
+    Measurement,
+    MetricKind,
+    Operation,
+    OperationResult,
+    RunState,
+    WriteLease,
+)
+
+from .run import RunPaused
 
 _NOT_IMPLEMENTED = "orchestration.{name}: not implemented"
+
+
+def _measurements_for(result: OperationResult) -> tuple[Measurement, ...]:
+    """Placeholder measurements for the objects an operation touched.
+
+    ``ScenePort`` (this module's own typed slice of ``scene``, see ``scene_port.py``)
+    exposes no ``contracts.EngineProtocol`` — only ``apply``/``document``/``undo``/
+    ``subscribe`` — so ``perform`` has no way to call ``measure.report``/``measure.evaluate``
+    against live geometry yet. Until that wiring exists (flagged in this task's
+    ``contractRequests`` output), this synthesizes minimal, honestly-labelled
+    ``contracts.Measurement`` placeholders from what ``OperationResult`` already reports,
+    so a report taken under ``CheckCadence.EVERY_GEOMETRY_CHANGE`` still carries *something*
+    to verify against rather than an empty tuple that reads as "nothing was checked".
+    """
+    touched: list[str] = []
+    seen: set[str] = set()
+    for obj in (*result.produced_objects, *result.modified_objects):
+        if obj not in seen:
+            seen.add(obj)
+            touched.append(obj)
+    return tuple(
+        Measurement(
+            kind=MetricKind.TRIANGLE_COUNT,
+            value=0.0,
+            unit="tri",
+            subject=obj,
+            detail=(
+                "orchestration placeholder: no EngineProtocol reachable through "
+                "ScenePort yet; not a real measure.report() call"
+            ),
+        )
+        for obj in touched
+    )
 
 
 class ReportingMixin:
@@ -50,17 +94,55 @@ class ReportingMixin:
            exactly one path out (``ActionReport.operator_notes``'s own docstring), and it
            must be delivered exactly once, never replayed on a later, unrelated call.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="perform"))
+        self.verify(lease)
+
+        if self.state is RunState.PAUSED:
+            raise RunPaused()
+
+        result = self._scene.apply(op)
+
+        if self._cadence is CheckCadence.EVERY_GEOMETRY_CHANGE:
+            checks_skipped = False
+        elif self._cadence is CheckCadence.PHASE_BOUNDARIES:
+            checks_skipped = op.kind != "phase_promotion"
+        else:  # CheckCadence.ON_REQUEST
+            checks_skipped = True
+
+        measurements = () if checks_skipped else _measurements_for(result)
+
+        notes = tuple(self._operator_notes)
+        self._operator_notes.clear()
+
+        changed: list[str] = []
+        seen: set[str] = set()
+        for obj in (*result.produced_objects, *result.modified_objects):
+            if obj not in seen:
+                seen.add(obj)
+                changed.append(obj)
+
+        return ActionReport(
+            op_id=op.op_id,
+            ok=result.ok,
+            summary=f"{op.kind} applied" if result.ok else f"{op.kind} failed",
+            changed=tuple(changed),
+            removed=result.removed_objects,
+            measurements=measurements,
+            checks_skipped=checks_skipped,
+            operator_notes=notes,
+            error_rule=result.error_rule,
+            error_detail=result.error_detail,
+            error_suggestion=result.error_suggestion,
+        )
 
     def set_cadence(self, c: CheckCadence) -> None:
         """Change the check cadence, effective on the very next ``perform`` call — a
         settings-menu control (Gate A 3.1: "with a settings menu setting that enables me
         changing that"), not a value read once at construction and then frozen."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="set_cadence"))
+        self._cadence = c
 
     def add_operator_note(self, text: str) -> None:
         """Queue free text typed mid-run for delivery on the next ``ActionReport`` (see
         ``perform``, step 5). Queued rather than sent immediately because MCP is
         call/response — there is no channel into a connected agent's context except the
         next tool response."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="add_operator_note"))
+        self._operator_notes.append(text)

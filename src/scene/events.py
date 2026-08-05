@@ -38,7 +38,15 @@ class EventsMixin:
         is a no-op, not an error, so a caller tearing down does not have to guard
         against a double-call.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="subscribe"))
+        self._listeners.append(listener)
+
+        def _unsubscribe() -> None:
+            for index, existing in enumerate(self._listeners):
+                if existing is listener:
+                    del self._listeners[index]
+                    break
+
+        return _unsubscribe
 
     def _emit(self, event: SceneChangeEvent) -> None:
         """Deliver ``event`` to every subscribed listener, independently.
@@ -53,4 +61,8 @@ class EventsMixin:
         ``events_test.py::test_a_raising_listener_does_not_break_apply`` and
         ``test_other_listeners_still_receive_the_event_when_one_raises``.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="_emit"))
+        for listener in list(self._listeners):
+            try:
+                listener(event)
+            except Exception:
+                pass

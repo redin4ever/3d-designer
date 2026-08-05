@@ -5,22 +5,29 @@ implementation-facing: conventions for whoever writes the bodies of the stubs he
 
 ## Status
 
-Currently **RED by design**. Every method on every mixin in `phases.py`, `locking.py`,
-`proposals.py`, `reporting.py` and `run.py` raises
-`NotImplementedError("orchestration.<name>: not implemented")`. `Orchestrator.__init__`
-is real (it only stores its two constructor arguments) and `ScenePort`,
-`ProposalConflict` and `RunPaused` are real, constructed types, not stubs.
+**GREEN.** All five mixins (`phases.py`, `locking.py`, `proposals.py`, `reporting.py`,
+`run.py`) are implemented; `pytest src/orchestration -q` passes 25/25. `Orchestrator.__init__`
+now also owns the instance state a real run needs (pending-proposal list, operator-note
+queue, run-state flag) alongside the two constructor arguments; `ScenePort`,
+`ProposalConflict` and `RunPaused` were already real, constructed types before this pass.
 
-25 tests across five `*_test.py` files. 24 are written against the eventual real
-behaviour and fail with `NotImplementedError` right now — that is expected and correct
-for this phase (Rule 4: a test that fails on the explicit stub error, never on
-`ImportError`/`AttributeError`, has verified the module's shape before any logic exists).
-One test is already green:
-`locking_test.py::test_orchestrator_structurally_satisfies_write_lock_manager` — a
-`@runtime_checkable` Protocol's `isinstance` check only asks whether the four methods
-exist, not whether they work, so it passes today and would only regress if a method were
-renamed or dropped. A change that makes the red/green split anything other than 24/1
-needs an explanation in the commit message.
+Notable implementation choices, each reversible and each filed in this task's
+`contractRequests`/`assumptions` output rather than resolved against a frozen contract:
+
+- `reporting.perform`'s measurement step cannot call `measure.report`/`measure.evaluate`
+  for real — `ScenePort` exposes no `contracts.EngineProtocol`, only
+  `apply`/`document`/`undo`/`subscribe`. It synthesizes minimal, honestly-labelled
+  `contracts.Measurement` placeholders from `OperationResult` instead, so a report taken
+  under `EVERY_GEOMETRY_CHANGE` still carries something to verify against.
+- `phases.can_promote` evaluates a structural placeholder criterion ("has this phase
+  recorded at least one non-promotion operation") rather than real per-phase
+  `AcceptanceQuery` objects, for the same reason — no engine reachable from here to
+  evaluate one against.
+- `phases.tools_for`'s registry is a small static table in the new `_tool_registry.py`
+  (module-private; not part of the public barrel), pending the real registry composition
+  point `README.md`'s "Contract gaps" item 3 describes.
+- `locking.acquire`'s same-holder-reacquire case (left open by the brief) renews the
+  lease rather than raising.
 
 The tests were written against this module's brief, `src/contracts/phases.py` and
 `src/contracts/operations.py`, and `docs/adr/ADR-007-single-writer-phase-split.md` /

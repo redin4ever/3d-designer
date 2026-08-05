@@ -47,12 +47,12 @@ class RunMixin:
         """Set run state to :attr:`contracts.RunState.PAUSED`. Once implemented,
         ``reporting.perform`` must consult this before starting a new operation — never
         abort one already in flight, which is what "cooperative" means here."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="pause"))
+        self._state = RunState.PAUSED
 
     def resume(self) -> None:
         """Restore :attr:`contracts.RunState.RUNNING`."""
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="resume"))
+        self._state = RunState.RUNNING
 
     @property
     def state(self) -> RunState:
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="state"))
+        return self._state

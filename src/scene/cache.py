@@ -40,7 +40,11 @@ class CacheMixin:
         stale value keeps coming back until ``invalidate_cache`` is called. See
         ``cache_test.py::test_invalidate_cache_makes_a_stale_snapshot_fresh_again``.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="snapshot_of"))
+        if object_id in self._cache:
+            return self._cache[object_id]
+        snapshot = self._engine.snapshot(object_id)
+        self._cache[object_id] = snapshot
+        return snapshot
 
     def invalidate_cache(self, object_id: str) -> None:
         """Drop ``object_id`` from the cache, if present.
@@ -50,4 +54,4 @@ class CacheMixin:
         ``document.py``'s ``apply`` for every object an operation's ``OperationResult``
         names, whether or not a snapshot had actually been read for it yet.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="invalidate_cache"))
+        self._cache.pop(object_id, None)

@@ -10,7 +10,14 @@ signatures and the contract described below do not move.
 
 from __future__ import annotations
 
-from contracts import Operation, OperationResult, WriteLease
+from contracts import (
+    ChangeKind,
+    LockContention,
+    Operation,
+    OperationResult,
+    SceneChangeEvent,
+    WriteLease,
+)
 
 __all__ = ["DocumentMixin"]
 
@@ -76,7 +83,63 @@ class DocumentMixin:
         ``lease=None`` is a valid, intentional default — see point 2. It is not an
         oversight that the signature allows it.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="apply"))
+        if op.kind not in self._handlers:
+            known = ", ".join(sorted(self._handlers)) or "(none)"
+            raise KeyError(
+                f"unknown operation kind {op.kind!r}; known kinds: {known}"
+            )
+
+        active_lease = self._document.active_lease
+        if active_lease is not None:
+            if lease is None:
+                raise LockContention(
+                    holder=active_lease.holder, expires_at_op=active_lease.expires_at_op
+                )
+            self._document.require_lease(lease)
+
+        # Pre-validate what SceneDocument.append will validate, before the handler runs
+        # (see point 3 above) — a rejected append must never leave engine-side effects
+        # that were never logged.
+        if any(existing.op_id == op.op_id for existing in self._document.operations):
+            raise ValueError(
+                f"operation id {op.op_id!r} is already in the log. Ids key the geometry "
+                "cache, so a duplicate silently overwrites an earlier result."
+            )
+        if op.opaque and not snapshot_path:
+            raise ValueError(
+                f"operation {op.op_id!r} is opaque but no snapshot path was given. An "
+                "opaque operation cannot be replayed, so rolling back across it needs a "
+                "snapshot — capture one before appending."
+            )
+
+        result = self._handlers[op.kind](self._engine, op)
+
+        if not result.ok:
+            return result
+
+        self._document.append(op, snapshot_path=snapshot_path)
+
+        touched = (*result.produced_objects, *result.modified_objects, *result.removed_objects)
+        for object_id in touched:
+            self.invalidate_cache(object_id)
+
+        if result.produced_objects:
+            kind = ChangeKind.OBJECTS_ADDED
+        elif result.removed_objects:
+            kind = ChangeKind.OBJECTS_REMOVED
+        else:
+            kind = ChangeKind.OBJECTS_MODIFIED
+
+        self._emit(
+            SceneChangeEvent(
+                kind=kind,
+                op_id=op.op_id,
+                object_ids=touched,
+                highlight=touched,
+                head=self._document.head,
+            )
+        )
+        return result
 
     def replay(self) -> None:
         """Rebuild every object in the scene from the operation log, from nothing.
@@ -99,4 +162,7 @@ class DocumentMixin:
         ``document_test.py::test_replay_reproduces_identical_geometry`` — if this is not
         true, undo is not a pointer move and nothing else in this module is true.
         """
-        raise NotImplementedError(_NOT_IMPLEMENTED.format(name="replay"))
+        self._engine.reset()
+        self._cache.clear()
+        for op in self._document.active_operations:
+            self._handlers[op.kind](self._engine, op)

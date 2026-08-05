@@ -183,7 +183,7 @@
         "B-010",
         "B-027"
       ],
-      "status": "red",
+      "status": "green",
       "note": "Operation log + deterministic replay + per-op cache + undo-by-pointer + checkpoints. Emits SceneChangeEvent; never imports viewer."
     },
     {
@@ -202,7 +202,7 @@
         "B-015",
         "B-016"
       ],
-      "status": "red",
+      "status": "green",
       "note": "Phase machine + single-writer lock + conflict flagging + check cadence policy + action-report assembly."
     },
     {
