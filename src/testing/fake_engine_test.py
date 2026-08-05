@@ -107,9 +107,10 @@ def test_merge_by_distance_welds_coincident_vertices(engine: FakeEngine) -> None
     verts = [Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(1, 1, 0), Vec3(1, 1, 0)]
     engine.create_mesh("m", verts, [(0, 1, 2)])
 
-    removed = engine.merge_by_distance("m", 1e-6)
+    outcome = engine.merge_by_distance("m", 1e-6)
 
-    assert removed == 1
+    assert outcome.fixed == 1
+    assert outcome.complete
     assert engine.snapshot("m").vertex_count == 3
 
 
@@ -117,10 +118,24 @@ def test_fill_holes_closes_an_open_box(engine: FakeEngine) -> None:
     verts, faces = unit_cube()
     engine.create_mesh("open", verts, faces[:-1])
 
-    filled = engine.fill_holes("open")
+    outcome = engine.fill_holes("open")
 
-    assert filled >= 1
-    assert engine.fill_holes("open") == 0, "a second pass found holes the first missed"
+    assert outcome.fixed >= 1
+    assert engine.fill_holes("open").fixed == 0, "a second pass found holes the first missed"
+
+
+def test_fill_holes_reports_what_it_could_not_do(engine: FakeEngine) -> None:
+    """A bare count cannot tell "nothing to do" from "found work and refused it" — both
+    are zero. A caller would then report a clean mesh that still has a hole in it."""
+    verts, faces = unit_cube()
+    engine.create_mesh("open", verts, faces[:-1])
+
+    outcome = engine.fill_holes("open", max_sides=3)
+
+    assert outcome.fixed == 0
+    assert outcome.skipped >= 1, "the 4-sided hole was skipped but not reported"
+    assert not outcome.complete
+    assert "max_sides" in outcome.reason
 
 
 def test_separate_loose_splits_disconnected_shells(engine: FakeEngine) -> None:
@@ -205,3 +220,36 @@ def test_reset_clears_everything(engine: FakeEngine) -> None:
     engine.create_material("m", (0.5, 0.5, 0.5))
     engine.reset()
     assert engine.list_objects() == []
+
+
+def test_array_uses_the_caller_supplied_name_template(engine: FakeEngine) -> None:
+    """Instance ids must be predictable before the call, so an operation can pre-declare
+    a constraint per instance and have live re-solve reach individual balusters."""
+    engine.create_primitive("baluster", "cube", Vec3(0.04, 0.04, 0.8))
+
+    ids = engine.array_along_curve(
+        "baluster",
+        [Vec3(0, 0, 0), Vec3(2, 0, 0)],
+        spacing=0.5,
+        keep_upright=True,
+        name_template="rail_bal_{index:02d}",
+    )
+
+    assert ids[0] == "rail_bal_00"
+    assert all(i.startswith("rail_bal_") for i in ids)
+
+
+def test_export_carries_the_whole_conversion_not_just_up_axis(engine: FakeEngine) -> None:
+    """A left-handed target needs an X mirror AND a rotation-sign flip. Sending one
+    without the other is the silent round-trip mirroring bug the profile table exists to
+    prevent, so every field must reach the exporter."""
+    engine.create_primitive("box", "cube", Vec3(1, 1, 1))
+
+    engine.export_gltf(
+        ["box"], "out.glb", y_up=True, mirror_x=True, negate_rotation=True, scale=1 / 0.28
+    )
+
+    call = next(c for c in reversed(engine.calls) if c[0] == "export_gltf")
+    _, path, y_up, mirror_x, negate_rotation, scale = call[1]
+    assert (y_up, mirror_x, negate_rotation) == (True, True, True)
+    assert scale == pytest.approx(1 / 0.28)

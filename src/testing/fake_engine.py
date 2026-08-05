@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from contracts import AABB, EngineError, MeshSnapshot, Quat, Transform, Vec3
+from contracts import AABB, EngineError, MeshSnapshot, Quat, RepairOutcome, Transform, Vec3
 
 from .fake_surfacing import FakeSurfacingMixin
 from .mesh_helpers import (
@@ -285,6 +285,7 @@ class FakeEngine(FakeSurfacingMixin):
         *,
         keep_upright: bool,
         extra_points: Sequence[Vec3] = (),
+        name_template: str = "{base}_i{index:03d}",
     ) -> list[str]:
         if spacing <= 0:
             raise EngineError("engine.bad_spacing", f"spacing {spacing} must be positive")
@@ -308,7 +309,7 @@ class FakeEngine(FakeSurfacingMixin):
             produced.append(
                 self.duplicate(
                     object_id,
-                    f"{object_id}_i{i:03d}",
+                    name_template.format(base=object_id, index=i),
                     Transform(translation=pos, rotation=rot),
                 )
             )
@@ -328,7 +329,7 @@ class FakeEngine(FakeSurfacingMixin):
             obj.faces = [tuple(reversed(f)) for f in obj.faces]
         self._record("recalculate_normals", object_id, inside)
 
-    def merge_by_distance(self, object_id: str, distance: float) -> int:
+    def merge_by_distance(self, object_id: str, distance: float) -> RepairOutcome:
         obj = self._get(object_id)
         kept: list[Vec3] = []
         remap: dict[int, int] = {}
@@ -343,15 +344,22 @@ class FakeEngine(FakeSurfacingMixin):
         removed = len(obj.vertices) - len(kept)
         obj.vertices = kept
         deduped: list[tuple[int, ...]] = []
+        degenerate = 0
         for f in obj.faces:
             nf = tuple(dict.fromkeys(remap[i] for i in f))
             if len(nf) >= 3:
                 deduped.append(nf)
+            else:
+                degenerate += 1
         obj.faces = deduped
         self._record("merge_by_distance", object_id, distance, removed)
-        return removed
+        return RepairOutcome(
+            fixed=removed,
+            skipped=degenerate,
+            reason=f"{degenerate} face(s) collapsed below 3 vertices" if degenerate else "",
+        )
 
-    def fill_holes(self, object_id: str, max_sides: int = 0) -> int:
+    def fill_holes(self, object_id: str, max_sides: int = 0) -> RepairOutcome:
         obj = self._get(object_id)
         counts: dict[tuple[int, int], int] = {}
         for f in obj.faces:
@@ -360,15 +368,20 @@ class FakeEngine(FakeSurfacingMixin):
                 counts[key] = counts.get(key, 0) + 1
         boundary = [e for e, n in counts.items() if n == 1]
         if not boundary:
-            return 0
-        filled = 0
+            return RepairOutcome()
+        filled = skipped = 0
         for loop in boundary_loops(boundary):
             if max_sides and len(loop) > max_sides:
+                skipped += 1
                 continue
             obj.faces.append(tuple(loop))
             filled += 1
         self._record("fill_holes", object_id, filled)
-        return filled
+        return RepairOutcome(
+            fixed=filled,
+            skipped=skipped,
+            reason=f"{skipped} hole(s) exceeded max_sides={max_sides}" if skipped else "",
+        )
 
     # ---------------------------------------------------------------- lifecycle
 

@@ -121,6 +121,9 @@ class FakeSurfacingMixin:
         path: str,
         *,
         y_up: bool,
+        mirror_x: bool = False,
+        negate_rotation: bool = False,
+        scale: float = 1.0,
         apply_modifiers: bool = True,
     ) -> str:
         if not object_ids:
@@ -129,9 +132,14 @@ class FakeSurfacingMixin:
                 "no objects were selected for export",
                 "pass at least one object id",
             )
+        if scale <= 0:
+            raise EngineError("engine.bad_export_scale", f"scale {scale} must be positive")
         for oid in object_ids:
             self._get(oid)
-        self._record("export_gltf", tuple(object_ids), path, y_up)
+        # Recorded in full so an export test can assert the whole conversion reached the
+        # exporter — a left-handed target needs mirror_x AND negate_rotation together, and
+        # sending one without the other is the silent round-trip mirroring bug.
+        self._record("export_gltf", tuple(object_ids), path, y_up, mirror_x, negate_rotation, scale)
         return path
 
     # -------------------------------------------------------------- raw

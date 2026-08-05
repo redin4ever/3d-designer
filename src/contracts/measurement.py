@@ -88,6 +88,20 @@ class DefectClass(StrEnum):
     """Two parts that should meet and do not — a tread short of its stringer. Passes
     every manifold and watertight check, because each part is individually fine."""
 
+    BUDGET_EXCEEDED = "budget_exceeded"
+    """Triangle count over the target profile's budget for this asset class, or over a
+    platform's hard per-mesh ceiling. Carried as a defect so a budget warning travels the
+    same "new problems" pipeline as everything else rather than needing its own channel."""
+
+
+#: The severity a defect class carries unless a specific measurement overrides it.
+#:
+#: Without this table two code paths assign different severities to structurally identical
+#: defects, and the same three non-manifold edges read as "3 blockers" or "3 warnings"
+#: depending purely on which one ran.
+DEFAULT_SEVERITY: dict["DefectClass", "Severity"] = {}
+"""Populated below, once :class:`Severity` exists."""
+
 
 class Severity(StrEnum):
     BLOCKER = "blocker"
@@ -98,6 +112,39 @@ class Severity(StrEnum):
 
     INFO = "info"
     """Worth knowing. Never acted on automatically."""
+
+
+DEFAULT_SEVERITY.update(
+    {
+        # These fail on import into an engine or a slicer. Not a judgement call.
+        DefectClass.NON_MANIFOLD_EDGE: Severity.BLOCKER,
+        DefectClass.NON_MANIFOLD_VERTEX: Severity.BLOCKER,
+        DefectClass.SELF_INTERSECTION: Severity.BLOCKER,
+        DefectClass.BOUNDARY_HOLE: Severity.BLOCKER,
+        # Wrong, survivable, and usually fixable downstream.
+        DefectClass.FLIPPED_NORMAL: Severity.WARNING,
+        DefectClass.LOOSE_OR_DUPLICATE: Severity.WARNING,
+        DefectClass.UNAPPLIED_TRANSFORM: Severity.WARNING,
+        DefectClass.PART_CLIPPING: Severity.WARNING,
+        DefectClass.VISUAL_GAP: Severity.WARNING,
+        DefectClass.BUDGET_EXCEEDED: Severity.WARNING,
+    }
+)
+
+
+class Comparison(StrEnum):
+    """How an acceptance query compares actual to expected.
+
+    An enum rather than a bare string because a typo'd ``"EQ"`` or ``"approx"`` type-checks
+    fine and then either silently falls through or raises a ``KeyError`` deep in an
+    evaluator's dispatch.
+    """
+
+    EQ = "eq"
+    LTE = "lte"
+    GTE = "gte"
+    NONE = "none"
+    """The query is purely about absent defects; ``expected`` is not used."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,17 +178,35 @@ class Defect:
     severity: Severity
     object_id: str
     detail: str
-    magnitude: float = 0.0
+    magnitude: float | None = None
+    """``None`` means "not measurable", which is genuinely different from ``0.0``.
+
+    Non-convex mesh-mesh penetration depth is unsolved in the general case — collision
+    libraries return zero depth on real contact. Collapsing the two would render a
+    genuine, documented defect as though nobody had measured it, in exactly the case
+    where the number matters most.
+    """
+
     unit: str = "m"
     location: Vec3 | None = None
     other_object_id: str | None = None
     suggestion: str = ""
 
+    @staticmethod
+    def of(defect_class: DefectClass, object_id: str, detail: str, **kw) -> "Defect":
+        """Build with the class's default severity, so identical defects cannot end up
+        with different severities depending on which code path produced them."""
+        kw.setdefault("severity", DEFAULT_SEVERITY[defect_class])
+        return Defect(defect_class=defect_class, object_id=object_id, detail=detail, **kw)
+
     def describe(self) -> str:
         where = f"{self.object_id}"
         if self.other_object_id:
             where += f" ∩ {self.other_object_id}"
-        mag = f", {self.magnitude:.4g}{self.unit}" if self.magnitude else ""
+        if self.magnitude is None:
+            mag = ", magnitude not measurable"
+        else:
+            mag = f", {self.magnitude:.4g}{self.unit}"
         tail = f" — {self.suggestion}" if self.suggestion else ""
         return f"[{self.severity}] {self.defect_class} at {where}{mag}: {self.detail}{tail}"
 
@@ -156,8 +221,33 @@ class MeasurementReport:
     """Object ids actually examined. At thousands of objects, checks are scoped to
     changed objects plus their spatial neighbours (ADR-011); this field records what was
     genuinely looked at so a clean report cannot be mistaken for a whole-scene clean
-    bill of health."""
+    bill of health.
+
+    Validated on construction: a report cannot claim a scope and then carry findings
+    from outside it. Without that check the field fails at the one thing it exists for.
+    """
+
     full_scene: bool = False
+
+    def __post_init__(self) -> None:
+        if self.full_scene:
+            return
+        known = set(self.scope)
+        for d in self.defects:
+            outside = {d.object_id, d.other_object_id} - {None} - known
+            if outside:
+                raise ValueError(
+                    f"MeasurementReport declares scope {sorted(known)} but reports a "
+                    f"{d.defect_class} on {sorted(outside)} — a report that examined "
+                    "objects it did not declare cannot be trusted about the ones it did"
+                )
+        for m in self.measurements:
+            subjects = set(m.subject.split("|")) - known
+            if subjects:
+                raise ValueError(
+                    f"MeasurementReport declares scope {sorted(known)} but measures "
+                    f"{sorted(subjects)}"
+                )
 
     @property
     def blockers(self) -> tuple[Defect, ...]:
@@ -188,10 +278,39 @@ class AcceptanceQuery:
     subject: str = ""
     expected: float | None = None
     tolerance: float = 1e-4
-    comparison: str = "eq"
-    """eq | lte | gte | none — ``none`` means the query is purely about absent defects."""
+    """Must be at least as loose as any joinery or constraint tolerance governing the same
+    subject. Three independently-defaulted tolerances across three types is how the same
+    geometry ends up simultaneously "not a defect" and "acceptance-failing"; see
+    :func:`reconcile_tolerance`."""
 
+    comparison: Comparison = Comparison.NONE
     params: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.comparison is not Comparison.NONE and self.expected is None:
+            raise ValueError(
+                f"acceptance query {self.query_id!r} compares with {self.comparison} but "
+                "has no expected value — the evaluator would raise on None, not fail cleanly"
+            )
+        if self.comparison is not Comparison.NONE and self.metric is None:
+            raise ValueError(
+                f"acceptance query {self.query_id!r} compares a value but names no metric"
+            )
+        if self.comparison is Comparison.NONE and not self.forbidden_defects:
+            raise ValueError(
+                f"acceptance query {self.query_id!r} checks nothing: no comparison and no "
+                "forbidden defects. A query that cannot fail is not a definition of done."
+            )
+
+
+def reconcile_tolerance(*tolerances: float) -> float:
+    """The tolerance an acceptance check must use given every tolerance governing it.
+
+    Always the loosest. A check tighter than the rule it verifies fails geometry that the
+    rule itself permits — the same 0.5 mm reading passing as intended joinery while
+    failing its own acceptance query.
+    """
+    return max(tolerances) if tolerances else 1e-4
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,10 +8,13 @@ work. Many sub-agents read and propose; exactly one writes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
+from typing import Protocol, runtime_checkable
 
+from .geometry import Vec3
 from .measurement import AcceptanceQuery, Defect
+from .operations import Proposal
 
 __all__ = [
     "Phase",
@@ -19,9 +22,11 @@ __all__ = [
     "CheckCadence",
     "RunState",
     "WriteLease",
-    "Proposal",
+    "WriteLockManager",
+    "LockContention",
     "Conflict",
     "PhasePromotion",
+    "Proposal",
 ]
 
 
@@ -52,7 +57,7 @@ class CheckCadence(StrEnum):
 
     Gate A 3.1, verbatim: *"after every change that touches geometry with a settings menu
     setting that enables me changing that"*. The default is the strictest option; the
-    setting exists because the user asked for it, not as an escape.
+    setting exists because the user asked for it, not as an escape hatch.
     """
 
     EVERY_GEOMETRY_CHANGE = "every_geometry_change"
@@ -70,37 +75,70 @@ class RunState(StrEnum):
     BLOCKED = "blocked"
 
 
+class LockContention(RuntimeError):
+    """Someone else holds the write lock.
+
+    A named error rather than a bare ``RuntimeError`` because an agent that is told
+    *who* holds the lock and *when it expires* can wait usefully; one given a traceback
+    retries immediately, forever.
+    """
+
+    def __init__(self, holder: str, expires_at_op: int) -> None:
+        super().__init__(
+            f"write lock held by {holder!r} until operation {expires_at_op}"
+        )
+        self.rule = "orchestration.lock_contention"
+        self.holder = holder
+        self.expires_at_op = expires_at_op
+
+
 @dataclass(frozen=True, slots=True)
 class WriteLease:
-    """Proof that a given agent currently holds the single write lock."""
+    """Proof that a given agent currently holds the single write lock.
+
+    Held in exactly one place — ``SceneDocument.active_lease`` — because a lease that can
+    be freely constructed proves nothing. Two agents each holding a ``WriteLease`` value
+    they built themselves is not a lock; it is two agents with the same dataclass.
+    """
 
     holder: str
     phase: Phase
     lease_id: str
     granted_at_op: int
+    expires_at_op: int
+    """Operation index past which this lease is stale and may be reclaimed. Without an
+    expiry, an agent that dies mid-operation holds the lock forever and the run wedges —
+    and agents die (Rule 6)."""
+
+    def is_stale(self, current_op: int) -> bool:
+        return current_op >= self.expires_at_op
 
 
-@dataclass(frozen=True, slots=True)
-class Proposal:
-    """A change a read-only sub-agent wants made.
+@runtime_checkable
+class WriteLockManager(Protocol):
+    """The single-writer mechanism, declared rather than merely described.
 
-    Inspect-role agents cannot write. They measure, critique, and return one of these;
-    the writer applies it. This is the mechanism by which parallelism is real without
-    concurrent mutation.
+    ADR-007's guarantee is the load-bearing safety property of the whole multi-agent
+    design, and several modules need to ask about it: ``mcp`` gating a mutating call,
+    ``raw`` before an opaque execution, ``viewer`` showing lock status.
     """
 
-    proposal_id: str
-    author: str
-    target_objects: tuple[str, ...]
-    operation_kind: str
-    params: dict = field(default_factory=dict)
-    rationale: str = ""
-    supporting_defects: tuple[Defect, ...] = ()
+    def acquire(self, holder: str, phase: Phase, *, ttl_ops: int = 64) -> WriteLease:
+        """Raises :class:`LockContention` if a live lease is held by someone else."""
+        ...
+
+    def release(self, lease: WriteLease) -> None: ...
+
+    def current(self) -> WriteLease | None: ...
+
+    def verify(self, lease: WriteLease) -> None:
+        """Raise unless ``lease`` is the live one. Called before every mutation."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
 class Conflict:
-    """Two proposals that cannot both be applied.
+    """Two or more proposals that cannot both be applied.
 
     Surfaced with the exact geometry involved, like a merge conflict, and never resolved
     silently (Gate A 10.3). Last-writer-wins is specifically wrong here: for geometry, a
@@ -112,15 +150,33 @@ class Conflict:
     proposals: tuple[Proposal, ...]
     overlapping_objects: tuple[str, ...]
     detail: str
-    magnitude: float = 0.0
+    location: Vec3 | None = None
+    """Where in the scene the clash is, so the viewer can point at it rather than
+    highlighting whole objects and leaving the operator to find the overlap."""
+
+    defects: tuple[Defect, ...] = ()
+    magnitude: float | None = None
     unit: str = "m"
+
+    def __post_init__(self) -> None:
+        if len(self.proposals) < 2:
+            raise ValueError(
+                f"conflict {self.conflict_id!r} has {len(self.proposals)} proposal(s); "
+                "a conflict is between at least two"
+            )
+        if not self.overlapping_objects:
+            raise ValueError(
+                f"conflict {self.conflict_id!r} names no objects — the operator would be "
+                "shown a clash with no geometry attached"
+            )
 
     def describe(self) -> str:
         authors = ", ".join(p.author for p in self.proposals)
-        mag = f" ({self.magnitude:.4g}{self.unit})" if self.magnitude else ""
+        mag = f" ({self.magnitude:.4g}{self.unit})" if self.magnitude is not None else ""
+        where = f" at {self.location.as_tuple()}" if self.location else ""
         return (
             f"CONFLICT {self.conflict_id}: {authors} both touch "
-            f"{', '.join(self.overlapping_objects)}{mag} — {self.detail}"
+            f"{', '.join(self.overlapping_objects)}{mag}{where} — {self.detail}"
         )
 
 

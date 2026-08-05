@@ -26,8 +26,31 @@ __all__ = [
 
 #: Default tolerance in metres. Two points closer than this are the same point.
 #: Chosen at 0.1 mm: tighter than any modelling tolerance we care about, looser than
-#: float32 accumulation error over a scene tens of metres across.
+#: float32 accumulation error near the origin.
+#:
+#: **This constant has a validity range.** The wire protocol ships positions as plain
+#: floats into a browser ``Float32Array``, where the ULP at x≈500 m is already ~3-4e-5 m —
+#: a third of EPSILON. At the district scale this system targets, two points the server
+#: considers coincident can round to distinct float32 values on the wire, producing cracks
+#: in the live view that do not exist in the source document. Use :func:`epsilon_at` for
+#: anything comparing coordinates far from the origin.
 EPSILON = 1e-4
+
+#: Beyond this distance from the origin, float32 precision degrades enough that a fixed
+#: EPSILON is no longer safe. Callers comparing world coordinates past it must scale.
+EPSILON_SAFE_RADIUS = 100.0
+
+
+def epsilon_at(distance_from_origin: float) -> float:
+    """Distance-scaled tolerance.
+
+    Inside :data:`EPSILON_SAFE_RADIUS` this is just :data:`EPSILON`. Beyond it, the
+    tolerance grows in proportion so that it stays above float32 representable
+    granularity at that magnitude.
+    """
+    if distance_from_origin <= EPSILON_SAFE_RADIUS:
+        return EPSILON
+    return EPSILON * (distance_from_origin / EPSILON_SAFE_RADIUS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,10 +180,25 @@ class Transform:
 
 @dataclass(frozen=True, slots=True)
 class AABB:
-    """Axis-aligned bounding box in world space."""
+    """Axis-aligned bounding box in world space.
+
+    Ordering is validated on construction. An inverted box short-circuits
+    :meth:`overlaps` to ``False`` on its first inverted axis, which is a *false negative*
+    in the broad-phase test that feeds clipping detection — a silent wrong answer in the
+    one place ADR-005 calls non-negotiable.
+    """
 
     minimum: Vec3
     maximum: Vec3
+
+    def __post_init__(self) -> None:
+        for axis in ("x", "y", "z"):
+            lo, hi = getattr(self.minimum, axis), getattr(self.maximum, axis)
+            if lo > hi:
+                raise ValueError(
+                    f"AABB is inverted on {axis}: minimum {lo} > maximum {hi}. "
+                    "An inverted box silently reports no overlap where one exists."
+                )
 
     @staticmethod
     def from_points(points: Iterable[Vec3]) -> "AABB":
@@ -215,8 +253,54 @@ class MeshSnapshot:
     transform: Transform = field(default_factory=Transform)
     normals: Sequence[Vec3] | None = None
     uvs: Sequence[tuple[float, float]] | None = None
-    polygon_count: int = 0
+    polygon_count: int | None = None
+    """Pre-triangulation face count. ``None`` means "derive it from triangles" —
+    deliberately not defaulted to ``0``, because a zero here silently reports a heavy
+    mesh as empty and defeats every polygon-budget warning for that object."""
+
     material_slots: Sequence[str] = ()
+    triangle_materials: Sequence[int] | None = None
+    """Per-triangle index into ``material_slots``. Required when more than one slot is
+    present: without it a multi-material mesh cannot be split for rendering, and the
+    viewer would have to silently drop every slot but the first."""
+
+    def __post_init__(self) -> None:
+        n = len(self.vertices)
+        if n == 0:
+            raise ValueError(f"MeshSnapshot {self.object_id!r} has no vertices")
+        for tri in self.triangles:
+            if len(tri) != 3:
+                raise ValueError(f"{self.object_id!r}: triangle {tri} does not have 3 indices")
+            if any(i < 0 or i >= n for i in tri):
+                raise ValueError(
+                    f"{self.object_id!r}: triangle {tri} indexes outside {n} vertices"
+                )
+        if self.normals is not None and len(self.normals) != n:
+            raise ValueError(
+                f"{self.object_id!r}: {len(self.normals)} normals for {n} vertices — "
+                "zip() would silently truncate rather than raise"
+            )
+        if self.uvs is not None and len(self.uvs) != n:
+            raise ValueError(f"{self.object_id!r}: {len(self.uvs)} uvs for {n} vertices")
+        if self.triangle_materials is not None:
+            if len(self.triangle_materials) != len(self.triangles):
+                raise ValueError(
+                    f"{self.object_id!r}: {len(self.triangle_materials)} material indices "
+                    f"for {len(self.triangles)} triangles"
+                )
+            if self.material_slots and any(
+                m < 0 or m >= len(self.material_slots) for m in self.triangle_materials
+            ):
+                raise ValueError(f"{self.object_id!r}: material index outside declared slots")
+        elif len(self.material_slots) > 1:
+            raise ValueError(
+                f"{self.object_id!r} declares {len(self.material_slots)} material slots but "
+                "no triangle_materials — the viewer cannot split it and would drop all but one"
+            )
+        if self.polygon_count is None:
+            object.__setattr__(self, "polygon_count", len(self.triangles))
+        elif self.polygon_count < 0:
+            raise ValueError(f"{self.object_id!r}: negative polygon_count")
 
     @property
     def triangle_count(self) -> int:
@@ -231,3 +315,31 @@ class MeshSnapshot:
 
     def world_bounds(self) -> AABB:
         return AABB.from_points(self.world_vertices())
+
+    def edges(self) -> list[tuple[int, int]]:
+        """The mesh's unique edges in **canonical order**.
+
+        This ordering is the contract: an edge index passed to
+        :meth:`ModifierOps.bevel_edges` indexes into exactly this list. Without a shared
+        definition, a detail pass selecting "exposed convex edges" would hand the engine
+        integers that mean something different at the other end — and the wrong edges
+        would be bevelled with no error at all.
+
+        Order: triangles in given order; within each triangle, edges ``(0,1) (1,2) (2,0)``;
+        each undirected edge normalised low-index-first and emitted the first time it is
+        seen.
+        """
+        seen: dict[tuple[int, int], None] = {}
+        for tri in self.triangles:
+            for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+                seen.setdefault((a, b) if a < b else (b, a), None)
+        return list(seen)
+
+    def boundary_edges(self) -> list[tuple[int, int]]:
+        """Edges bounding exactly one triangle. Each closed loop of these is one hole."""
+        counts: dict[tuple[int, int], int] = {}
+        for tri in self.triangles:
+            for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+                key = (a, b) if a < b else (b, a)
+                counts[key] = counts.get(key, 0) + 1
+        return [e for e, c in counts.items() if c == 1]

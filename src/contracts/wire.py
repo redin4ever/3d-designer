@@ -16,12 +16,17 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from .phases import CheckCadence
+
 __all__ = [
     "WIRE_VERSION",
     "ServerMessageType",
     "ClientMessageType",
     "MeshPayload",
     "TransformPayload",
+    "RollbackTarget",
+    "RedirectPayload",
+    "CadencePayload",
     "ServerMessage",
     "ClientMessage",
 ]
@@ -51,6 +56,10 @@ class ServerMessageType(StrEnum):
     RUN_STATE = "run_state"
     PROBLEMS = "problems"
     CONFLICT = "conflict"
+    EXPORT_REPORT = "export_report"
+    """Carries the export warning banner (Gate A 6.3). Separate from ``PROBLEMS`` because
+    an export banner is about a file that was written, not about the live scene."""
+
     RESYNC_REQUIRED = "resync_required"
     ERROR = "error"
 
@@ -62,16 +71,57 @@ class ClientMessageType(StrEnum):
     PAUSE = "pause"
     RESUME = "resume"
     ROLLBACK = "rollback"
-    """``{"steps": N}`` or ``{"checkpoint": "name"}``."""
+    """Payload: :class:`RollbackTarget`."""
 
     REDIRECT = "redirect"
-    """``{"text": "..."}`` — free-text instruction injected into the running agent."""
+    """Payload: :class:`RedirectPayload`."""
 
     REQUEST_FULL_SCENE = "request_full_scene"
     SET_CADENCE = "set_cadence"
-    """The settings control the user explicitly asked for at Gate A 3.1."""
+    """Payload: :class:`CadencePayload`. The settings control asked for at Gate A 3.1."""
 
     SELECT = "select"
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackTarget:
+    """Where to roll back to. Exactly one of the two.
+
+    Typed rather than a free dict because ``frontend`` and ``viewer`` are built in
+    parallel against this file alone. A disagreement about whether the key is ``steps``
+    or ``count`` surfaces only at live WebSocket runtime, which is the worst place to
+    find it.
+    """
+
+    steps: int | None = None
+    checkpoint: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.steps is None) == (self.checkpoint is None):
+            raise ValueError("rollback takes exactly one of steps or checkpoint")
+        if self.steps is not None and self.steps < 1:
+            raise ValueError(f"rollback steps must be >= 1, got {self.steps}")
+
+
+@dataclass(frozen=True, slots=True)
+class RedirectPayload:
+    """A free-text instruction typed by the operator mid-run.
+
+    It reaches the agent by riding out on the next tool response, in
+    ``ActionReport.operator_notes`` — MCP is call/response, so a server cannot push into
+    a connected agent's context uninvited.
+    """
+
+    text: str
+
+    def __post_init__(self) -> None:
+        if not self.text.strip():
+            raise ValueError("a redirect with no text would be silently dropped")
+
+
+@dataclass(frozen=True, slots=True)
+class CadencePayload:
+    cadence: CheckCadence
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +138,15 @@ class MeshPayload:
     indices: list[int]
     normals: list[float] | None = None
     uvs: list[float] | None = None
-    material: str = ""
+    materials: tuple[str, ...] = ()
+    """All material slots, not one. A mesh with several materials cannot be rendered
+    faithfully from a single name, and silently keeping the first is a rendering bug that
+    looks like a modelling bug."""
+
+    groups: tuple[tuple[int, int, int], ...] = ()
+    """``(start, count, material_index)`` draw ranges over ``indices``, one per material
+    run. Empty means the whole mesh uses ``materials[0]``."""
+
     triangle_count: int = 0
 
 
@@ -107,8 +165,15 @@ class TransformPayload:
 class ServerMessage:
     type: ServerMessageType
     seq: int = 0
-    """Monotonic. A client that sees a gap requests a full resync rather than rendering a
-    scene it cannot prove is current — a silently stale viewport is worse than a slow one."""
+    """Monotonic, assigned by exactly one counter in ``viewer``. Never set by a caller.
+
+    Client rules, both required:
+
+    - **Gap** (``seq > last_applied + 1``) → request a full resync. A silently stale
+      viewport is worse than a slow one.
+    - **Duplicate or out-of-order** (``seq <= last_applied``) → ignore. Retries happen,
+      and a client that applies mesh updates additively would otherwise double-apply one.
+    """
 
     meshes: tuple[MeshPayload, ...] = ()
     transforms: tuple[TransformPayload, ...] = ()

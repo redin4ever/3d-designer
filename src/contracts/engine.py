@@ -18,11 +18,13 @@ the seam has been crossed in the wrong direction.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol, Sequence, runtime_checkable
 
 from .geometry import AABB, MeshSnapshot, Transform, Vec3
 
 __all__ = [
+    "RepairOutcome",
     "MeshOps",
     "ModifierOps",
     "MaterialOps",
@@ -65,6 +67,24 @@ class EngineUnavailable(EngineError):
             suggestion="install Blender and enable the subprocess fallback, or skip this step",
         )
         self.capability = capability
+
+
+@dataclass(frozen=True, slots=True)
+class RepairOutcome:
+    """The result of a repair operation.
+
+    A bare integer cannot distinguish "nothing needed doing" from "found work and could
+    not do it" — both return zero. A caller building a report from that says *0 holes
+    remain* about a mesh that still has an unfilled one.
+    """
+
+    fixed: int = 0
+    skipped: int = 0
+    reason: str = ""
+
+    @property
+    def complete(self) -> bool:
+        return self.skipped == 0
 
 
 @runtime_checkable
@@ -152,8 +172,14 @@ class ModifierOps(Protocol):
         *,
         keep_upright: bool,
         extra_points: Sequence[Vec3] = (),
+        name_template: str = "{base}_i{index:03d}",
     ) -> list[str]:
         """Instance ``object_id`` along a polyline.
+
+        ``name_template`` lets the caller predict every instance's id before the call, so
+        an operation can pre-declare a ``ConstraintSet`` per instance and have live
+        re-solve reach individual balusters rather than only the array as a whole.
+        Available fields: ``base``, ``index``.
 
         ``keep_upright=True`` keeps each instance's own +Z parallel to world up rather
         than to the path normal. On a sloped path — a stair rake — the difference is
@@ -170,12 +196,12 @@ class ModifierOps(Protocol):
 
     def recalculate_normals(self, object_id: str, *, inside: bool = False) -> None: ...
 
-    def merge_by_distance(self, object_id: str, distance: float) -> int:
-        """Returns the number of vertices removed."""
+    def merge_by_distance(self, object_id: str, distance: float) -> "RepairOutcome":
+        """Weld coincident vertices."""
         ...
 
-    def fill_holes(self, object_id: str, max_sides: int = 0) -> int:
-        """Returns the number of holes filled. ``max_sides=0`` means no limit."""
+    def fill_holes(self, object_id: str, max_sides: int = 0) -> "RepairOutcome":
+        """Triangulate boundary loops. ``max_sides=0`` means no limit."""
         ...
 
 
@@ -226,14 +252,24 @@ class ExportOps(Protocol):
         path: str,
         *,
         y_up: bool,
+        mirror_x: bool = False,
+        negate_rotation: bool = False,
+        scale: float = 1.0,
         apply_modifiers: bool = True,
     ) -> str:
         """Write glTF/GLB via Blender's own exporter and return the path.
 
         Deliberately delegated rather than reimplemented: Blender's exporter handles PBR
-        and material edge cases correctly. Axis, handedness, unit and budget conversion
-        stay in ``src/export/`` as pure functions over plain data so they can be
-        round-trip tested without Blender.
+        and material edge cases correctly. The *decision* about which conversion applies
+        stays in ``src/export/`` as pure functions over the profile table, so it is
+        round-trip testable without Blender; this method just carries the answer through.
+
+        Every field of the conversion has a parameter here on purpose. An earlier draft
+        exposed only ``y_up``, which left ``mirror_x`` and ``negate_rotation`` — the two a
+        left-handed target needs together — with no way to reach the exporter. The only
+        remaining route would have been mutating live object transforms before the call
+        and reverting after: destructive, lock-requiring, and exactly the silent
+        round-trip mirroring bug the profile table exists to prevent.
         """
         ...
 
@@ -243,9 +279,26 @@ class RawOps(Protocol):
     def execute(self, source: str, namespace: dict | None = None) -> dict:
         """Run arbitrary Python against the live engine context (ADR-009).
 
-        This is unrestricted by explicit user decision. It provides no security boundary,
-        it breaks the parametric chain, and it acts as an undo barrier. Callers record
-        every invocation as an opaque operation.
+        Unrestricted by explicit user decision. It provides no security boundary, it
+        breaks the parametric chain, and it acts as an undo barrier. Callers record every
+        invocation as an opaque operation.
+
+        **This is the one method that cannot honour the error contract itself.** Arbitrary
+        code raises arbitrary exceptions, so the rest of this file's promise — that an
+        agent is told which rule broke, never a raw traceback — has to be kept by the
+        caller instead. Every call site must wrap it:
+
+        .. code-block:: python
+
+            try:
+                ns = engine.execute(source)
+            except Exception as exc:
+                raise EngineError(
+                    "raw.execution_failed", f"{type(exc).__name__}: {exc}",
+                    "the code you supplied raised; the scene may be partly modified"
+                ) from exc
+
+        Not wrapping it is how an agent ends up looping on a traceback it cannot act on.
         """
         ...
 

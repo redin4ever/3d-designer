@@ -11,19 +11,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Callable
+from typing import Any, Protocol, runtime_checkable
 
 from .constraints import ConstraintSet
-from .measurement import AcceptanceQuery, Defect, Measurement
+from .engine import EngineProtocol
+from .export_profiles import AssetClass
+from .measurement import AcceptanceQuery, Defect, Measurement, MeasurementReport
 
 __all__ = [
     "OperationStatus",
     "JoineryIntent",
     "Operation",
     "OperationResult",
+    "OperationHandler",
+    "HandlerRegistry",
+    "Proposal",
     "ActionReport",
+    "ExportReport",
     "ToolRole",
     "ToolSpec",
+    "MutatingHandler",
+    "ReadHandler",
     "ToolError",
 ]
 
@@ -67,7 +75,9 @@ class Operation:
 
     op_id: str
     kind: str
-    """The operation name, e.g. ``add_railing``. Matches a registered ToolSpec."""
+    """The operation name, e.g. ``add_railing``. Must resolve in the handler registry;
+    validated at append time by the scene document rather than here, because the set of
+    registered kinds is owned by the operation modules, not by contracts."""
 
     params: dict[str, Any] = field(default_factory=dict)
     placements: tuple[ConstraintSet, ...] = ()
@@ -76,6 +86,19 @@ class Operation:
     phase: str = "blockout"
     author: str = ""
     """Which agent/role issued it. Needed for conflict attribution."""
+
+    target_objects: tuple[str, ...] = ()
+    """Existing objects this operation acts *upon*, as opposed to ``produced_objects``
+    which it creates. Conflict detection compares these, so an operation that does not
+    declare what it touches cannot be checked against a concurrent one."""
+
+    asset_class: AssetClass | None = None
+    """Which polygon budget applies to what this produces. Without it the per-class
+    budgets in the export profiles are unreachable and only the platform's hard ceiling
+    can ever be checked."""
+
+    proposal_id: str = ""
+    """Provenance, when this operation came from a read-only sub-agent's proposal."""
 
     opaque: bool = False
     """True for raw code execution and any edit that cannot be replayed deterministically.
@@ -100,6 +123,61 @@ class OperationResult:
     error_rule: str = ""
     error_detail: str = ""
     error_suggestion: str = ""
+
+
+@runtime_checkable
+class OperationHandler(Protocol):
+    """How an operation kind is executed and re-executed.
+
+    Five separately-owned modules (``ops``, ``align``, ``gaps``, ``detail``, ``uv``)
+    contribute operations, and ``scene`` must replay all of them deterministically. Without
+    one declared calling convention here, each module would expose its operations however
+    it saw fit and ``scene`` would need five hand-written adapters — or five authors would
+    have to converge on an identical convention by luck.
+
+    A handler must be **deterministic**: the same operation against the same engine state
+    must produce the same geometry. Replay depends on it (ADR-002).
+    """
+
+    def __call__(self, engine: EngineProtocol, op: Operation) -> OperationResult: ...
+
+
+#: What each operation module exports and ``scene`` composes. Keys are operation kinds.
+HandlerRegistry = dict[str, OperationHandler]
+
+
+@dataclass(frozen=True, slots=True)
+class Proposal:
+    """A change a read-only sub-agent wants made.
+
+    Inspect-role agents cannot write. They measure, critique, and return one of these; the
+    single writer applies it. This is how parallelism is real without concurrent mutation
+    (ADR-007). It lives here rather than beside the phase machinery because a proposal is
+    structurally an un-applied :class:`Operation`, and it must convert into one without
+    losing fields.
+    """
+
+    proposal_id: str
+    author: str
+    target_objects: tuple[str, ...]
+    operation_kind: str
+    params: dict[str, Any] = field(default_factory=dict)
+    rationale: str = ""
+    supporting_defects: tuple[Defect, ...] = ()
+
+    def to_operation(self, op_id: str, phase: str) -> Operation:
+        """Convert losslessly. ``target_objects`` and provenance survive; ``rationale``
+        and ``supporting_defects`` are argument, not instruction, and are deliberately
+        dropped here — they belong in the log line, not in replayable state."""
+        return Operation(
+            op_id=op_id,
+            kind=self.operation_kind,
+            params=dict(self.params),
+            phase=phase,
+            author=self.author,
+            target_objects=self.target_objects,
+            proposal_id=self.proposal_id,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +207,21 @@ class ActionReport:
     no problems and ``checks_skipped=True`` is not a clean bill of health, and must never
     be presented as one."""
 
+    proposals: tuple[Proposal, ...] = ()
+    """What a read-only inspect tool returns instead of changes. Typed here so an inspect
+    handler has somewhere real to put a proposal, rather than serialising one into
+    ``summary`` text that conflict detection would then have to parse back out."""
+
+    operator_notes: tuple[str, ...] = ()
+    """Free-text instructions the human typed while the run was in flight.
+
+    MCP is call/response — a server cannot push into a connected agent's context
+    uninvited. So a redirect typed into the browser has exactly one way to reach the
+    agent: riding out on the next tool response. This field is that path, and it is
+    required rather than optional, because the alternative is smuggling it into
+    ``summary`` where two implementations will do it two different ways.
+    """
+
     def render(self) -> str:
         """Compact text form. Deliberately terse: token efficiency has a measured
         cost/accuracy tradeoff and a concise format runs about a third the tokens of a
@@ -142,11 +235,47 @@ class ActionReport:
             lines.append(f"PROBLEM  {d.describe()}")
         if self.checks_skipped:
             lines.append("NOTE     verification skipped by cadence setting — not a clean result")
+        for note in self.operator_notes:
+            lines.append(f"OPERATOR {note}")
         if not self.ok:
             lines.append(f"ERROR    {self.error_rule}: {self.error_detail}")
             if self.error_suggestion:
                 lines.append(f"TRY      {self.error_suggestion}")
         return "\n".join(lines)
+
+
+@dataclass(frozen=True, slots=True)
+class ExportReport:
+    """The outcome of an export.
+
+    Distinct from :class:`ActionReport`, which is shaped around an operation id. Export is
+    not an operation on the model — it is a file being written — and the warning banner
+    (Gate A 6.3) needs somewhere typed to travel from export through to the browser.
+    """
+
+    path: str
+    profile: str
+    ok: bool
+    triangle_count: int = 0
+    defects: tuple[Defect, ...] = ()
+    budget: int | None = None
+    over_budget_by: int = 0
+    forced: bool = False
+    """True when the user exported past a blocking defect. Recorded, never silent."""
+
+    @property
+    def banner(self) -> str:
+        if not self.defects and not self.over_budget_by:
+            return f"Exported {self.path} for {self.profile} — {self.triangle_count} tris, clean."
+        parts = [f"Exported {self.path} for {self.profile} with issues:"]
+        for d in self.defects:
+            parts.append(f"  • {d.describe()}")
+        if self.over_budget_by:
+            parts.append(
+                f"  • {self.triangle_count} tris is {self.over_budget_by} over the "
+                f"{self.budget} budget for this profile"
+            )
+        return "\n".join(parts)
 
 
 class ToolRole(StrEnum):
@@ -170,6 +299,20 @@ class ToolRole(StrEnum):
     """Checkpoints, rollback, raw execution."""
 
 
+@runtime_checkable
+class MutatingHandler(Protocol):
+    """A tool that changes the model. Always returns an :class:`ActionReport`."""
+
+    def __call__(self, **params: Any) -> ActionReport: ...
+
+
+@runtime_checkable
+class ReadHandler(Protocol):
+    """A read-only tool. Returns measurements, and may return proposals; never mutates."""
+
+    def __call__(self, **params: Any) -> MeasurementReport | ActionReport: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ToolSpec:
     """One MCP tool, declared beside the operation it exposes.
@@ -183,12 +326,26 @@ class ToolSpec:
     description: str
     roles: tuple[ToolRole, ...]
     input_schema: dict[str, Any]
-    handler: Callable[..., Any] | None = None
+    handler: MutatingHandler | ReadHandler | None = None
+    """Typed per kind so ``mcp`` can serialise a response without duck-typing its way to
+    one. A handler returning the wrong shape is otherwise discovered at runtime, for one
+    tool, the first time anybody calls it."""
+
     mutating: bool = True
     """Mutating tools require the single write lock. Read-only tools do not, which is
     what lets many inspect agents run beside the one writer."""
 
     examples: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.mutating and ToolRole.INSPECT in self.roles:
+            raise ValueError(
+                f"tool {self.name!r} is mutating but exposed to the INSPECT role. Many "
+                "inspect agents run concurrently precisely because none of their tools "
+                "can mutate — this combination breaks that guarantee (ADR-007)."
+            )
+        if not self.roles:
+            raise ValueError(f"tool {self.name!r} is visible to no role, so nothing can call it")
 
 
 class ToolError(Exception):
