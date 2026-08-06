@@ -211,3 +211,72 @@ verified by running them, not by an agent's report.
 injection point).
 
 **Repo now:** on branch `build/pass-1`, 10 commits, `state.json` at `phase: 4, pass: 1`.
+
+### Phase 4 — Build, pass 1 — continued (2026-08-06)
+
+**All 16 modules green**, plus a seventeenth the architecture panel did not foresee.
+
+**The fan-out cost.** 3 architects, 2 contract reviewers, 10 test-writers, 2 test auditors,
+16 implementers, 5 module reviewers (as a verified workflow), 1 completeness critic. One
+implementer died mid-task on an API error and was retried per Rule 6 — the retry found a
+real bug in the partial work it inherited (`matrix_world` stays stale after setting
+location/rotation until `view_layer.update()`, which silently broke `world_bounds` after
+any duplicate-then-move and would have fed stale cutter positions into every boolean).
+
+**What the verification agents actually bought**, since a check that never changes an
+outcome is a line item to delete:
+
+- The **contract review** found 15 blockers before a single module was built against the
+  frozen surface. Each would have been multiplied by sixteen.
+- The **test audits** found six implementations that would have passed while doing nothing:
+  `spatial.invalidate` as a no-op, `measure.gap_width` delegating to `distance`,
+  `find_clipping` applying any joinery intent globally, `engine.reset` clearing a private
+  ledger instead of the Blender scene, `export_gltf` dropping the handedness flags, and
+  `raw.execute` text-scanning source instead of diffing state.
+- The **engine retry** corrected a research assumption I had recorded as fact: `bpy` as a
+  module *does* have window access in this build, so unwrap, bake and glTF export run
+  in-process rather than needing the subprocess fallback. Also: Blender 5.2's boolean solver
+  enum is `FLOAT/EXACT/MANIFOLD`, not `FAST`.
+
+**The composition root.** There was no code anywhere that built an engine, a Scene, an
+Orchestrator and the registry and wired them together — `pyproject.toml` declared a
+`forge3d` entry point that did not exist. Rule 5 keeps every module out of its siblings,
+which is what made parallel construction safe; the cost is that the wiring has to be done
+once, deliberately, by whoever is allowed to know about all of them. `src/app/` is that,
+and it found three defects no module suite could:
+
+1. `ScenePort.document` declared a **method**; `Scene` exposes a **property**. Both
+   consumers matched the declaration and both wrote doubles that matched it too, so three
+   suites were green while the real trio could never have worked together.
+2. `ops.validate_params` expected `Vec3`; an agent sends JSON lists. `ops` documented that
+   conversion belongs at the boundary — correctly — and nobody built the boundary, so every
+   point-taking operation raised `AttributeError` on first real agent contact.
+3. `src/mcp/` shadowed the `mcp` PyPI SDK, so `import mcp` in our own transport resolved
+   back to us and the SDK was unreachable. No subscription client could ever have
+   connected, which is the one thing Gate A 7.4 asked for.
+
+Also found and fixed: `ops`, `gaps` and `align` each correctly declared `ToolRole.REFINE`,
+totalling 19 tools against a load-bearing 8-tool bound, with the registry's fair-cap
+fallback silently hiding `repair`, `make_plumb` and `close_visual_gap`. Split into `REPAIR`
+and `ALIGN` roles; every role now sits within 1–8 with nothing hidden.
+
+**Verified, by running it:** 609 backend test functions, 54 engine conformance checks run
+twice (fake and real Blender), 28 frontend tests. Both suites exit 0. `forge3d doctor`
+exits 0 on Blender 5.2.0 LTS with all three optional dependencies present. The gate
+(`node .pipeline/check.mjs --phase 4`) exits 0.
+
+**The end-to-end proof**, on real Blender: a staircase and a railing come out of the real
+stack; every railing post stands plumb on a 31° rake; a 30 mm interpenetration is detected
+and a declared `JoineryIntent` silences it; the model exports for Roblox with the stud
+conversion applied.
+
+**Assumed:** recorded per module in each agent's return and in
+`.pipeline/contract-requests.json`. The notable one: `orchestration` still cannot evaluate
+real per-phase acceptance queries because it reaches `scene` through a `ScenePort` that now
+exposes an engine but whose `can_promote` still uses a structural placeholder.
+
+**Queued for Gate B:** `MetricKind` has no member for the realism proxies (`detail` and `uv`
+both reuse unrelated kinds with the real name in `Measurement.detail`).
+
+**Repo now:** branch `build/pass-1`, 15 commits, 17 modules green, `state.json` at
+`phase: 4, pass: 1` pending the module-review workflow's verified findings.
