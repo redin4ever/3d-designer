@@ -85,6 +85,57 @@ CLIENTS: dict[str, dict] = {
 }
 
 
+def _looks_installed(client: str) -> bool:
+    """Whether this client appears to be on this machine.
+
+    Detected by its **config location**, not by hunting for an executable. A client that
+    has ever run has written its config directory; an installed-but-never-launched one has
+    not, and offering to configure something that will overwrite the file on first launch
+    is worse than not offering.
+
+    Deliberately generous: the directory existing is enough. A false positive costs a
+    config file in a folder the client already owns, and a false negative hides the whole
+    feature from someone who does have the client — so the failure modes are not
+    symmetric, and this errs toward showing it.
+    """
+    path = config_path_for(client)
+    return path.exists() or path.parent.exists()
+
+
+def _already_configured(client: str) -> bool:
+    path = config_path_for(client)
+    if not path.exists():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) or {}
+    except (OSError, ValueError):
+        return False
+    return "forge3d" in (data.get("mcpServers") or {})
+
+
+def detect_clients() -> list[dict]:
+    """Every AI client on this machine that forge3d can wire itself into.
+
+    Returned rather than printed, so the browser's Connect button and the CLI can share one
+    answer instead of drifting apart.
+    """
+    found = []
+    for name, spec in CLIENTS.items():
+        if not _looks_installed(name):
+            continue
+        found.append(
+            {
+                "id": name,
+                "label": spec["label"],
+                "transport": spec["transport"],
+                "config_path": str(config_path_for(name)),
+                "configured": _already_configured(name),
+                "note": spec["note"],
+            }
+        )
+    return found
+
+
 def config_for(client: str) -> dict:
     """The JSON this client expects, ready to paste."""
     if client not in CLIENTS:
