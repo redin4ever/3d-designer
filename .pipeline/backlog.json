@@ -270,7 +270,8 @@
     "module": "docs",
     "priority": "P2",
     "title": "SECURITY.md — state the unrestricted-execution and full-disk-access exposure plainly",
-    "source": "gate-A 7.2, 7.4, ADR-009"
+    "source": "gate-A 7.2, 7.4, ADR-009",
+    "status": "done"
   },
   {
     "id": "B-029",
