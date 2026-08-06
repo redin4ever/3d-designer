@@ -22,6 +22,10 @@ from .client import ClientMixin
 from .report import ReportMixin
 from .translate import TranslateMixin
 
+TRANSCRIPT_HISTORY = 200
+"""How many conversation lines a reconnecting client is handed. Matches the frontend
+transcript's own cap: replaying more than it will keep is work thrown away."""
+
 __all__ = ["ViewerBridge"]
 
 
@@ -42,6 +46,7 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         self._notifier: Callable[[], None] | None = None
         self._last_highlight: tuple[str, ...] = ()
         self._seen_conflicts: set[str] = set()
+        self._transcript: list[ServerMessage] = []
 
     def set_notifier(self, notifier: Callable[[], None] | None) -> None:
         """Register a zero-argument callback fired whenever a message is queued.
@@ -87,6 +92,8 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         already closed underneath it. ``scene.apply`` completing correctly is not allowed
         to depend on anything about the browser.
         """
+        if message.type is ServerMessageType.LOG:
+            self._remember(message)
         try:
             self._queue.append(message)
         except Exception:
@@ -110,6 +117,26 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         touch the outbound queue — this is a pull, for an explicit resync request, not a
         push."""
         return self._build_full_scene_message()
+
+    def _remember(self, message: ServerMessage) -> None:
+        """Keep a bounded history of the conversation, so a refresh does not erase it.
+
+        The transcript lived only in the browser, so reloading the page — or opening it in
+        a second window — showed an empty conversation while the run carried on. Nothing
+        was lost on the backend; there was simply no way to ask for it. This is that.
+
+        Bounded, because a long build is thousands of operations and a session that
+        remembered all of them would hold the whole run in memory and hand every new
+        watcher a wall of text. The cap matches the frontend transcript's own.
+
+        In memory and per-process on purpose: this is session history, not scene history.
+        The scene itself persists in the operation log; a restarted server genuinely has
+        nothing to say about a conversation that happened before it existed, and pretending
+        otherwise would mean writing chat to disk that no one asked to keep.
+        """
+        self._transcript.append(message)
+        if len(self._transcript) > TRANSCRIPT_HISTORY:
+            del self._transcript[: len(self._transcript) - TRANSCRIPT_HISTORY]
 
     def greeting(self) -> tuple[ServerMessage, ...]:
         """Everything a freshly-connected client needs before the first change arrives.
@@ -140,4 +167,18 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
             )
         )
         messages.append(self._build_full_scene_message(seq=seq))
+
+        # The conversation so far, after the scene, replayed at the same `seq` as
+        # everything else in the greeting for the reason above: consuming numbers here
+        # would push every already-connected watcher past its baseline and trigger a full
+        # resync in each of them, just because somebody opened a second tab.
+        messages.extend(
+            ServerMessage(
+                type=ServerMessageType.LOG,
+                seq=seq,
+                text=past.text,
+                data={**past.data, "replayed": True},
+            )
+            for past in self._transcript
+        )
         return tuple(messages)

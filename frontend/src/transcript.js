@@ -100,12 +100,22 @@ function normalizeRole(role) {
 export function applyServerLog(transcript, message) {
   const seq = message?.seq;
   const hasSeq = typeof seq === 'number';
-  if (hasSeq && transcript.lastSeq !== null && seq <= transcript.lastSeq) {
+
+  // Replayed conversation history, handed over when a client connects. It is exempt from
+  // the duplicate rule, and has to be: the entire greeting is sent at a single seq, so
+  // every replayed line after the first compares `seq <= lastSeq` and would be dropped —
+  // silently, and one layer below the socket's own gate, which needs the same exemption
+  // for the same reason. That is the difference between a refresh keeping the
+  // conversation and a refresh appearing to erase it.
+  const replayed = message?.data?.replayed === true;
+
+  if (!replayed && hasSeq && transcript.lastSeq !== null && seq <= transcript.lastSeq) {
     // wire.py's duplicate/out-of-order rule. Retries happen; a retried frame that
     // double-printed would read as the agent repeating itself.
     return transcript;
   }
-  if (hasSeq) transcript.lastSeq = seq;
+  // History does not advance the baseline either — it is older than everything live.
+  if (hasSeq && !replayed) transcript.lastSeq = seq;
 
   const role = normalizeRole(message?.data?.role);
   const text = message?.text ?? '';

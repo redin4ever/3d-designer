@@ -522,6 +522,44 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   // cleared, and the page showed nothing at all — no record, no confirmation, no reply.
   // These two cover the round trip the panel exists to make visible.
 
+  test('a page refresh does not erase the conversation', async () => {
+    // Reported: "if i refresh the chat gets cleared". The transcript lived only in the
+    // page, so reloading showed an empty conversation while the run carried on around it.
+    // The backend now replays it in the greeting — and because the whole greeting shares
+    // one seq, those lines have to bypass the duplicate-seq rule or they are discarded in
+    // silence and the fix does nothing at all.
+    const replayed = [
+      serverMessage('log', 4, { text: 'put a crate by the stairs', data: { role: 'operator', replayed: true } }),
+      serverMessage('log', 4, { text: 'add_primitive applied (1 object)', data: { role: 'agent', replayed: true } }),
+    ];
+    const s = await withScene([...FULL_SCENE_GREETING, ...replayed]);
+    try {
+      await waitForConnected(s);
+
+      const rows = await waitUntil(async () => {
+        const all = await transcriptRows(s.page);
+        return all.length >= 2 ? all : null;
+      }, 'the replayed conversation to appear after a reconnect');
+
+      const texts = rows.map((r) => r.text);
+      assert.ok(
+        texts.includes('put a crate by the stairs'),
+        `the operator's line did not survive: ${JSON.stringify(texts)}`,
+      );
+      assert.ok(
+        texts.includes('add_primitive applied (1 object)'),
+        `the agent's line did not survive: ${JSON.stringify(texts)}`,
+      );
+
+      const operator = rows.find((r) => r.text === 'put a crate by the stairs');
+      assert.equal(operator.role, 'operator', 'replayed history lost who said it');
+
+      assert.deepEqual(complaints(s).pageErrors, []);
+    } finally {
+      await s.dispose();
+    }
+  });
+
   test('a message typed into the composer appears in the transcript and reaches the server', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {

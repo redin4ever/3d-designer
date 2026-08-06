@@ -321,3 +321,50 @@ test('the newest message is scrolled into view without the operator hunting for 
 
     assert.equal(container.scrollTop, 900);
   }));
+
+// --- replayed history --------------------------------------------------------------
+// "if i refresh the chat gets cleared". The backend replays the conversation on connect,
+// and the whole greeting shares one seq — so the duplicate rule has to be exempted here
+// as well as in socket.js, or the lines are dropped one layer further down.
+
+test('replayed history is kept even though it shares a seq with a live line', () => {
+  const t = createTranscript();
+  applyServerLog(t, { seq: 4, text: 'created wall.south', data: { role: 'agent' } });
+
+  applyServerLog(t, { seq: 4, text: 'put a crate by the stairs', data: { role: 'operator', replayed: true } });
+  applyServerLog(t, { seq: 4, text: 'add_primitive applied', data: { role: 'agent', replayed: true } });
+
+  const texts = t.entries.map((e) => e.text);
+  assert.ok(texts.includes('put a crate by the stairs'), `dropped: ${JSON.stringify(texts)}`);
+  assert.ok(texts.includes('add_primitive applied'), `dropped: ${JSON.stringify(texts)}`);
+});
+
+test('replayed history keeps who said it', () => {
+  const t = createTranscript();
+  applyServerLog(t, { seq: 1, text: 'widen the door', data: { role: 'operator', replayed: true } });
+  assert.equal(t.entries.at(-1).role, 'operator', 'history came back unattributed');
+});
+
+test('replayed history does not move the baseline', () => {
+  // It is older than everything live. Advancing the baseline past a live message's seq
+  // would make the next real message look like a duplicate and silence the transcript.
+  const t = createTranscript();
+  applyServerLog(t, { seq: 2, text: 'live', data: { role: 'agent' } });
+  applyServerLog(t, { seq: 9, text: 'old', data: { role: 'agent', replayed: true } });
+
+  applyServerLog(t, { seq: 3, text: 'next live line', data: { role: 'agent' } });
+
+  assert.ok(
+    t.entries.map((e) => e.text).includes('next live line'),
+    'a replayed line silenced everything after it',
+  );
+});
+
+test('a live duplicate is still dropped', () => {
+  // The exemption must be narrow: only messages explicitly marked as replayed history.
+  const t = createTranscript();
+  applyServerLog(t, { seq: 4, text: 'once', data: { role: 'agent' } });
+  applyServerLog(t, { seq: 4, text: 'again', data: { role: 'agent' } });
+
+  assert.equal(t.entries.filter((e) => e.text === 'again').length, 0, 'a retry double-printed');
+});

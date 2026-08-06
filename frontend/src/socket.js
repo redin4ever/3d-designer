@@ -60,6 +60,28 @@ export function classifySeq(lastApplied, seq) {
   return 'apply';
 }
 
+/**
+ * What to do with one incoming message. Pure, so it is testable without faking a WebSocket
+ * — the same reason `classifySeq` is pure, and this module's stated convention.
+ *
+ *   'snapshot' — authoritative; it IS the resync payload, so it resets the baseline.
+ *   'history'  — replayed conversation handed to a client that just connected. Delivered
+ *                but does NOT move the baseline, because the snapshot messages own that.
+ *   'apply' / 'ignore' / 'resync' — the ordinary seq gate.
+ */
+export function routeMessage(lastApplied, awaitingResync, message) {
+  if (message.type === ServerMessageType.FULL_SCENE || message.type === ServerMessageType.HELLO) {
+    return 'snapshot';
+  }
+  // Checked BEFORE the gate, not allowed through it: the whole greeting shares one seq, so
+  // by the time replayed history arrives `seq <= lastApplied` holds and the duplicate rule
+  // would discard every line of it silently. That is what made a page refresh look like it
+  // had erased the conversation even after the backend started replaying it.
+  if (message.data && message.data.replayed === true) return 'history';
+  if (awaitingResync) return 'ignore';
+  return classifySeq(lastApplied, message.seq);
+}
+
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 10_000;
 
@@ -137,21 +159,18 @@ export class SocketClient {
   }
 
   _handleMessage(message) {
-    if (message.type === ServerMessageType.FULL_SCENE || message.type === ServerMessageType.HELLO) {
-      // A full snapshot is authoritative — it IS the resync payload, so it always
-      // resets the baseline rather than going through the gap/duplicate gate itself.
+    const action = routeMessage(this.lastApplied, this.awaitingResync, message);
+
+    if (action === 'snapshot') {
       this.lastApplied = message.seq;
       this.awaitingResync = false;
       this.onMessage(message);
       return;
     }
-
-    if (this.awaitingResync) {
-      // Ordinary messages are meaningless mid-resync; wait for the FULL_SCENE above.
+    if (action === 'history') {
+      this.onMessage(message);
       return;
     }
-
-    const action = classifySeq(this.lastApplied, message.seq);
     if (action === 'ignore') return;
     if (action === 'resync') {
       this.awaitingResync = true;
