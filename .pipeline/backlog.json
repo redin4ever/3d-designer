@@ -1,509 +1,315 @@
 [
   {
-    "id": "Q-017",
+    "id": "F-001",
     "type": "defect",
-    "module": "pipeline",
-    "priority": "P2",
+    "module": "mcp_server,orchestration",
+    "priority": "P0",
+    "title": "Bind ToolRole to the WriteLease. dispatch must read the role from the lease, never from the role string the caller passes. A tool the granted role does not hold is refused with a named rule stating the role that would allow it.",
+    "decision": "Gate B 6.3",
+    "adr": "ADR-013",
     "status": "open",
-    "title": "Tests-first git evidence: 10 modules have RED commits with combined scopes the gate cannot parse; gaps/align/uv/mcp/viewer/frontend have none at all; app committed tests after implementation. Not fabricating retroactive commits.",
-    "source": "phase 5 QA, 2026-08-06"
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "Q-016",
+    "id": "F-002",
     "type": "defect",
-    "module": "docs",
-    "priority": "P2",
-    "status": "fixed",
-    "title": "Ten module CLAUDE.md/README.md files still say RED by design / raises NotImplementedError for modules that are fully green.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-015",
-    "type": "defect",
-    "module": "frontend",
-    "priority": "P1",
-    "status": "fixed",
-    "title": "Primary-button hover fails WCAG AA at 2.87:1. DESIGN.md typography scale never reached tokens.css so app.css hardcodes off-scale px. No main landmark, no h1. Action log rebuilds the whole DOM inside an aria-live region on every append.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-014",
-    "type": "defect",
-    "module": "engine",
-    "priority": "P1",
-    "status": "fixed",
-    "title": "Object creation degrades 17x from 3.16ms to 54.52ms per op between 100 and 900 objects (a view_layer.update() per object). The stated target is thousands.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-013",
-    "type": "defect",
-    "module": "engine",
-    "priority": "P1",
-    "status": "fixed",
-    "title": "snapshot() walks mesh.polygons, so a vertex referenced by no face is invisible on real Blender. measure.find_loose_or_duplicate is dead code against real geometry while working against the fake.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-012",
-    "type": "defect",
-    "module": "app+scene+raw",
+    "module": "mcp_server,orchestration",
     "priority": "P0",
-    "status": "fixed",
-    "title": "Nothing in the production wiring computes a snapshot_path, so raw execution either raises or records an unrestorable barrier. Undo across it re-runs the arbitrary script instead of restoring - SECURITY.md claims this defence and it does not exist.",
-    "source": "phase 5 QA, 2026-08-06"
+    "title": "Enforce phase on dispatch. A tool not legal in the session current phase is refused with a named rule stating the current phase, what is available in it, and how to promote. Verified today: unwrap_uvs (POLISH) and add_railing (REFINE) both succeeded while phase was blockout.",
+    "decision": "Gate B 6.3",
+    "adr": "ADR-013",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "Q-011",
-    "type": "defect",
-    "module": "orchestration",
+    "id": "F-003",
+    "type": "test",
+    "module": "orchestration,scene",
     "priority": "P0",
-    "status": "fixed",
-    "title": "A dead writer wedges the lock forever: lease expiry is measured against document.head, but head only advances through apply, which only the dead lease holder can call.",
-    "source": "phase 5 QA, 2026-08-06"
+    "title": "Real OS-concurrency tests on the write lock: genuine threads contending for acquire, a second writer refused while a lease is live, INSPECT readers running concurrently with a writer, lease expiry under contention, dead-writer recovery. Zero threading.Thread exists anywhere in the lock test surface today. This is the property the whole design assumes and the thing the pass is judged on.",
+    "decision": "Gate B 6.2",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "Q-010",
+    "id": "F-004",
+    "type": "defect",
+    "module": "orchestration,measure,ops",
+    "priority": "P0",
+    "title": "can_promote evaluates real per-phase AcceptanceQuery objects against live geometry via measure.evaluate. Remove the force=True override. Every failing query names the object, the measured value, the threshold missed, and the operation that would fix it — that message is load-bearing, not cosmetic, because there is no override behind it.",
+    "decision": "Gate B 1.1",
+    "adr": "ADR-012",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-005",
+    "type": "defect",
+    "module": "export,mcp_server,app",
+    "priority": "P0",
+    "title": "export_scene and check_export_budget get real ToolSpec.handler callables invoked directly by dispatch, outside the operation log. Remove the carve-out at app/app_test.py:66 so the every-registered-tool-is-executable assertion becomes total.",
+    "decision": "Gate B 4.1",
+    "adr": "ADR-014",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-006",
+    "type": "feature",
+    "module": "measure,mcp_server",
+    "priority": "P0",
+    "title": "Publish MEASURE_SPECS: distance, gap_width, angle, find_clipping, full defect report. Assigned to the INSPECT role, which has zero tools today. This is the product central claim and the largest gap against blender-ai-mcp.",
+    "decision": "Gate B 3.1",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-007",
+    "type": "feature",
+    "module": "orchestration,mcp_server",
+    "priority": "P0",
+    "title": "Add inspect and promote tools: get_phase, list_objects, describe_object, promote_phase. Without these an agent cannot see what it built, learn what phase it is in, advance, or finish.",
+    "decision": "Gate B 3.1",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-008",
+    "type": "feature",
+    "module": "detail,mcp_server",
+    "priority": "P0",
+    "title": "Publish DETAIL_SPECS for the three detail passes named first-class at Gate A 8.4 and currently holding zero tools.",
+    "decision": "Gate B 3.1",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-009",
+    "type": "defect",
+    "module": "app,viewer,forge3d_cli",
+    "priority": "P0",
+    "title": "forge3d serve starts viewer.serve() automatically alongside the MCP transport. Today the socket is never opened, so no browser can reach a running session and the entire built control surface is unreachable.",
+    "decision": "Gate B 1.3",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-010",
     "type": "defect",
     "module": "scene",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "A handler that creates objects then raises leaves them live in the engine with no log entry - add_railing failing on its 3rd create_mesh left 29 orphans. They show in the live view as geometry with no history and vanish on the next save/load.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-009",
-    "type": "defect",
-    "module": "measure",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "distance and gap_width are computed from world AABBs only. Two beams yawed 45 degrees and 1.4m apart report distance 0.0 while find_clipping reports a 0.1m interpenetration between parts that never touch. Every test uses an unrotated cube.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-008",
-    "type": "defect",
-    "module": "measure",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "find_clipping reports min per-axis AABB overlap as magnitude and feeds it to JoineryIntent.permits. For anything thinner than it is deep - every post, dowel, tenon - the number collapses to the cross-section. A post 500mm through a deck reports 0.1m, and a declared 150mm socket silences it entirely.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-007",
-    "type": "defect",
-    "module": "tooling",
     "priority": "P1",
-    "status": "fixed",
-    "title": "npm run test:backend called python, the Windows Store stub. The documented command never worked and the gate read the suite as red. Now resolves a working interpreter.",
-    "source": "phase 5 QA, 2026-08-06"
+    "title": "Undo: reject at apply() an operation targeting an object no logged operation produced, with a named rule; AND make replay() tolerant of a single operation that cannot re-run, skipping and reporting rather than aborting. Today one such operation makes undo/redo/rollback raise for the rest of the session.",
+    "decision": "Gate B 5.2",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "Q-006",
+    "id": "F-011",
     "type": "defect",
-    "module": "uv+align+constraints",
+    "module": "scene,orchestration",
     "priority": "P1",
-    "status": "fixed",
-    "title": "Three duplicated copies of the degenerate-triangle guard used 1e-12 where normalized() raises below EPSILON. detail hit this and was fixed; the copies never were.",
-    "source": "phase 5 QA, 2026-08-06"
+    "title": "undo/redo/rollback_to restore from barrier.snapshot_path when an undo barrier is crossed, instead of replaying the opaque operation. Verified today: a non-deterministic raw script produced 1 object, then 3 differently-named objects after undo+redo, while reporting FULL_RESYNC. The capture half already exists.",
+    "decision": "Gate B 5.3",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "Q-005",
+    "id": "F-012",
     "type": "defect",
+    "module": "scene,contracts",
+    "priority": "P1",
+    "title": "Scene document v2: serialise placements, joinery, acceptance, asset_class and proposal_id. SCHEMA_VERSION to 2. A v1 file loads with an explicit named warning that its constraints were never stored. Round-trip test per nested type.",
+    "decision": "Gate B 1.2",
+    "adr": "ADR-015",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-013",
+    "type": "defect",
+    "module": "app,ops,constraints,align,uv,spatial,contracts",
+    "priority": "P1",
+    "title": "Every failure names a rule. Broad catch at the app/handlers.py boundary mapping any unhandled exception to a real rule carrying the original detail, PLUS degeneracy checks (zero-length path, zero quaternion, empty point set) moved into validate_params so good cases never reach the floor.",
+    "decision": "Gate B 5.4",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-014",
+    "type": "defect",
+    "module": "orchestration,measure,spatial",
+    "priority": "P1",
+    "title": "The automatic post-operation check runs pairwise find_clipping and find_visual_gaps against spatial neighbours, matching the checks_scope: \"changed+neighbours\" it already reports. One small room produced 39 unreported clipping defects; sweeping 480 pairs by hand took 14ms.",
+    "decision": "Gate B 4.2",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-015",
+    "type": "defect",
+    "module": "measure,spatial",
+    "priority": "P1",
+    "title": "find_self_intersections uses the spatial index for broadphase pruning. Today it is an O(triangles^2) pure-Python sweep: 0.006s to create a 960-triangle sphere, 6.5s to check it and find nothing — about 40% of a realistic session. F-014 adds load to the same loop.",
+    "decision": "Gate B 5.1",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-016",
+    "type": "defect",
+    "module": "contracts,export",
+    "priority": "P1",
+    "title": "Verify 1 Roblox stud = 0.28 m against Roblox own documentation, cite the source in export_profiles.py, and pin it with a regression test. Currently an uncited guess in the primary export profile.",
+    "decision": "Gate B 2.1",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-017",
+    "type": "improvement",
+    "module": "orchestration",
+    "priority": "P2",
+    "title": "Summarise the post-operation report above a threshold: per-object detail while it is a handful, aggregate plus breakdown plus defects beyond that. add_railing currently returns ~3,398 tokens for 40 objects; a small room costs ~5,400.",
+    "decision": "Gate B 4.3",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-018",
+    "type": "improvement",
+    "module": "detail,engine",
+    "priority": "P2",
+    "title": "Tune bevel parameters and add a topology cleanup pass. Real Blender bevels currently give mean triangle aspect ratio ~116 and edge-length CoV ~1.6 on a simple tread. Closes B-00L.",
+    "decision": "Gate B 3.4",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-019",
+    "type": "test",
+    "module": "engine,scene,orchestration",
+    "priority": "P2",
+    "title": "Measure the object-creation and check-loop curve to a real few thousand objects, not ~900. Record where it bends, and what the viewer and the check loop cost at that size. Gate A 11.4 named thousands as the target.",
+    "decision": "Gate B 2.4",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
+  },
+  {
+    "id": "F-020",
+    "type": "test",
     "module": "frontend",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "MESH_UPSERT carries a transform the browser never applied; every object rendered at the world origin and a positioned object snapped back there on its next topology change.",
-    "source": "phase 5 QA, 2026-08-06"
+    "priority": "P2",
+    "title": "Install Puppeteer and add a smoke test: the page loads against a live backend, the canvas draws, the action log updates. Not the full interaction and layout suite (cut at Gate B 6.1). Nothing has ever run this frontend in a browser.",
+    "decision": "Gate B 2.2 as reduced by 6.1",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "Q-004",
-    "type": "defect",
-    "module": "engine",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "export scaled each mesh in place but left its translation in metres; two-object scenes landed 3.57x wrong for Roblox and 100x for Unreal. mirror_x flipped meshes without moving them. Verified by a test that reads node translations out of the written GLB.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-003",
-    "type": "defect",
-    "module": "app+orchestration",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "promote() logged a phase_promotion operation no handler could execute, so the phase machine could not advance at all.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-002",
-    "type": "defect",
-    "module": "orchestration",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "perform() emitted hardcoded 0.0 placeholder measurements; B-000 was marked closed but the wiring was never done. Now calls measure against scene.engine and populates new_problems.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "Q-001",
-    "type": "defect",
-    "module": "orchestration",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "perform() never forwarded the write lease to scene.apply(); every mutating call through the real agent path raised LockContention against its own just-verified lease. Reported independently by 5 finders.",
-    "source": "phase 5 QA, 2026-08-06"
-  },
-  {
-    "id": "B-000",
-    "type": "defect",
-    "module": "orchestration+scene",
-    "priority": "P0",
-    "title": "ScenePort exposes no EngineProtocol, so Orchestrator.perform cannot run real measurements — the check-after-every-geometry-change loop currently carries placeholder Measurements. This is the products core promise (Gate A 3.1 + ADR-005) and must be wired before Phase 5.",
-    "source": "orchestration GREEN agent contract request, 2026-08-06",
-    "status": "fixed"
-  },
-  {
-    "id": "B-00F",
-    "type": "defect",
-    "module": "engine",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "engine.snapshot() assumed every mesh was already triangulated (a comment said so outright). True for geometry it created, false for Blenders own startup cube and every imported asset or hand-modelled .blend — so snapshot() raised on the first outside mesh and measure could not inspect exactly the geometry a user most wants checked. Now fan-triangulates; polygon_count preserves the face count."
-  },
-  {
-    "id": "B-00G",
-    "type": "defect",
-    "module": "engine+detail",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "bevel_edges resolved edge_indices as (vertex,vertex) pairs, matching two conformance checks that had drifted from the contracts Sequence[int]. detail follows the contract and passed ints, so the real consumer raised TypeError on first use while both suites stayed green. The engine agent flagged this honestly in testsSuspect. Contract form is now primary."
-  },
-  {
-    "id": "B-00H",
-    "type": "defect",
-    "module": "detail",
-    "priority": "P1",
-    "status": "fixed",
-    "title": "_triangle_normal called normalized() unconditionally and raised on degenerate slivers, which real Blender bevels produce. realism_report crashed on exactly the post-bevel geometry it exists to assess. Never caught because FakeEngines bevel duplicates a face rather than producing real geometry."
-  },
-  {
-    "id": "B-00I",
-    "type": "defect",
-    "module": "contracts+cli",
-    "priority": "P1",
-    "status": "fixed",
-    "title": "Defect.describe() emitted a set-intersection sign and reports used bullet characters; cp1252 is the default Windows console encoding and cannot encode them, so printing a clipping defect raised UnicodeEncodeError on the primary target platform. ASCII in machine-readable report text, UTF-8 forced at the CLI entry point, regression test encodes every report string as cp1252."
-  },
-  {
-    "id": "B-00J",
-    "type": "defect",
-    "module": "app",
-    "priority": "P1",
-    "status": "fixed",
-    "title": "build_app did not reset the engine, so Blenders startup cube/camera/light were in every session and showed up in object counts, clipping checks and exports as geometry the agent never made."
-  },
-  {
-    "id": "B-00K",
+    "id": "F-021",
     "type": "improvement",
     "module": "ops",
     "priority": "P2",
+    "title": "add_railing reports the cross-sections it supplied when the agent omitted post_size/baluster_size/rail_size, so the 5cm/5cm/3cm defaults stop being invisible. Gate A 6.4 chose no built-in dimension table.",
+    "decision": "Gate B 1.4",
     "status": "open",
-    "title": "add_railing sockets posts and balusters into whatever it is mounted on but declares no JoineryIntent, so a stair-plus-railing reports 94 clipping defects an agent must dismiss one by one. The railing should declare its own joinery for the parts it deliberately embeds."
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "B-00L",
-    "type": "improvement",
-    "module": "detail",
+    "id": "F-022",
+    "type": "chore",
+    "module": "orchestration",
     "priority": "P2",
+    "title": "Delete _tool_registry.py and its tests; Orchestrator.tools_for delegates to the real mcp_server registry. Its 16 tool names match none of the 29 real ones and nothing in src/app calls it.",
+    "decision": "Gate B 4.4",
     "status": "open",
-    "title": "Real Blender bevel produces a mean triangle aspect ratio of ~116 and edge-length CoV ~1.6 on a simple tread — very poor topology. The tool measures and reports this correctly; the bevel itself needs better parameters or a cleanup pass."
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "B-00C",
-    "type": "defect",
-    "module": "orchestration+scene+mcp_server",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "ScenePort declared document() as a method; Scene exposes it as a property. Both consumers matched the declaration and wrote doubles that matched it too, so three suites passed while the real trio could never work together. Found only by the end-to-end suite."
-  },
-  {
-    "id": "B-00D",
-    "type": "defect",
-    "module": "app+ops",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "ops.validate_params expected Vec3; an agent sends JSON lists. ops documented conversion as belonging at the boundary and nobody built the boundary, so every point-taking operation raised AttributeError on first real agent contact. Coerced at the composition root, schema-driven so add_lod_chain ratios are not mistaken for a coordinate."
-  },
-  {
-    "id": "B-00E",
-    "type": "defect",
-    "module": "mcp_server",
-    "priority": "P1",
-    "status": "fixed",
-    "title": "Four transport tests asserted the MCP SDK was absent - an assertion about the machine, not the code. They inverted the moment the declared dependency was installed. Now simulate absence; a new test fails loudly if the package rename is undone."
-  },
-  {
-    "id": "B-00A",
-    "type": "defect",
-    "module": "mcp_server",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "src/mcp shadowed the mcp PyPI SDK so `import mcp` in our own transports resolved to us — the SDK was permanently unreachable and no subscription client could ever connect. Renamed to src/mcp_server."
-  },
-  {
-    "id": "B-00B",
-    "type": "defect",
-    "module": "contracts+gaps+align",
-    "priority": "P0",
-    "status": "fixed",
-    "title": "ops+gaps+align all correctly declared ToolRole.REFINE, totalling 19 tools in one role against an 8-tool bound. The registrys fair-cap fallback then silently hid repair, make_plumb and close_visual_gap. Split REPAIR and ALIGN into their own roles; every role now sits inside 1-8 with nothing hidden."
-  },
-  {
-    "id": "B-001",
-    "type": "feature",
-    "module": "scene",
-    "priority": "P0",
-    "title": "Parametric scene document — typed operation log, deterministic evaluation, JSON persistence",
-    "source": "gate-A 6.1, ADR-002"
-  },
-  {
-    "id": "B-002",
-    "type": "feature",
-    "module": "engine",
-    "priority": "P0",
-    "title": "Blender adapter — in-process bpy session, data-API-first, temp_override for unavoidable operators",
-    "source": "gate-A 9.2, ADR-001, ADR-008"
-  },
-  {
-    "id": "B-003",
-    "type": "feature",
-    "module": "measure",
-    "priority": "P0",
-    "title": "Geometry query layer — bbox, dimensions, distance, angle, gap width, volume, tri count",
-    "source": "gate-A 11.3, ADR-005"
-  },
-  {
-    "id": "B-004",
-    "type": "feature",
-    "module": "measure",
-    "priority": "P0",
-    "title": "Validity checks — manifold, watertight, self-intersection, loose/duplicate verts, normal consistency, unapplied transforms",
-    "source": "gate-A 2.1, 6.3, ADR-005"
-  },
-  {
-    "id": "B-005",
-    "type": "feature",
-    "module": "spatial",
-    "priority": "P0",
-    "title": "BVH spatial index with incremental invalidation; broad-phase overlap pruning",
-    "source": "gate-A 11.4, ADR-011"
-  },
-  {
-    "id": "B-006",
-    "type": "feature",
-    "module": "clipping",
-    "priority": "P0",
-    "title": "Interpenetration detection — overlap extent along separating axis, intended-vs-unintended via declared joinery intent",
-    "source": "gate-A 2.1, 6 — the headline capability"
-  },
-  {
-    "id": "B-007",
-    "type": "feature",
-    "module": "constraints",
-    "priority": "P0",
-    "title": "Constraint vocabulary + solver — on, flush_with, centred_on, follows, offset_from, ends_at, plumb, parallel_to, perpendicular_to, coplanar_with, spacing, clear_of",
-    "source": "gate-A 3.4, ADR-004, A-006"
-  },
-  {
-    "id": "B-008",
-    "type": "feature",
-    "module": "ops",
-    "priority": "P0",
-    "title": "Typed parametric operation library — primitives, staircase, railing, wall, floor, opening, array-along-curve",
-    "source": "gate-A 3.3, ADR-004"
-  },
-  {
-    "id": "B-009",
-    "type": "feature",
-    "module": "mcp",
-    "priority": "P0",
-    "title": "MCP server — stdio + streamable HTTP, role-partitioned tool registry (5-8 tools per role)",
-    "source": "gate-A 9.1, 11.2, 7.4, ADR-003"
-  },
-  {
-    "id": "B-010",
-    "type": "feature",
-    "module": "history",
-    "priority": "P0",
-    "title": "Per-action undo via operation-log pointer; named checkpoints; pause/rollback/redirect",
-    "source": "gate-A 4.3, 5.4, ADR-006"
-  },
-  {
-    "id": "B-011",
-    "type": "feature",
-    "module": "gaps",
-    "priority": "P1",
-    "title": "Gap taxonomy + repair — boundary holes, non-manifold edges/verts, loose/duplicate verts, flipped normals, self-intersections, disconnected shells, visual gaps between parts",
-    "source": "gate-A 2.1"
-  },
-  {
-    "id": "B-012",
-    "type": "feature",
-    "module": "detail",
-    "priority": "P1",
-    "title": "Edge treatment pass — heuristic bevel (convex, exposed, dihedral threshold, width scaled to object size)",
-    "source": "gate-A 8.3, 8.4 — the top realism lever"
-  },
-  {
-    "id": "B-013",
-    "type": "feature",
-    "module": "detail",
-    "priority": "P1",
-    "title": "Surface detail pass — panel lines, seams, insets, greebles with deliberate rest zones",
-    "source": "gate-A 8.4"
-  },
-  {
-    "id": "B-014",
-    "type": "feature",
-    "module": "detail",
-    "priority": "P1",
-    "title": "Material realism pass — varied roughness, albedo clamped off pure black/white, wear masks",
-    "source": "gate-A 8.4"
-  },
-  {
-    "id": "B-015",
-    "type": "feature",
-    "module": "phases",
-    "priority": "P1",
-    "title": "Staged plan — blockout/refine/detail/polish with acceptance-query promotion gates",
-    "source": "gate-A 3.2, 10.2, ADR-007"
-  },
-  {
-    "id": "B-016",
-    "type": "feature",
-    "module": "agents",
-    "priority": "P1",
-    "title": "Sub-agent coordination — single writer, parallel readers, phase split, conflict flagged with exact geometry",
-    "source": "gate-A 10.1, 10.2, 10.3, ADR-007"
-  },
-  {
-    "id": "B-017",
-    "type": "feature",
-    "module": "viewer",
-    "priority": "P1",
-    "title": "Live browser view — three.js, WebSocket incremental updates, action log, latest change highlighted",
-    "source": "gate-A 5.1, 5.3, ADR-011"
-  },
-  {
-    "id": "B-018",
-    "type": "feature",
-    "module": "viewer",
-    "priority": "P1",
-    "title": "Operator controls — pause, roll back N, redirect in words; settings panel including check cadence",
-    "source": "gate-A 5.4, 3.1"
-  },
-  {
-    "id": "B-019",
-    "type": "feature",
-    "module": "export",
-    "priority": "P1",
-    "title": "Engine export profiles — Roblox (primary), Unity, Unreal, Godot; audited axis/handedness/unit conversion with round-trip fixtures",
-    "source": "gate-A 12.1, ADR-010"
-  },
-  {
-    "id": "B-020",
-    "type": "feature",
-    "module": "export",
-    "priority": "P1",
-    "title": "Export warning banner — validity report shown, never blocking",
-    "source": "gate-A 6.3"
-  },
-  {
-    "id": "B-021",
-    "type": "feature",
-    "module": "align",
-    "priority": "P1",
-    "title": "Angle and alignment operations — make parallel/perpendicular/coplanar/plumb/flush; quaternion internal, Euler surface",
-    "source": "gate-A 2.1, domain.md (a genuine gap in stock bpy)"
-  },
-  {
-    "id": "B-022",
-    "type": "feature",
-    "module": "budget",
+    "id": "F-023",
+    "type": "chore",
+    "module": "engine,docs",
     "priority": "P2",
-    "title": "Polygon budget tracking and warning, per engine profile and asset class",
-    "source": "gate-A 12.2"
+    "title": "Delete create_engine(prefer_subprocess=True) and correct docs/ARCHITECTURE.md:34,43, which still describes the subprocess fallback as a working part of the engine surface.",
+    "decision": "Gate B 2.3",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "B-023",
-    "type": "feature",
-    "module": "lod",
+    "id": "F-024",
+    "type": "chore",
+    "module": "mcp_server,docs",
     "priority": "P2",
-    "title": "LOD generation — simplified distance variants",
-    "source": "gate-A 12.3"
+    "title": "Record actual per-role tool counts after F-005..F-008 land, and state plainly where a role exceeds the 5-8 accuracy-optimal band. Gate B 3.3 chose to exceed it deliberately and measure rather than split roles.",
+    "decision": "Gate B 3.3",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "B-024",
-    "type": "feature",
-    "module": "modular",
+    "id": "F-025",
+    "type": "chore",
+    "module": "engine,testing",
     "priority": "P2",
-    "title": "Modular/snapping pieces — grid-aligned tiling kits for level geometry",
-    "source": "gate-A 12.3, 1.4 (environments)"
+    "title": "Add the missing spacing <= 0 guard to engine/_curve.py sample_polyline, which loops forever if called directly; its twin in testing/mesh_helpers.py:51 already has it. Reconcile the four _triangle_normal copies on their degenerate-case return value (three return None, constraints/anchors.py returns Vec3 zero and re-checks 1e-9 rather than EPSILON at :95).",
+    "decision": "Gate B 6.4",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "B-025",
-    "type": "feature",
-    "module": "uv",
-    "priority": "P2",
-    "title": "Auto UV unwrap and PBR bake, with agent-overridable seams",
-    "source": "gate-A 2.2, 12.4 — flagged as the highest-risk area in scope"
-  },
-  {
-    "id": "B-026",
-    "type": "feature",
-    "module": "raw",
-    "priority": "P2",
-    "title": "Unrestricted code execution tool; logged as an opaque edit that acts as an undo barrier",
-    "source": "gate-A 7.2, ADR-009"
-  },
-  {
-    "id": "B-027",
-    "type": "feature",
-    "module": "units",
-    "priority": "P2",
-    "title": "Unit convention — 1 unit = 1 metre locked by default, changeable per scene, conversion on ingest",
-    "source": "gate-A 6.2"
-  },
-  {
-    "id": "B-028",
+    "id": "F-026",
     "type": "docs",
     "module": "docs",
     "priority": "P2",
-    "title": "SECURITY.md — state the unrestricted-execution and full-disk-access exposure plainly",
-    "source": "gate-A 7.2, 7.4, ADR-009",
-    "status": "done"
+    "title": "Correct the four stale module docs: mcp_server/CLAUDE.md and README.md describe the package collision as live and blocking when it is fixed and claim the SDK is not installed when it is; viewer/CLAUDE.md says the same of websockets/starlette; orchestration/README.md still frames src/scene as unbuilt.",
+    "decision": "Gate B 6.4",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "B-029",
-    "type": "feature",
-    "module": "detail",
+    "id": "F-027",
+    "type": "chore",
+    "module": "contracts,testing,app",
     "priority": "P3",
-    "title": "Rigging and organic sculpting — thin coverage, depth as budget allows",
-    "source": "gate-A 2.3 'attempt everything', A-004"
+    "title": "Add the one required justification line to the seven files marginally over the 300-line soft cap (contracts_test.py 530, operations.py 408, fake_engine.py 392, geometry.py 345, measurement.py 325, engine.py 319, app/handlers.py 310). Five are in contracts/ where splitting is explicitly disfavoured.",
+    "decision": "Gate B 6.4",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   },
   {
-    "id": "B-030",
-    "type": "feature",
-    "module": "export",
+    "id": "F-028",
+    "type": "chore",
+    "module": "pipeline",
     "priority": "P3",
-    "title": "Collision meshes — offered at 12.3 and not selected",
-    "source": "A-003"
-  },
-  {
-    "id": "B-031",
-    "type": "feature",
-    "module": "export",
-    "priority": "P3",
-    "title": "Texture atlasing — offered at 12.3 and not selected",
-    "source": "A-003"
+    "title": "Set status \"done\" on the 24 backlog entries (B-001..B-021, B-023..B-025, B-027) that are built and green but carry no status field, in the archived .pipeline/backlog-pass-1.json.",
+    "decision": "Gate B 6.4",
+    "status": "open",
+    "source": "phase 7 Gate B, 2026-08-06",
+    "pass": 2
   }
 ]

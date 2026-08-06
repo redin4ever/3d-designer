@@ -112,3 +112,26 @@ gate slot on. This file is read aloud at the top of Gate B.
 - **Why:** 6.1 chose a parametric working file but not its encoding.
 - **Blast radius:** persistence layer; anything that reads a scene file by hand.
 - **Reversal cost:** low behind a serialiser interface, which is how it is built.
+
+---
+
+# Gate B reconciliation — 2026-08-06
+
+Every assumption above was read out at Gate B and voted on. This is the outcome. Where an
+assumption is amended, the text above stands as the record of what was assumed; this section
+is what is true from here.
+
+| id | Outcome | What changed |
+|---|---|---|
+| A-001 | **Confirmed** | Python core with in-process `bpy` held, and turned out to have window access, so unwrap/bake/export all run in-process. The unused subprocess fallback flag is deleted and `ARCHITECTURE.md` corrected (Gate B 2.3). The reversal window is closed; that is now a stated fact rather than a caveat. |
+| A-002 | **Amended** | Per-operation checks still report and never halt the agent. **Phase promotion now blocks** — [ADR-012](adr/ADR-012-phase-promotion-is-a-hard-gate.md), Gate B 1.1. The reporting default applies to operations, not to phase boundaries. |
+| A-003 | **Amended** | Read as "not now" from an unselected Gate A option. At Gate B 3.2 the user actively selected collision meshes and texture atlasing, then cut them at 6.1 for budget. They are now **named `HANDOVER.md` items the user wants**, not non-goals. |
+| A-004 | **Confirmed, and paid** | Sequencing by the user's own priorities held. The promised honest write-up is `docs/HANDOVER.md`, written this gate — it did not exist before, which was itself the drift Phase 6 found. Rigging and organic sculpting have **zero** coverage, not thin coverage. |
+| A-005 | **Confirmed** | HTTP still binds `127.0.0.1` and still warns on any other host, naming ADR-009. The non-loopback path remains untested; that is recorded in `HANDOVER.md`. |
+| A-006 | **Still open** | The 12-type constraint vocabulary is built and correct. "Which constraints agents actually reach for" was offered at Gate B 2.4 against measuring scale, and **scale won**. No agent has exercised the vocabulary outside a test file, and none will before the run ends. Goes to `HANDOVER.md` as the one assumption this pipeline could not resolve. |
+| A-007 | **Confirmed** | Retention unchanged. The operation log now persists more of each operation — [ADR-015](adr/ADR-015-scene-document-v2.md) — but for the same lifetime. |
+| A-008 | **Resolved** | Verify 1 stud = 0.28 m against Roblox's own documentation and pin it with a cited regression test (Gate B 2.1). No longer an assumption after the final pass. |
+| A-009 | **Amended** | Puppeteer is installed and the frontend gets a **smoke test** — page loads, canvas draws, log updates — not the full interaction and layout suite chosen at 2.2 and cut for budget at 6.1. Real keyboard behaviour and CSS layout stay unverified, in `HANDOVER.md`. |
+| A-010 | **Confirmed** | The scene document is still JSON, now at schema version 2. |
+
+**Six confirmed, three amended, one resolved, one still open.** No assumption was overturned.
