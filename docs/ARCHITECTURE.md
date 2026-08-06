@@ -46,8 +46,11 @@ src/
   export/          per-engine profiles (Roblox/Unity/Unreal/Godot), budget check, warning banner.
   raw/             arbitrary Python execution against a live engine context. ADR-009.
   viewer/          Python WebSocket server; scene-change events → wire protocol; operator controls.
-  mcp/             both transports; role-partitioned tool registry; routing.
-frontend/          static three.js page + Puppeteer suite. Node toolchain, no Python.
+  mcp_server/      both transports; role-partitioned tool registry; routing.
+  app/             THE COMPOSITION ROOT. Builds and wires everything; owns the
+                   JSON→domain parameter coercion at the agent boundary.
+  forge3d_cli.py   the `forge3d` entry point: `doctor` and `serve`.
+frontend/          static ES-module page + node:test suite. Node toolchain, no Python.
 ```
 
 ## Data flow through one request
@@ -158,3 +161,38 @@ because of the protocol seam described at the top of this file.
 
 `src/contracts/`, `.pipeline/*.json`, `pyproject.toml`, root config, the composition root that
 wires dependencies, and every integration decision. Rule 5.
+
+## Corrections made during the build
+
+Four things this document asserted turned out to be wrong once real code existed. They are
+recorded rather than quietly edited, because each was found by something specific and
+knowing what found it is worth as much as the correction.
+
+**`src/mcp/` had to become `src/mcp_server/`.** The package name shadowed the `mcp` PyPI SDK
+that `pyproject.toml` depends on. The root `conftest.py` puts `src/` first on `sys.path`, so
+`import mcp` from inside our own transport code resolved back to us and the SDK was
+permanently unreachable — meaning no subscription client could ever have connected, the one
+thing Gate A 7.4 asked for. Found by the module's own author, who correctly reported it as
+unfixable from inside the module's own boundary.
+
+**`ToolRole.REFINE` was over-subscribed.** `ops`, `gaps` and `align` each correctly declared
+`REFINE`; together that was 19 tools against a load-bearing 8-tool bound, and the registry's
+fair-cap fallback was silently hiding `repair`, `make_plumb` and `close_visual_gap` — core
+operations. The cap was the symptom, not the fix. `REPAIR` and `ALIGN` are now separate
+roles inside the same phase, and every role sits within 1–8 with nothing hidden.
+
+**`ScenePort.document` was declared a method; `Scene` exposes a property.** Both consumers
+matched the declaration, and both wrote test doubles that matched it too — so three suites
+were green while the real trio could never have worked together.
+
+**Nobody owned JSON→domain conversion.** `ops` documented, correctly, that params carry
+`Vec3` internally and that converting from the wire shape "is `scene`'s or `mcp`'s job at
+the boundary". Every module honoured that. Nobody built the boundary, so every point-taking
+operation raised `AttributeError: 'list' object has no attribute 'x'` the first time a real
+agent called it. It now lives in `app/handlers.py`, driven by each tool's own declared
+schema — a structural guess would have turned `add_lod_chain`'s `ratios=[0.5, 0.25, 0.1]`
+into a coordinate.
+
+The pattern in all four: a module can be entirely correct in isolation and still not
+connect. Two of the four could only ever have been found by putting the real objects side by
+side, which is what `src/app/` and its end-to-end suite exist to do.
