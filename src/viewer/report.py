@@ -211,6 +211,10 @@ class ReportMixin:
                 "measurements": [m.describe() for m in report.measurements],
                 "assumptions": list(report.assumptions),
                 "checks_skipped": report.checks_skipped,
+                # The transcript tells operator, agent and status lines apart by this.
+                # Without it every line looks like a system notice and a conversation reads
+                # as a log.
+                "role": "agent",
             },
         )
 

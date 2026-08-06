@@ -14,6 +14,8 @@ of the result is worth sending.
 
 from __future__ import annotations
 
+import logging
+
 from contracts import (
     ActionReport,
     CheckCadence,
@@ -28,6 +30,8 @@ from ._neighbours import NeighbourIndex
 from ._phase_acceptance import VISUAL_GAP_MAX
 from ._summary import Detail, summarise
 from .run import RunPaused
+
+log = logging.getLogger(__name__)
 
 
 def _touched(result: OperationResult) -> tuple[str, ...]:
@@ -183,7 +187,7 @@ class ReportingMixin:
             notes = tuple(self._operator_notes)
             self._operator_notes.clear()
 
-        return ActionReport(
+        report = ActionReport(
             op_id=op.op_id,
             ok=result.ok,
             summary=f"{op.kind} applied" if result.ok else f"{op.kind} failed",
@@ -202,6 +206,36 @@ class ReportingMixin:
             error_detail=result.error_detail,
             error_suggestion=result.error_suggestion,
         )
+        self._publish(report)
+        return report
+
+    def on_report(self, listener) -> None:
+        """Register something to be told about every :class:`ActionReport` this run produces.
+
+        The one arrow from the write path out to anything watching it. ``viewer`` already
+        knew how to turn a report into ``HIGHLIGHT``/``LOG``/``PROBLEMS`` messages —
+        ``ViewerBridge.report_action`` — and nothing ever called it, so a person with the
+        live view open saw meshes appear and was told nothing about what the agent had just
+        done or found.
+
+        A listener, rather than importing ``viewer`` here: the dependency arrow points from
+        the web layer into the core and never back (``ARCHITECTURE.md``), so the composition
+        root does the wiring and this side stays ignorant of who is listening.
+        """
+        self._report_listeners.append(listener)
+
+    def _publish(self, report: ActionReport) -> None:
+        """Tell every listener, and never let one of them break the operation.
+
+        Each in its own try, not one around the loop: a single raising listener must not
+        stop the ones after it from being told — the same rule ``scene._emit`` follows, and
+        for the same reason. A broken viewer must not be able to fail a geometry write.
+        """
+        for listener in self._report_listeners:
+            try:
+                listener(report)
+            except Exception:  # noqa: BLE001
+                log.exception("orchestration: a report listener raised; continuing")
 
     def set_cadence(self, c: CheckCadence) -> None:
         """Change the check cadence, effective on the very next ``perform`` call — a

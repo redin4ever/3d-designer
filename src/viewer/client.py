@@ -126,6 +126,25 @@ class ClientMixin:
         payload = RedirectPayload(**msg.data)
         self._orchestrator.add_operator_note(payload.text)
 
+        # Echo it to every watcher, including the sender.
+        #
+        # For the sender this is the delivery confirmation: the browser renders the line
+        # optimistically the moment Enter is pressed and reconciles it when this arrives, so
+        # a line that never reconciles is one the backend never received — which is exactly
+        # what a person needs to know and what the UI could not tell them before.
+        #
+        # For everybody else it is the point of a shared session: Gate A 10.1 chose many
+        # watchers, and an instruction typed by one of them that the others never see makes
+        # the build look like it changed its own mind.
+        self._enqueue(
+            ServerMessage(
+                type=ServerMessageType.LOG,
+                seq=self._next_seq(),
+                text=payload.text,
+                data={"role": "operator"},
+            )
+        )
+
     def _handle_set_cadence(self, msg: ClientMessage) -> None:
         cadence = msg.data.get("cadence")
         if not isinstance(cadence, CheckCadence):

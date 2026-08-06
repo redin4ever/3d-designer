@@ -91,6 +91,7 @@ class Orchestrator(
         self._index_engine = None
 
         # Re-entrant: `accept` calls `perform`, and both are part of the write path.
+        self._report_listeners: list = []
         self._write_mutex = threading.RLock()
         self._notes_mutex = threading.Lock()
         self._pending_mutex = threading.Lock()

@@ -12,6 +12,10 @@
 // unavailable: there is no try/catch around the launch and no conditional skip anywhere
 // in this file, because a browser test that passes without opening a browser is worse
 // than no browser test at all.
+//
+// Rule 2 soft cap, justified: `test:frontend:browser` names *this file* by path, and the
+// root package.json is main-agent-only — a sibling file would never be run, so splitting
+// along a seam here would silently delete tests rather than organise them.
 
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +24,12 @@ import { dirname, join } from 'node:path';
 
 import { startStaticServer } from './harness/static-server.mjs';
 import { startWireServer } from './harness/ws-server.mjs';
-import { FULL_SCENE_GREETING, EMPTY_GREETING, replyToClient } from './harness/fixtures.mjs';
+import {
+  FULL_SCENE_GREETING,
+  EMPTY_GREETING,
+  replyToClient,
+  serverMessage,
+} from './harness/fixtures.mjs';
 import {
   launchBrowser,
   openConsolePage,
@@ -32,6 +41,17 @@ import { probeCanvas, waitForCanvasDrawn } from './harness/canvas-probe.mjs';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NARROW = { width: 360, height: 720 };
+
+/** Every conversation row currently on screen, in reading order. */
+const transcriptRows = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('#chat-transcript li')].map((li) => ({
+      role: li.dataset.role ?? null,
+      state: li.dataset.state ?? null,
+      text: li.querySelector('.transcript-text')?.textContent ?? '',
+      background: getComputedStyle(li).backgroundColor,
+    })),
+  );
 
 /** Poll a predicate to a deadline. No sleeps anywhere in this suite (Rule 4). */
 async function waitUntil(predicate, description, timeoutMs = 10_000) {
@@ -103,11 +123,13 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         '/index.html',
         '/src/tokens.css',
         '/src/app.css',
+        '/src/chat.css',
         '/src/main.js',
         '/src/socket.js',
         '/src/viewport.js',
         '/src/scene-renderer.js',
         '/src/log.js',
+        '/src/transcript.js',
         '/src/controls.js',
       ]) {
         assert.ok(paths.includes(expected), `${expected} was never requested — the module graph did not load`);
@@ -140,6 +162,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
       assert.deepEqual(structure.h1s, ['forge3d'], 'exactly one <h1>, naming the product');
       assert.ok(structure.mainHasContent, 'the 3D view must be inside the main landmark');
       assert.ok(structure.liveRegions.includes('action-log'), 'the action log is an aria-live region');
+      assert.ok(structure.liveRegions.includes('chat-transcript'), 'the transcript is an aria-live region');
       assert.ok(structure.liveRegions.includes('connection-status'), 'the status pill is an aria-live region');
       assert.ok(structure.labelledInputs, 'every input and select has a real <label for=...>');
     } finally {
@@ -490,6 +513,107 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
       assert.equal(cleared, '', 'the redirect field must clear after sending');
       assert.deepEqual(s.pageErrors, [], 'driving the controls must not throw');
       assert.deepEqual(s.consoleErrors, [], 'driving the controls must not log an error');
+    } finally {
+      await s.dispose();
+    }
+  });
+
+  // The conversation panel. Before it existed you typed into the redirect box, the box
+  // cleared, and the page showed nothing at all — no record, no confirmation, no reply.
+  // These two cover the round trip the panel exists to make visible.
+
+  test('a message typed into the composer appears in the transcript and reaches the server', async () => {
+    const s = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s);
+      const words = 'add a garage door on the east wall';
+      const mine = async () => (await transcriptRows(s.page)).filter((r) => r.text === words);
+
+      await s.page.focus('#redirect-text');
+      await s.page.keyboard.type(words);
+      await s.page.keyboard.press('Enter');
+
+      // Optimistic: the operator's line is on screen before the server has said a word
+      // about it, because the agent will not even see it until its next tool call.
+      const shown = await waitUntil(async () => {
+        const rows = await mine();
+        return rows.length === 1 ? rows : null;
+      }, 'the operator line to appear in the transcript');
+      assert.equal(shown[0].role, 'operator');
+      assert.equal(shown[0].state, 'pending', 'nothing has confirmed delivery yet');
+
+      const redirect = await waitUntil(
+        () => s.wire.received.find((m) => m.type === 'redirect'),
+        'the redirect to reach the fake socket server',
+      );
+      assert.equal(redirect.data.text, words);
+      assert.equal(
+        await s.page.$eval('#redirect-text', (el) => el.value),
+        '',
+        'the field must clear once the message is queued',
+      );
+
+      // The server echoes the operator's own words back once it has queued them; that
+      // echo IS the delivery confirmation, so it must reconcile, never double-print.
+      s.wire.broadcast(serverMessage('log', 6, { text: words, data: { role: 'operator' } }));
+      await waitUntil(async () => (await mine())[0]?.state === 'confirmed', 'the echo to confirm the line');
+      assert.equal((await mine()).length, 1, 'the echo printed the operator line a second time');
+
+      // What "sent" means here is genuinely unusual, so it has to be said in the UI.
+      const note = await s.page.evaluate(() => {
+        const input = document.getElementById('redirect-text');
+        const described = document.getElementById(input.getAttribute('aria-describedby'));
+        return { text: described?.textContent.trim() ?? '', visible: described?.offsetParent !== null };
+      });
+      assert.ok(note.visible, 'the explanation must be on the page, not in a tooltip');
+      assert.match(
+        note.text,
+        /next tool call/i,
+        'the UI must say the agent picks the message up on its next tool call',
+      );
+
+      assert.deepEqual(complaints(s).pageErrors, [], 'sending a message must not throw');
+      assert.deepEqual(complaints(s).consoleErrors, []);
+    } finally {
+      await s.dispose();
+    }
+  });
+
+  test('operator, agent and role-less lines are told apart in the transcript', async () => {
+    const s = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s);
+      s.wire.broadcast(serverMessage('log', 6, { text: 'measured the gap: 3.2 mm', data: { role: 'agent' } }));
+      s.wire.broadcast(serverMessage('log', 7, { text: 'an older backend sends no role' }));
+
+      await s.page.focus('#redirect-text');
+      await s.page.keyboard.type('raise the roof');
+      await s.page.keyboard.press('Enter');
+
+      const rows = await waitUntil(async () => {
+        const seen = await transcriptRows(s.page);
+        return seen.length >= 3 && seen.some((r) => r.text === 'raise the roof') ? seen : null;
+      }, 'the agent, role-less and operator lines to all be on screen');
+
+      const agent = rows.find((r) => r.text === 'measured the gap: 3.2 mm');
+      const roleless = rows.find((r) => r.text === 'an older backend sends no role');
+      const operator = rows.find((r) => r.text === 'raise the roof');
+
+      assert.ok(agent, `the agent line never rendered: ${JSON.stringify(rows)}`);
+      assert.equal(agent.role, 'agent');
+      assert.ok(roleless, 'a LOG with no role must never make a message disappear');
+      assert.equal(roleless.role, 'system', 'a missing role is treated as system');
+      assert.ok(operator, 'the operator line never rendered');
+      assert.equal(operator.role, 'operator');
+      assert.notEqual(
+        operator.background,
+        agent.background,
+        'operator and agent lines must be distinguishable at a glance — that is the whole point',
+      );
+
+      const live = await s.page.$eval('#chat-transcript', (el) => el.getAttribute('aria-live'));
+      assert.equal(live, 'polite', 'assertive would interrupt a screen-reader user on every agent message');
+      assert.deepEqual(complaints(s).pageErrors, []);
     } finally {
       await s.dispose();
     }

@@ -13,6 +13,7 @@
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="src/tokens.css" />
   <link rel="stylesheet" href="src/app.css" />
+  <link rel="stylesheet" href="src/chat.css" />
 </head>
 <body>
   <header class="topbar">
@@ -35,11 +36,9 @@
       </div>
     </section>
 
-    <aside class="sidebar" aria-label="Action log">
-      <h2 class="panel-heading">Action log</h2>
-      <ul id="action-log" class="action-log" aria-live="polite"></ul>
-    </aside>
-
+    <!-- The controls panel sits before the sidebar in source order even though the grid
+         paints it below-left: it keeps the tab order canvas → run controls → conversation,
+         so the keyboard path through the page did not change when the chat panel landed. -->
     <section class="controls-panel" aria-label="Operator controls">
       <div class="control-group">
         <span id="run-controls-label">Run</span>
@@ -68,21 +67,6 @@
         </form>
       </div>
 
-      <div class="control-group redirect-group">
-        <form data-action="redirect-form">
-          <label for="redirect-text">Redirect the build, in words</label>
-          <div class="control-row">
-            <input
-              id="redirect-text"
-              data-field="redirect-text"
-              type="text"
-              placeholder="e.g. add a garage door on the east wall"
-            />
-            <button type="submit" class="btn">Send</button>
-          </div>
-        </form>
-      </div>
-
       <div class="control-group">
         <label for="cadence-select">Check cadence</label>
         <select id="cadence-select" data-field="cadence">
@@ -94,6 +78,41 @@
 
       <p id="control-error" class="control-error" role="alert"></p>
     </section>
+
+    <aside class="sidebar" aria-label="Conversation and action log">
+      <section class="chat-panel" aria-labelledby="chat-heading">
+        <h2 id="chat-heading" class="panel-heading">Conversation</h2>
+        <!-- aria-live="polite", not "assertive": an agent narrating a long build emits a
+             line every few seconds, and assertive interrupts a screen-reader user mid-word
+             every single time. Polite queues behind whatever they are already reading.
+             tabindex="0" because this scrolls, and a scrollable region a keyboard cannot
+             reach is a region a keyboard user cannot read the history of. -->
+        <ol id="chat-transcript" class="transcript" tabindex="0" aria-live="polite" aria-label="Conversation with the agent"></ol>
+        <form class="composer" data-action="redirect-form">
+          <label for="redirect-text">Redirect the build, in words</label>
+          <div class="control-row">
+            <input
+              id="redirect-text"
+              data-field="redirect-text"
+              type="text"
+              autocomplete="off"
+              aria-describedby="composer-note"
+              placeholder="e.g. add a garage door on the east wall"
+            />
+            <button type="submit" class="btn primary">Send</button>
+          </div>
+          <p id="composer-note" class="composer-note">
+            Sending queues your message. The agent picks it up on its next tool call — not the
+            moment you press Enter — so if it is idle right now, nothing happens until it acts again.
+          </p>
+        </form>
+      </section>
+
+      <section class="log-panel" aria-labelledby="action-log-heading">
+        <h2 id="action-log-heading" class="panel-heading">Action log</h2>
+        <ul id="action-log" class="action-log" aria-live="polite"></ul>
+      </section>
+    </aside>
   </main>
 
   <script type="module" src="src/main.js"></script>

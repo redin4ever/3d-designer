@@ -3,6 +3,7 @@
 Four things a person actually wants to do:
 
     forge3d run                 start everything and open the live view — the one command
+    forge3d connect             the exact config to point Claude / Cursor at this
     forge3d doctor              what is installed, what works, what does not
     forge3d serve --stdio       expose the tools to Claude Desktop / Claude Code / Cursor
     forge3d serve --http        expose them to a ChatGPT developer-mode connector
@@ -109,6 +110,14 @@ def start_viewer(app: Any, host: str, port: int) -> str:
         import viewer as viewer_module
 
         server = viewer_module.serve(app.scene, app.orchestrator, host=host, port=port)
+
+        # The arrow the whole live view was missing. `ViewerBridge.report_action` already
+        # knew how to turn an ActionReport into HIGHLIGHT / LOG / PROBLEMS messages and
+        # nothing ever called it, so a person watching saw meshes appear and was told
+        # nothing about what the agent had just done or found. Wired here, in the
+        # composition root, because the dependency arrow points from the web layer into the
+        # core and never back — `orchestration` must not learn that `viewer` exists.
+        app.orchestrator.on_report(server.bridge.report_action)
     except Exception as exc:  # noqa: BLE001
         return f"  live view: unavailable ({exc}). The tools are unaffected."
 
@@ -172,6 +181,39 @@ def serve(args: argparse.Namespace) -> int:
         return 1
 
 
+def connect(args: argparse.Namespace) -> int:
+    """``forge3d connect`` — print, or write, the config an AI client needs."""
+    from app.connect import CLIENTS, describe, write_config
+
+    if args.write:
+        if args.client in (None, "chatgpt"):
+            known = ", ".join(sorted(CLIENTS))
+            print(file=sys.stderr)
+            print("  --write needs a specific stdio client, e.g.:", file=sys.stderr)
+            print("    forge3d connect claude-desktop --write", file=sys.stderr)
+            print(f"  Known: {known}", file=sys.stderr)
+            print(file=sys.stderr)
+            return 1
+        try:
+            path = write_config(args.client)
+        except (KeyError, RuntimeError) as exc:
+            print(file=sys.stderr)
+            print(f"  {exc}", file=sys.stderr)
+            print(file=sys.stderr)
+            return 1
+        print()
+        print(f"  Wrote forge3d into {path}")
+        print(f"  {CLIENTS[args.client]['note']}")
+        print()
+        return 0
+
+    print()
+    print("forge3d connect")
+    print(describe(args.client, http_port=args.port))
+    print()
+    return 0
+
+
 def run(args: argparse.Namespace) -> int:
     """``forge3d run`` — everything at once. See ``app/live.py`` for what and why."""
     from app.live import run_live
@@ -191,6 +233,13 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("doctor", help="report what is installed and whether the core is wired")
+
+    c = sub.add_parser("connect", help="the exact config to point an AI client at this")
+    c.add_argument("client", nargs="?", default=None,
+                   help="claude-desktop | claude-code | cursor | chatgpt (default: all)")
+    c.add_argument("--write", action="store_true",
+                   help="merge it into the client's own config file rather than printing it")
+    c.add_argument("--port", type=int, default=8765, help="the HTTP MCP port forge3d run uses")
 
     r = sub.add_parser("run", help="start everything and open the live view (the one command)")
     r.add_argument("--port", type=int, default=8765, help="MCP over streamable HTTP")
@@ -223,6 +272,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "doctor":
         return doctor()
+    if args.command == "connect":
+        return connect(args)
     if args.command == "run":
         return run(args)
     return serve(args)

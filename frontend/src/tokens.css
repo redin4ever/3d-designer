@@ -71,6 +71,12 @@
   --font-text: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
+  /* Type scale (DESIGN.md "Typography"), transcribed verbatim from the frontmatter's
+     `typography` block. Only the two rungs this console actually uses are mapped; add the
+     rest here rather than writing a px literal into a stylesheet. */
+  --text-body-sm: 14px;
+  --text-caption: 12px;
+
   /* Elevation 4 — focus ring (DESIGN.md "Elevation & Depth") */
   --focus-ring: 2px solid var(--accent-focus);
 }

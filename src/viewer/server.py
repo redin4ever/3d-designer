@@ -62,7 +62,12 @@ def decode(raw: str | bytes) -> ClientMessage:
 #: Produced by one client's action but relevant to every watcher (Gate A 10.1). One
 #: operator pausing the run while another watches must not leave the second one believing
 #: it is still running.
-BROADCAST_TO_OTHERS = frozenset({ServerMessageType.RUN_STATE, ServerMessageType.PHASE})
+BROADCAST_TO_OTHERS = frozenset(
+    {ServerMessageType.RUN_STATE, ServerMessageType.PHASE, ServerMessageType.LOG}
+)
+#: ``LOG`` is here for the operator's own echoed instruction. A message typed by one watcher
+#: that the others never see makes the build look like it changed its own mind — and the
+#: sender needs it too, as the confirmation that the backend actually has their words.
 
 
 class ViewerSocketServer:

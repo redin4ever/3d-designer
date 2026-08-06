@@ -5,8 +5,8 @@ implementation-facing.
 
 ## Status
 
-**GREEN.** `node --test frontend/tests/` passes 70/70 (also `npm run test:frontend`), plus
-`npm run test:frontend:browser` for 14 smoke tests in real Chromium via Puppeteer.
+**GREEN.** `node --test frontend/tests/` passes 89/89 (also `npm run test:frontend`), plus
+`npm run test:frontend:browser` for 16 smoke tests in real Chromium via Puppeteer.
 The module tests are pure logic — no browser, no WebGL, no real WebSocket. The browser
 suite exists because that purity is also a blind spot: it is how a camera that could only
 turn left and right shipped.
@@ -77,6 +77,18 @@ independently discovered) rather than harmful — leave it in place regardless.
 - **Every `*.test.js` must be imported by `tests/index.js`** — see the quirk above. A file
   that is not listed passes when run directly and is silently invisible to
   `npm run test:frontend`.
+- **`transcript.js` is a separate module from `log.js`, not a variant of it.** The action
+  log only ever receives; the transcript has to reconcile a line this browser printed
+  optimistically against the server's later echo of the same line, which log.js's
+  append-only counter cannot express — reconciling changes an entry that is already on
+  screen. Both share the same append/cap/drop-from-the-DOM shape for the same reason:
+  their containers are `aria-live`, and a rebuild re-announces the whole history.
+- **The redirect composer lives in the conversation panel, not `.controls-panel`.** So
+  `main.js` passes `.layout` to `attachControls`, which queries its root for each control
+  individually and does not care that they now sit in two sections. The controls panel
+  still comes *before* the sidebar in `index.html`'s source order even though the grid
+  paints it below-left — that is what keeps the tab order `canvas → Pause → …`, which the
+  browser suite asserts.
 - `controls.js`'s message builders (`buildRollbackMessage` etc.) are pure and imported by
   `attachControls` in the same file, not duplicated — `main.js` only ever calls
   `attachControls`, never the builders directly.
@@ -114,6 +126,11 @@ doesn't pin something down, these were read from `src/viewer/server.py` /
   `wire.py` doesn't specify ordering guarantees between a mesh's arrival and a transform
   for it; treating an unmatched transform as informational rather than fatal is the
   reversible choice (`viewport.test.js`'s "no-op, not a crash" case pins this down).
+- **`LOG.data.role` is `operator` / `agent` / `system`**, and a `LOG` with no role is
+  treated as `system` — older backends send exactly that, and a missing role must never
+  make a message disappear. Every `LOG` goes to the conversation transcript; only
+  system-role and role-less ones *also* go to the action log, so an agent's reply is not
+  duplicated into the machine record.
 - **The action log only appends for discrete narrative events** (`LOG`, `PHASE`,
   `RUN_STATE`, `PROBLEMS`, `CONFLICT`, `EXPORT_REPORT`, `ERROR`, `HIGHLIGHT`, connection
   status) — not for every `MESH_UPSERT`/`TRANSFORM_UPDATE`, which show up in the live 3D
@@ -135,3 +152,9 @@ consequence of it being wrong, matching the house convention in
 `src/orchestration/CLAUDE.md`. Test files mirror source files one-to-one
 (`viewport.js` ↔ `viewport.test.js`, etc.) except `scene-renderer.js` and `main.js`,
 which are the two files with no pure logic to unit-test (see README).
+
+`tokens.css` gained two `--text-*` type-scale rungs (`--text-body-sm`, `--text-caption`),
+transcribed verbatim from DESIGN.md's `typography` frontmatter. New CSS
+reads sizes from those rather than writing a px literal; the older declarations in
+`app.css` still carry literals and are left alone rather than reformatted (Rule 5: no
+drive-by cleanups).

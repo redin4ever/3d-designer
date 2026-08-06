@@ -21,4 +21,5 @@ import './log.test.js';
 import './raster.test.js';
 import './socket.test.js';
 import './tokens.test.js';
+import './transcript.test.js';
 import './viewport.test.js';

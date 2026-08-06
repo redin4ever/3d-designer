@@ -32,15 +32,17 @@ real backend listens, not a frozen contract value). Override with a query param:
 
 ```
 frontend/
-  index.html          the shell: topbar, viewport panel, action log, controls panel
+  index.html          the shell: topbar, viewport panel, conversation, action log, controls
   src/
     tokens.css         GENERATED FROM DESIGN.md — DO NOT EDIT
     app.css            hand-authored layout/components, var(--token) only, no raw hex
-    main.js             entry — wires socket, viewport, log, controls to the DOM
+    chat.css           the conversation panel's rows and composer
+    main.js             entry — wires socket, viewport, log, transcript, controls to the DOM
     socket.js           WebSocket connection, the two seq rules, reconnect
     viewport.js          pure scene-graph state + payload→buffer translation
     scene-renderer.js    Canvas2D renderer — the real "renderer-like object"
     log.js               action log: append + cap
+    transcript.js        the conversation: append + cap + optimistic-send reconciliation
     controls.js           client-message builders + DOM wiring
   tests/
     index.js            works around a Node CLI quirk — see CLAUDE.md
@@ -77,14 +79,15 @@ constraints forbid adding a dependency or fetching one over the network. So
 node --test frontend/tests/
 ```
 
-Also runnable as `npm run test:frontend` from the repo root. 28 tests across 5 files,
-all pure logic:
+Also runnable as `npm run test:frontend` from the repo root — 89 tests, all pure logic —
+plus `npm run test:frontend:browser` for 16 smoke tests in real Chromium.
 
 | File | Covers |
 |---|---|
 | `viewport.test.js` | mesh_upsert geometry shape, transform_update's cheap path (no rebuild), objects_removed, highlight semantics, clearViewportState |
 | `socket.test.js` | the two seq rules — gap → resync, duplicate/out-of-order → ignore |
 | `log.test.js` | append order, length cap |
+| `transcript.test.js` | append order, cap (array and DOM), the three roles, missing-role default, optimistic send reconciled against the server's echo, unconfirmed lines |
 | `controls.test.js` | rollback (exactly one of steps/checkpoint), redirect (rejects empty), set_cadence (one of three values) |
 | `tokens.test.js` | tokens.css defines the required custom properties; no other file under `src/` contains a raw hex color |
 
@@ -105,6 +108,26 @@ Every control is a native `<button>`, `<input>`, `<select>`, or `<form>` — key
 reachable with no custom widget code. `:focus-visible` in `app.css` draws a 2px outline
 in `--accent-focus` on whatever has focus. Every input has a real `<label for=...>`;
 the run controls (`Pause`/`Resume`) are grouped under `role="group"` with a visible,
-referenced label. The connection status pill and action log both use `aria-live` so a
-screen reader hears state changes without the operator needing to hunt for them —
-answering the same "find it without hunting" brief as the visual highlight (Gate A 5.3).
+referenced label. The connection status pill, action log and conversation transcript all
+use `aria-live` so a screen reader hears state changes without the operator needing to
+hunt for them — answering the same "find it without hunting" brief as the visual
+highlight (Gate A 5.3).
+
+The transcript is `aria-live="polite"`, never `assertive`: an agent narrating a long build
+emits a line every few seconds, and assertive would interrupt a screen-reader user
+mid-word every single time. It carries `tabindex="0"` because it scrolls, and a scrollable
+region a keyboard cannot reach is a history a keyboard user cannot read. Rows are appended
+and updated in place, never rebuilt, so confirming a delivered message does not re-announce
+it — the delivery marker itself is `aria-hidden`, since it is the one part of a row that
+changes after the row has already been read out.
+
+## What "sent" means in the composer
+
+The agent does not receive a redirect when the operator presses Enter. MCP is
+call/response, so the backend queues the text and hands it over in the agent's next tool
+response (`contracts.wire.RedirectPayload`). That is unusual enough that a user who
+misreads it concludes the product is broken, so it is stated on the page, under the field,
+referenced by `aria-describedby` — not in a tooltip. The operator's line appears in the
+transcript immediately and is only claimed as delivered once the server echoes it back
+with `data.role: "operator"`; if the socket drops first, the line is marked
+"not delivered — send it again" rather than left looking sent.
