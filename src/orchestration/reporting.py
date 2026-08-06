@@ -15,6 +15,7 @@ of the result is worth sending.
 from __future__ import annotations
 
 import logging
+from typing import Iterable
 
 from contracts import (
     ActionReport,
@@ -22,6 +23,7 @@ from contracts import (
     Defect,
     Operation,
     OperationResult,
+    OperatorAnnotation,
     RunState,
     WriteLease,
 )
@@ -186,6 +188,12 @@ class ReportingMixin:
         with self._notes_mutex:
             notes = tuple(self._operator_notes)
             self._operator_notes.clear()
+            annotations = tuple(self._annotations)
+            self._annotations.clear()
+            # Read, never cleared. This is the one piece of operator state that outlives its
+            # own delivery, and it is the whole of Q-10: an instruction the agent re-reads
+            # every turn rather than one it is told once and then forgets.
+            focus = self._focus
 
         report = ActionReport(
             op_id=op.op_id,
@@ -197,6 +205,8 @@ class ReportingMixin:
             new_problems=new_problems,
             checks_skipped=checks_skipped,
             operator_notes=notes,
+            operator_annotations=annotations,
+            operator_focus=focus,
             assumptions=result.assumptions,
             breakdown=detail.breakdown,
             detail_omitted=detail.detail_omitted,
@@ -244,20 +254,39 @@ class ReportingMixin:
         self._cadence = c
 
     @property
-    def focus(self):
+    def focus(self) -> tuple[str, ...]:
         """The parts the operator has marked as important.
 
-        Nothing here is implemented yet (Rule 4 — tests come first).
+        Readable outside the write path on purpose: an idle run performs nothing, and the
+        operator can mark parts while it is idle. The MCP tool that hands an agent its
+        operator context is exactly that caller.
         """
-        raise NotImplementedError("orchestration.focus: not implemented")
+        with self._notes_mutex:
+            return self._focus
 
-    def set_focus(self, object_ids) -> None:
-        """Replace the focus set. Nothing here is implemented yet (Rule 4)."""
-        raise NotImplementedError("orchestration.set_focus: not implemented")
+    def set_focus(self, object_ids: Iterable[str]) -> None:
+        """Replace the focus set — the whole set, never a delta (Q-11).
 
-    def add_annotation(self, annotation) -> None:
-        """Queue one operator annotation. Nothing here is implemented yet (Rule 4)."""
-        raise NotImplementedError("orchestration.add_annotation: not implemented")
+        Replacing rather than accumulating is what keeps the backend and the operator's own
+        screen in agreement. The browser sends everything currently marked each time; if this
+        merged instead, unmarking something in the UI would leave it marked here, forever, and
+        the screen showing the truth would be the wrong one.
+
+        Held under ``_notes_mutex`` with the other operator state: a viewer socket calls this
+        from its own thread while the agent's thread is inside ``perform``.
+        """
+        with self._notes_mutex:
+            self._focus = tuple(object_ids)
+
+    def add_annotation(self, annotation: OperatorAnnotation) -> None:
+        """Queue one annotation for delivery on the next :class:`ActionReport`.
+
+        Queued and then drained, exactly like an operator note and for the same reason — MCP
+        is call/response, so the next tool response is the only channel into a connected
+        agent's context. Unlike focus, this is an event: it is delivered once.
+        """
+        with self._notes_mutex:
+            self._annotations.append(annotation)
 
     def add_operator_note(self, text: str) -> None:
         """Queue free text typed mid-run for delivery on the next ``ActionReport``. Queued
