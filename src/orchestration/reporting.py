@@ -243,6 +243,22 @@ class ReportingMixin:
         changing that"), not a value read once at construction and then frozen."""
         self._cadence = c
 
+    @property
+    def focus(self):
+        """The parts the operator has marked as important.
+
+        Nothing here is implemented yet (Rule 4 — tests come first).
+        """
+        raise NotImplementedError("orchestration.focus: not implemented")
+
+    def set_focus(self, object_ids) -> None:
+        """Replace the focus set. Nothing here is implemented yet (Rule 4)."""
+        raise NotImplementedError("orchestration.set_focus: not implemented")
+
+    def add_annotation(self, annotation) -> None:
+        """Queue one operator annotation. Nothing here is implemented yet (Rule 4)."""
+        raise NotImplementedError("orchestration.add_annotation: not implemented")
+
     def add_operator_note(self, text: str) -> None:
         """Queue free text typed mid-run for delivery on the next ``ActionReport``. Queued
         rather than sent immediately because MCP is call/response — there is no channel into
