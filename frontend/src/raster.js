@@ -38,19 +38,27 @@
 // coplanar geometry z-fight in bands. 1/w *is* linear in screen space, which is why every
 // hardware pipeline interpolates it and compares that. Nearer is larger.
 
-/** A colour+depth target. Plain typed arrays, so this is testable with no canvas at all. */
+/**
+ * A colour+depth+id target. Plain typed arrays, so this is testable with no canvas at all.
+ *
+ * `ids` is the picking channel — which object owns each pixel — written in the same inner
+ * loop and behind the same depth test as the colour. Picking therefore returns the object the
+ * depth test already chose, instead of a second opinion from a ray cast. See picking.js for
+ * why two answers to "what is visible" is worse than one.
+ */
 export function createFrame(width, height) {
   return {
     width,
     height,
     color: new Uint8ClampedArray(width * height * 4),
     depth: new Float32Array(width * height), // 1/w, 0 = nothing drawn (infinitely far)
+    ids: new Int32Array(width * height), // 0 = no object here (picking.NOTHING)
   };
 }
 
-/** Fill the whole frame with a background colour and reset every depth. */
+/** Fill the whole frame with a background colour and reset every depth and id. */
 export function clearFrame(frame, [r, g, b]) {
-  const { color, depth } = frame;
+  const { color, depth, ids } = frame;
   for (let i = 0; i < depth.length; i += 1) {
     const o = i * 4;
     color[o] = r;
@@ -58,6 +66,9 @@ export function clearFrame(frame, [r, g, b]) {
     color[o + 2] = b;
     color[o + 3] = 255;
     depth[i] = 0;
+    // Cleared with the depth, never separately. An id left behind keeps a deleted object
+    // pickable in the space it used to occupy until something is drawn over it.
+    if (ids) ids[i] = 0;
   }
 }
 
@@ -69,9 +80,13 @@ export function clearFrame(frame, [r, g, b]) {
  *
  * Returns the number of pixels actually written, which is what makes the depth test
  * testable — "the far triangle wrote nothing" is the assertion that matters.
+ *
+ * `id` is optional and defaults to 0 ("no object here"). This renderer also draws things that
+ * are not scene objects, and keeping it optional is what lets every existing caller and every
+ * existing test in raster.test.js stay exactly as it was.
  */
-export function drawTriangle(frame, a, b, c, [r, g, b_, ]) {
-  const { width, height, color, depth } = frame;
+export function drawTriangle(frame, a, b, c, [r, g, b_, ], id = 0) {
+  const { width, height, color, depth, ids } = frame;
 
   // Signed area via the cross product. Zero means degenerate — a triangle seen exactly
   // edge-on covers no pixels, and dividing by it would produce NaN barycentrics that
@@ -113,6 +128,9 @@ export function drawTriangle(frame, a, b, c, [r, g, b_, ]) {
       if (invW <= depth[idx]) continue; // something nearer is already here
 
       depth[idx] = invW;
+      // Inside the depth test, deliberately. Writing the id unconditionally would make the
+      // last-drawn object pickable straight through everything in front of it.
+      if (ids) ids[idx] = id;
       const o = idx * 4;
       color[o] = r;
       color[o + 1] = g;
