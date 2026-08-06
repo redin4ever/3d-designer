@@ -20,6 +20,7 @@
 
 import { OrbitCamera, clipTriangleNear, shadeFactor, triangleNormal, zUpToYUp } from './camera.js';
 import { clearFrame, createFrame, drawTriangle } from './raster.js';
+import { createIdIndex } from './picking.js';
 
 function readColor(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -67,10 +68,16 @@ export class SceneRenderer {
     this._dragging = false;
     this._lastPointerX = 0;
     this._lastPointerY = 0;
-    this._colors = { ink: 'white', muted: 'gray', accent: 'slateblue', canvas: 'black' };
+    // Named CSS colours as the pre-theme fallback, never hex: tests/tokens.test.js scans
+    // every source file for a hex literal outside tokens.css and fails on one.
+    this._colors = { ink: 'white', muted: 'gray', accent: 'slateblue', canvas: 'black', marked: 'gold' };
     this._frame = null;
     this._image = null;
     this._rgbCache = new Map();
+    // Picking reads the id the depth test chose, so the renderer is the one place that
+    // can assign these — see picking.js for why this is not a ray cast.
+    this.ids = createIdIndex();
+    this._focused = new Set();
     this._probeCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     this._bindPointer();
     this._resizeObserver = new ResizeObserver(() => this._resize());
@@ -83,6 +90,7 @@ export class SceneRenderer {
       ink: readColor('--ink', this._colors.ink),
       muted: readColor('--muted', this._colors.muted),
       accent: readColor('--accent', this._colors.accent),
+      marked: readColor('--marked', this._colors.marked),
       canvas: readColor('--canvas', this._colors.canvas),
     };
     this._rgbCache.clear(); // the tokens just changed; the resolved bytes are stale
@@ -108,10 +116,30 @@ export class SceneRenderer {
 
   removeNode(handle) {
     this.nodes.delete(handle.handleId);
+    // Retire the picking id with the node. Reusing it would let a pick that was in
+    // flight when the object was deleted resolve to whatever took its place.
+    this.ids.forget(handle.id);
   }
 
   setHighlighted(handle, on) {
     handle.highlighted = on;
+  }
+
+  /**
+   * The parts the operator marked as important (Q-13).
+   *
+   * Kept separate from `highlighted`, deliberately. HIGHLIGHT means 'the agent just
+   * changed this' and clears every previous id on each message — reusing it would wipe
+   * the operator's marks every time the agent touched anything, which is the one thing
+   * a standing mark must not do.
+   */
+  setFocused(objectIds) {
+    this._focused = new Set(objectIds ?? []);
+  }
+
+  /** The current colour+depth+id frame, for picking. Null before the first draw. */
+  get frame() {
+    return this._frame;
   }
 
   start() {
@@ -258,6 +286,7 @@ export class SceneRenderer {
     const background = this._rgb(this._colors.canvas);
     const surface = this._rgb(this._colors.muted);
     const accent = this._rgb(this._colors.accent);
+    const marked = this._rgb(this._colors.marked);
 
     if (!this._frame || this._frame.width !== width || this._frame.height !== height) {
       this._frame = createFrame(width, height);
@@ -306,7 +335,11 @@ export class SceneRenderer {
     for (const handle of this.nodes.values()) {
       const world = allWorld.get(handle.handleId);
       const { indices } = handle.geometry;
-      const base = handle.highlighted ? accent : surface;
+      // A part the operator marked reads as focus first: it is standing state they put up
+      // deliberately, where a change-highlight is a moment that fades (Q-13).
+      const focused = this._focused.has(handle.id);
+      const base = focused ? marked : handle.highlighted ? accent : surface;
+      const id = this.ids.idFor(handle.id);
 
       for (let i = 0; i < indices.length; i += 3) {
         const a = world[indices[i]];
@@ -320,7 +353,7 @@ export class SceneRenderer {
         // No sort, no subdivision, no seam inflation. The depth buffer decides visibility
         // per pixel, so draw order does not matter and none of those are needed.
         for (const [ca, cb, cc] of clipTriangleNear(a, b, c, nearPlane)) {
-          drawTriangle(frame, project(ca), project(cb), project(cc), rgb);
+          drawTriangle(frame, project(ca), project(cb), project(cc), rgb, id);
         }
       }
     }

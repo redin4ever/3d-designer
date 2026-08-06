@@ -42,6 +42,18 @@
   --on-accent: #ffffff;
   --brand-secure: #7a7fad;
 
+  /* EXTENSION, not from DESIGN.md: the parts the operator has marked as important.
+     Named --marked, not --focus: --focus-ring already means keyboard focus here, and two
+     unrelated meanings under one word is how a later reader reaches for the wrong one
+     (Q-13). Deliberately not --accent, which already means "the agent just changed
+     this" in the live view — HIGHLIGHT flashes and fades, focus stays lit, and if the
+     two shared a colour the operator could not tell a mark they put up from a change
+     that happened to them. Amber reads as attention rather than as a state change,
+     separates from --accent at a glance, and is distinguishable from it for the common
+     red-green deficiencies, where two blues would not be. */
+  --marked: #d9a441;
+  --marked-soft: rgba(217, 164, 65, 0.18);
+
   /* Semantic (DESIGN.md "Semantic") */
   --success: #27a644;
   --overlay: #000000;

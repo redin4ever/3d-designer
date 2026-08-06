@@ -5,7 +5,7 @@ implementation-facing.
 
 ## Status
 
-**GREEN.** `node --test frontend/tests/` passes 112/112 (also `npm run test:frontend`), plus
+**GREEN.** `node --test frontend/tests/` passes 164/164 (also `npm run test:frontend`), plus
 `npm run test:frontend:browser` for 22 smoke tests in real Chromium via Puppeteer.
 The module tests are pure logic — no browser, no WebGL, no real WebSocket. The browser
 suite exists because that purity is also a blind spot: it is how a camera that could only
@@ -131,6 +131,31 @@ independently discovered) rather than harmful — leave it in place regardless.
   strings via `getComputedStyle` and blends translucency with `ctx.globalAlpha` rather
   than hand-parsing hex to `rgba()`, specifically to avoid ever needing a hex literal in
   source.
+
+- **Picking reads the rasterizer's id channel; it is never a ray cast.** `raster.js` writes
+  the object's id into `frame.ids` in the same inner loop, and behind the same depth test, as
+  the colour. A ray would be a second, independent answer to "what is visible", and two
+  answers disagree eventually — when they do, the operator clicks one thing and sees another
+  highlighted, intermittently, depending on camera angle. That is the same class of bug as
+  the painter's algorithm this renderer already threw out. `drawTriangle`'s `id` argument is
+  optional so every pre-existing caller stays untouched.
+- **`SceneRenderer.setFocused` is not `setHighlighted`.** `highlighted` means "the agent just
+  changed this" and `applyHighlight` clears every previous id on each HIGHLIGHT message,
+  deliberately. Focus is standing state the operator put up and expects to persist. Reusing
+  the one set would wipe their marks every time the agent touched anything.
+- **`--marked`, not `--focus`.** `--focus-ring` already means keyboard focus in `tokens.css`,
+  and two unrelated meanings under one word is how a later reader reaches for the wrong one.
+- **The two snaps must agree exactly.** `edit-tools.js`'s `snapTo` and `ops/transform.py`'s
+  `_snapped` round the same drag, and both round **half away from zero** — which is neither
+  language's default. Python's `round` is banker's rounding and `Math.round` rounds half
+  toward +Infinity, so the two disagreed on 0.25 and then, once Python was fixed, on -0.25.
+  Both suites pin the same table of cases; do not "simplify" either back to a built-in.
+- **`point-ui.js` is impure wiring and is not unit-tested**, for the same reason
+  `attachControls` and `SocketClient` are not: every decision worth checking is already in
+  `picking.js`, `annotate.js`, `capture.js` and `edit-tools.js`, which are pure and covered.
+- **A number input has an intrinsic width that `flex: 1` does not override.** The edit fields
+  need `min-width` plus `width: 0`, or three of them hold the whole grid wider than a 360px
+  viewport — which the browser suite's no-horizontal-scroll test catches, and did.
 
 ## Wire protocol assumptions
 

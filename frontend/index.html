@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="src/app.css" />
   <link rel="stylesheet" href="src/chat.css" />
   <link rel="stylesheet" href="src/connect.css" />
+  <link rel="stylesheet" href="src/point.css" />
 </head>
 <body>
   <header class="topbar">
@@ -28,6 +29,35 @@
     <section class="viewport-panel" aria-label="Live 3D view">
       <canvas id="viewport-canvas" tabindex="0" role="img"
           aria-label="Live 3D view of the current build. Drag to orbit, scroll to zoom. With the keyboard: arrow keys orbit, plus and minus zoom, 0 resets."></canvas>
+      <!-- The in-place annotation composer (Q-07). Positioned over the canvas beside
+           whatever was picked, and hidden until something is. It sits inside the viewport
+           panel rather than in the sidebar because the operator chose to type where they
+           are looking; `hidden` keeps it out of the tab order entirely while closed, so
+           the keyboard path through the page is unchanged when nothing is selected. -->
+      <form id="point-composer" class="point-composer" data-action="annotate-form" hidden>
+        <p class="point-selection" id="point-selection" aria-live="polite">nothing selected</p>
+        <div class="control-row">
+          <label class="visually-hidden" for="annotate-text">What should the agent know about this?</label>
+          <input
+            id="annotate-text"
+            data-field="annotate-text"
+            type="text"
+            autocomplete="off"
+            placeholder="e.g. this one clips the tread"
+            aria-describedby="point-selection"
+          />
+          <button type="submit" class="btn primary">Send</button>
+        </div>
+        <div class="control-row point-actions">
+          <button type="button" class="btn" data-action="toggle-focus">Mark important</button>
+          <button type="button" class="btn" data-action="attach-image" aria-pressed="false">
+            Attach view
+          </button>
+          <button type="button" class="btn" data-action="close-composer">Close</button>
+        </div>
+        <p class="point-note" id="point-note"></p>
+      </form>
+
       <div id="connection-banner" class="connection-banner">
         <p class="connection-banner-title">Not connected</p>
         <p class="connection-banner-detail" id="connection-banner-detail">
@@ -66,6 +96,44 @@
             <button type="submit" class="btn">Roll back</button>
           </div>
         </form>
+      </div>
+
+      <!-- Pointing and editing. Placed after Run and before Check cadence so the tab order
+           runs canvas → pause/resume → point → edit → cadence → conversation: the controls
+           you reach for while watching come before the setting you change once. -->
+      <div class="control-group">
+        <span id="point-controls-label">Pointing</span>
+        <div class="control-row" role="group" aria-labelledby="point-controls-label">
+          <button type="button" class="btn" data-action="point-mode" aria-pressed="false">
+            Point mode
+          </button>
+          <button type="button" class="btn" data-action="clear-focus">Clear marks</button>
+        </div>
+        <p class="control-hint" id="point-mode-hint">
+          Off: drag turns the camera. On: click a part, or drag a loop round several.
+        </p>
+        <ul id="focus-list" class="focus-list" aria-live="polite" aria-label="Parts marked as important"></ul>
+      </div>
+
+      <div class="control-group" id="edit-group">
+        <span id="edit-controls-label">Edit the selected part</span>
+        <div class="control-row" role="group" aria-labelledby="edit-controls-label">
+          <button type="button" class="btn" data-action="edit-move">Move…</button>
+          <button type="button" class="btn" data-action="edit-duplicate">Duplicate</button>
+          <button type="button" class="btn" data-action="edit-delete">Delete</button>
+        </div>
+        <div class="control-row edit-fields">
+          <label class="visually-hidden" for="edit-x">X, metres</label>
+          <input id="edit-x" data-field="edit-x" type="number" step="0.1" placeholder="x" inputmode="decimal" />
+          <label class="visually-hidden" for="edit-y">Y, metres</label>
+          <input id="edit-y" data-field="edit-y" type="number" step="0.1" placeholder="y" inputmode="decimal" />
+          <label class="visually-hidden" for="edit-z">Z, metres</label>
+          <input id="edit-z" data-field="edit-z" type="number" step="0.1" placeholder="z" inputmode="decimal" />
+        </div>
+        <!-- Q-20: the reason is stated, and the Pause that fixes it is right here. A
+             disabled control with no reason is indistinguishable from a broken one. -->
+        <p class="control-hint" id="edit-blocked" role="status"></p>
+        <button type="button" class="btn" data-action="pause-to-edit" hidden>Pause the build</button>
       </div>
 
       <div class="control-group">
