@@ -311,6 +311,25 @@ class ScenePort(Protocol):
 
     def undo(self, steps: int = 1) -> None: ...
 
+    def capture_snapshot(self, op_id: str) -> str:
+        """Write the live **geometry** to a restorable file and return its path.
+
+        Called immediately before an opaque operation, because that is the only moment the
+        pre-execution state still exists.
+
+        This has to be geometry, not the document. ``orchestration`` originally implemented
+        it by calling ``scene.save()``, which serialises the *operation log* — and an
+        opaque operation is by definition one whose effect the log does not describe. So
+        restoring from it restored nothing, and undo across an arbitrary-code barrier
+        re-ran the script: a non-deterministic script produced one object, then three
+        differently-named ones after undo-then-redo, while the system reported a clean
+        ``FULL_RESYNC``. Gate B 5.3.
+
+        It belongs on ``scene`` rather than on its caller because ``scene`` is what holds
+        the engine, owns the barriers, and is the only thing that can restore.
+        """
+        ...
+
     def subscribe(self, listener: object) -> None:
         """Register a listener for :class:`SceneChangeEvent`. ``scene`` never imports
         ``viewer``; this is the arrow that lets a change reach it anyway."""

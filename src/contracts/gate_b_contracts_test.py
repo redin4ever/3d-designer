@@ -294,3 +294,13 @@ def test_scene_port_is_declared_once_in_the_frozen_surface():
     params = inspect.signature(ScenePort.apply).parameters
     assert "lease" in params
     assert "snapshot_path" in params
+
+
+def test_capturing_a_snapshot_is_the_scene_s_job_not_its_caller_s():
+    """``orchestration`` implemented this by calling ``scene.save()``, which serialises the
+    operation log — and an opaque operation is by definition one the log does not describe.
+    Restoring from it restored nothing, so undo across a raw-execution barrier re-ran the
+    script: one object became three differently-named ones after undo+redo, reported as a
+    clean FULL_RESYNC. Only ``scene`` holds the engine and can actually restore."""
+    assert hasattr(ScenePort, "capture_snapshot")
+    assert "op_id" in inspect.signature(ScenePort.capture_snapshot).parameters
