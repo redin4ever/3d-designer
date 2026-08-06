@@ -228,3 +228,36 @@ def test_every_new_operation_is_declared_as_a_tool() -> None:
         "set_object_material",
     ):
         assert kind in declared, f"{kind} is not declared as a tool"
+
+
+# ─── the snap agrees with the browser's ─────────────────────────────────────────────
+
+#: The same cases `frontend/tests/edit-tools.test.js` pins. Both halves of this product snap
+#: the same drag, so the two must agree exactly — see `_snapped`'s docstring for the defect
+#: this found, where 0.25 became 0.3 in the browser and 0.2 here.
+#:
+#: 0.35 -> 0.3 is not a typo and not the arithmetic ideal. 0.35 has no exact binary
+#: representation, so 0.35/0.1 is 3.4999999999999996 in *both* languages and both round it
+#: down. What is being pinned here is that they agree, which is the property an operator can
+#: actually perceive; a rule about ideal halves that only one side implemented would be worse
+#: than the shared quirk.
+_SNAP_CASES = ((1.03, 1.0), (2.07, 2.1), (0.35, 0.3), (0.25, 0.3), (-0.25, -0.3), (0.0, 0.0))
+
+
+@pytest.mark.parametrize(("value", "expected"), _SNAP_CASES)
+def test_the_grid_snap_matches_the_browsers_exactly(value, expected) -> None:
+    """If this drifts from edit-tools.test.js, an operator lets go of a part, watches it sit
+    where they put it, and sees it jump one grid step on commit — only on half-steps, which
+    is the kind of thing reported as "the snapping is broken sometimes" and never
+    reproduced."""
+    from ops.transform import _snapped
+
+    assert _snapped(value, 0.1) == pytest.approx(expected)
+
+
+def test_a_snapped_coordinate_is_not_a_floating_point_smear() -> None:
+    """round(1.03 / 0.1) * 0.1 is 1.0000000000000002. A coordinate that prints like that in a
+    report reads as a precision bug in a product whose whole claim is verified numbers."""
+    from ops.transform import _snapped
+
+    assert repr(_snapped(1.03, 0.1)) == "1.0"

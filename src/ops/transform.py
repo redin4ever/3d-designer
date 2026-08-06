@@ -106,13 +106,25 @@ def _vec3(params: dict, name: str, *, required: bool = True, default: Vec3 | Non
 def _snapped(value: float, step: float) -> float:
     """Round to the nearest multiple of ``step``; ``step <= 0`` means no snapping.
 
+    **Half steps round away from zero, not to even.** Python's built-in ``round`` is
+    banker's rounding — ``round(2.5)`` is 2 — while JavaScript's ``Math.round`` rounds half
+    up. The browser and this module both snap the same drag, and with the two conventions
+    they disagreed on exactly the half-step cases: 0.25 snapped to a 0.1 grid gave 0.3 in the
+    browser and 0.2 here. The operator would let go of a part, watch it sit where they put
+    it, and see it jump one grid step on commit — intermittently, only on halves, which is
+    the kind of thing that gets reported as "the snapping is broken sometimes" and never
+    reproduced. ``ops/transform_test.py`` and ``frontend/tests/edit-tools.test.js`` pin the
+    same cases on both sides so they cannot drift apart again.
+
     Re-rounded to nine places because ``round(1.03 / 0.1) * 0.1`` is 1.0000000000000002 in
     binary floating point, and a coordinate that prints as 1.0000000000000002 in a report
     reads as a precision bug in a product whose entire claim is verified numbers.
     """
     if step <= 0:
         return value
-    return round(round(value / step) * step, 9)
+    steps = value / step
+    away_from_zero = math.floor(abs(steps) + 0.5)
+    return round(math.copysign(away_from_zero, steps) * step, 9)
 
 
 def _snap_vec(v: Vec3, step: float) -> Vec3:

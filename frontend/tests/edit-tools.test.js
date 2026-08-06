@@ -27,10 +27,26 @@ test('snapping lands on the grid, and 0 turns it off', () => {
 
 test('a snapped value is not a floating-point smear', () => {
   // round(1.03 / 0.1) * 0.1 is 1.0000000000000002 in binary floating point. A coordinate
-  // that prints like that in a report reads as a precision bug in a product whose entire
-  // claim is verified numbers.
+  // that prints like that in a numeric field reads as a precision bug in a product whose
+  // entire claim is verified numbers.
   assert.equal(String(snapTo(1.03, 0.1)), '1');
-  assert.equal(String(snapTo(0.35, 0.1)), '0.4');
+  assert.equal(String(snapTo(2.07, 0.1)), '2.1');
+});
+
+test('the snap agrees with the backend on every half-step', () => {
+  // These are the exact cases src/ops/transform_test.py pins. They disagreed: Python's round
+  // is banker's rounding, JavaScript's Math.round is half-up, so 0.25 on a 0.1 grid gave 0.3
+  // here and 0.2 there. The operator would let go of a part, watch it sit where they put it,
+  // and see it jump one grid step on commit — only on halves, which is the kind of thing
+  // reported as "the snapping is broken sometimes" and never reproduced.
+  //
+  // 0.35 -> 0.3 is not the arithmetic ideal. 0.35 has no exact binary representation, so
+  // 0.35/0.1 is 3.4999999999999996 in both languages and both round it down. Agreement is
+  // what an operator can perceive; a rule about ideal halves only one side implemented would
+  // be worse than a shared quirk.
+  for (const [value, expected] of [[1.03, 1], [2.07, 2.1], [0.35, 0.3], [0.25, 0.3], [-0.25, -0.3], [0, 0]]) {
+    assert.equal(snapTo(value, 0.1), expected, `${value} snapped wrong`);
+  }
 });
 
 test('the defaults are the ones the backend uses', () => {
