@@ -302,6 +302,34 @@
       ],
       "status": "green",
       "note": "Static three.js + Puppeteer. Depends only on the wire-protocol contract; runs against fixtures with no Python and no Blender."
+    },
+    {
+      "id": "app",
+      "owner": "main-agent",
+      "paths": [
+        "src/app/**",
+        "src/forge3d_cli.py"
+      ],
+      "publicInterface": "src/app/__init__.py",
+      "dependsOn": [
+        "contracts",
+        "engine",
+        "scene",
+        "orchestration",
+        "mcp",
+        "ops",
+        "gaps",
+        "align",
+        "detail",
+        "uv",
+        "raw",
+        "viewer"
+      ],
+      "backlogItems": [
+        "B-000"
+      ],
+      "status": "green",
+      "note": "The composition root. Main-agent owned (Rule 5): it is the one place allowed to know about every module at once. Holds the JSON->domain parameter coercion the operation modules documented as belonging at the boundary."
     }
   ]
 }

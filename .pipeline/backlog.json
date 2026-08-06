@@ -5,7 +5,32 @@
     "module": "orchestration+scene",
     "priority": "P0",
     "title": "ScenePort exposes no EngineProtocol, so Orchestrator.perform cannot run real measurements — the check-after-every-geometry-change loop currently carries placeholder Measurements. This is the products core promise (Gate A 3.1 + ADR-005) and must be wired before Phase 5.",
-    "source": "orchestration GREEN agent contract request, 2026-08-06"
+    "source": "orchestration GREEN agent contract request, 2026-08-06",
+    "status": "fixed"
+  },
+  {
+    "id": "B-00C",
+    "type": "defect",
+    "module": "orchestration+scene+mcp_server",
+    "priority": "P0",
+    "status": "fixed",
+    "title": "ScenePort declared document() as a method; Scene exposes it as a property. Both consumers matched the declaration and wrote doubles that matched it too, so three suites passed while the real trio could never work together. Found only by the end-to-end suite."
+  },
+  {
+    "id": "B-00D",
+    "type": "defect",
+    "module": "app+ops",
+    "priority": "P0",
+    "status": "fixed",
+    "title": "ops.validate_params expected Vec3; an agent sends JSON lists. ops documented conversion as belonging at the boundary and nobody built the boundary, so every point-taking operation raised AttributeError on first real agent contact. Coerced at the composition root, schema-driven so add_lod_chain ratios are not mistaken for a coordinate."
+  },
+  {
+    "id": "B-00E",
+    "type": "defect",
+    "module": "mcp_server",
+    "priority": "P1",
+    "status": "fixed",
+    "title": "Four transport tests asserted the MCP SDK was absent - an assertion about the machine, not the code. They inverted the moment the declared dependency was installed. Now simulate absence; a new test fails loudly if the package rename is undone."
   },
   {
     "id": "B-00A",
