@@ -24,7 +24,8 @@
 
   <main class="layout">
     <section class="viewport-panel" aria-label="Live 3D view">
-      <canvas id="viewport-canvas" role="img" aria-label="Live 3D view of the current build"></canvas>
+      <canvas id="viewport-canvas" tabindex="0" role="img"
+          aria-label="Live 3D view of the current build. Drag to orbit, scroll to zoom. With the keyboard: arrow keys orbit, plus and minus zoom, 0 resets."></canvas>
       <div id="connection-banner" class="connection-banner">
         <p class="connection-banner-title">Not connected</p>
         <p class="connection-banner-detail" id="connection-banner-detail">

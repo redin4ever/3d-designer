@@ -12,6 +12,10 @@
 // match any default test-file naming pattern (`*.test.js`), so Node's real recursive
 // discovery never independently loads it, and there is no double-execution risk either
 // way. See frontend/CLAUDE.md "Known environment quirk" for the verification steps.
+// Every *.test.js here must be listed below or the directory run silently skips it —
+// which is not hypothetical: camera.test.js was written, passed when run directly, and
+// reported nothing at all through `npm run test:frontend` until it was added here.
+import './camera.test.js';
 import './controls.test.js';
 import './log.test.js';
 import './socket.test.js';

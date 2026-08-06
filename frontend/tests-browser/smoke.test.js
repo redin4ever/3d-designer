@@ -196,6 +196,95 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
     }
   });
 
+  // These three exist because a user opened the page and found the view would only turn
+  // left and right — no tilt, no zoom, and it span on its own the whole time. None of it
+  // was catchable: the camera lived inside scene-renderer.js, the one file this module's
+  // own docs exempt from node:test. The arithmetic now lives in camera.js and is unit
+  // tested; these assert that the arithmetic is actually *wired to the input events*,
+  // which is the half a unit test cannot see.
+
+  test('dragging up and down changes the view, not just left and right', async () => {
+    const s = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s);
+      await waitForCanvasDrawn(s.page, 500);
+
+      const box = await s.page.$eval('#viewport-canvas', (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+
+      const before = (await probeCanvas(s.page)).signature;
+
+      await s.page.mouse.move(box.x, box.y);
+      await s.page.mouse.down();
+      await s.page.mouse.move(box.x, box.y - 120, { steps: 8 }); // straight up, no x at all
+      await s.page.mouse.up();
+      await new Promise((r) => setTimeout(r, 200));
+
+      const after = (await probeCanvas(s.page)).signature;
+      assert.notEqual(after, before, 'a purely vertical drag left the render identical');
+      assert.deepEqual(complaints(s).pageErrors, []);
+    } finally {
+      await s.dispose();
+    }
+  });
+
+  test('the wheel zooms, and does not scroll the page instead', async () => {
+    const s = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s);
+      await waitForCanvasDrawn(s.page, 500);
+
+      const box = await s.page.$eval('#viewport-canvas', (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+      const before = (await probeCanvas(s.page)).nonModalPixels;
+
+      await s.page.mouse.move(box.x, box.y);
+      await s.page.mouse.wheel({ deltaY: -400 }); // toward the viewer
+      await new Promise((r) => setTimeout(r, 200));
+
+      const after = (await probeCanvas(s.page)).nonModalPixels;
+      assert.ok(
+        after > before,
+        `zooming in must cover more pixels, went ${before} -> ${after}`,
+      );
+
+      const scrolled = await s.page.evaluate(() => window.scrollY);
+      assert.equal(scrolled, 0, 'the wheel scrolled the page instead of zooming the view');
+      assert.deepEqual(complaints(s).pageErrors, []);
+    } finally {
+      await s.dispose();
+    }
+  });
+
+  test('the view holds still when nobody is touching it', async () => {
+    const s = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s);
+      await waitForCanvasDrawn(s.page, 500);
+
+      // Settle first: the greeting's objects arrive over several frames, so an immediate
+      // probe catches the scene mid-arrival and would fail for a reason that is not drift.
+      let settled = (await probeCanvas(s.page)).signature;
+      for (let i = 0; i < 25; i += 1) {
+        await new Promise((r) => setTimeout(r, 120));
+        const next = (await probeCanvas(s.page)).signature;
+        if (next === settled) break;
+        settled = next;
+      }
+
+      await new Promise((r) => setTimeout(r, 1500));
+      const later = (await probeCanvas(s.page)).signature;
+
+      assert.equal(later, settled, 'the view drifted on its own — it used to auto-rotate');
+    } finally {
+      await s.dispose();
+    }
+  });
+
   test('a connected-but-empty scene leaves the canvas flat — the pixel check discriminates', async () => {
     const s = await withScene(EMPTY_GREETING);
     try {
@@ -310,18 +399,31 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
     try {
       await waitForConnected(s);
 
+      const describeFocus = () =>
+        s.page.evaluate(() => {
+          const el = document.activeElement;
+          const style = getComputedStyle(el);
+          return {
+            tag: el.tagName,
+            id: el.id || null,
+            action: el.dataset?.action ?? null,
+            outlineWidth: style.outlineWidth,
+            outlineStyle: style.outlineStyle,
+          };
+        });
+
+      // The 3D view is the first stop, and that is deliberate: it is a control now, not
+      // decoration. Arrow keys orbit it and +/- zoom, so a keyboard user who could never
+      // reach it could never look at the thing this product exists to build. It used to be
+      // skipped entirely because a <canvas> is not focusable without tabindex.
       await s.page.keyboard.press('Tab');
-      const focused = await s.page.evaluate(() => {
-        const el = document.activeElement;
-        const style = getComputedStyle(el);
-        return {
-          tag: el.tagName,
-          action: el.dataset?.action ?? null,
-          outlineWidth: style.outlineWidth,
-          outlineStyle: style.outlineStyle,
-        };
-      });
-      assert.equal(focused.action, 'pause', `first Tab must reach Pause, reached ${JSON.stringify(focused)}`);
+      const viewport = await describeFocus();
+      assert.equal(viewport.id, 'viewport-canvas', `first Tab must reach the 3D view, reached ${JSON.stringify(viewport)}`);
+      assert.notEqual(viewport.outlineStyle, 'none', ':focus-visible must draw a ring on the view too');
+
+      await s.page.keyboard.press('Tab');
+      const focused = await describeFocus();
+      assert.equal(focused.action, 'pause', `Tab from the view must reach Pause, reached ${JSON.stringify(focused)}`);
       assert.notEqual(focused.outlineStyle, 'none', ':focus-visible must draw a ring on keyboard focus');
       assert.notEqual(focused.outlineWidth, '0px', 'the focus ring must have a width');
 

@@ -28,6 +28,7 @@ export async function probeCanvas(page) {
       nonModalPixels: 0,
       modalColor: 'none',
       totalPixels: 0,
+      signature: 'blank',
     };
     if (!canvas) return empty;
     const rect = canvas.getBoundingClientRect();
@@ -52,6 +53,15 @@ export async function probeCanvas(page) {
     }
     const total = data.length / 4;
     const channel = (shift) => (modalKey >> shift) & 0xff;
+
+    // A cheap content hash, so two renders can be compared for "did anything move at all"
+    // without shipping a megabyte of pixels out of the browser. FNV-1a over every 16th
+    // pixel: enough to catch a camera that rotated, cheap enough to call in a loop.
+    let signature = 0x811c9dc5;
+    for (let i = 0; i < data.length; i += 64) {
+      signature ^= data[i];
+      signature = Math.imul(signature, 0x01000193);
+    }
     return {
       width: canvas.width,
       height: canvas.height,
@@ -62,6 +72,7 @@ export async function probeCanvas(page) {
       nonModalPixels: total - modalCount,
       modalColor: `rgba(${channel(24)},${channel(16)},${channel(8)},${modalKey & 0xff})`,
       totalPixels: total,
+      signature: (signature >>> 0).toString(16),
     };
   });
 }

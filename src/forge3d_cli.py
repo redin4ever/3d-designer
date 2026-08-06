@@ -1,10 +1,16 @@
 """``forge3d`` — the command line entry point declared in ``pyproject.toml``.
 
-Three things a person actually wants to do:
+Four things a person actually wants to do:
 
+    forge3d run                 start everything and open the live view — the one command
     forge3d doctor              what is installed, what works, what does not
     forge3d serve --stdio       expose the tools to Claude Desktop / Claude Code / Cursor
     forge3d serve --http        expose them to a ChatGPT developer-mode connector
+
+``run`` exists because ``serve`` cannot be it: on stdio it blocks waiting for a client on
+its own pipes, which is right for a desktop client launching it and useless for a person
+who wants to look at the thing. ``run`` starts the engine, the viewer socket, an HTTP MCP
+endpoint and the frontend, and opens a browser at it.
 
 ``doctor`` exists because this system has several independent optional pieces — Blender,
 the MCP SDK, the websocket transport — and each degrades differently. A single command that
@@ -166,12 +172,32 @@ def serve(args: argparse.Namespace) -> int:
         return 1
 
 
+def run(args: argparse.Namespace) -> int:
+    """``forge3d run`` — everything at once. See ``app/live.py`` for what and why."""
+    from app.live import run_live
+
+    return run_live(
+        prefer_blender=not args.no_blender,
+        include_raw=not args.no_raw,
+        ports={"mcp": args.port, "viewer": args.viewer_port, "web": args.web_port},
+        open_browser=not args.no_browser,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="forge3d", description=__doc__)
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("doctor", help="report what is installed and whether the core is wired")
+
+    r = sub.add_parser("run", help="start everything and open the live view (the one command)")
+    r.add_argument("--port", type=int, default=8765, help="MCP over streamable HTTP")
+    r.add_argument("--viewer-port", type=int, default=8766)
+    r.add_argument("--web-port", type=int, default=8767)
+    r.add_argument("--no-blender", action="store_true", help="force the in-memory engine")
+    r.add_argument("--no-raw", action="store_true", help="omit the unrestricted-execution tool")
+    r.add_argument("--no-browser", action="store_true", help="do not open a browser window")
 
     s = sub.add_parser("serve", help="expose the tools over MCP")
     s.add_argument("--http", action="store_true", help="streamable HTTP instead of stdio")
@@ -194,6 +220,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "doctor":
         return doctor()
+    if args.command == "run":
+        return run(args)
     return serve(args)
 
 

@@ -5,9 +5,11 @@ implementation-facing.
 
 ## Status
 
-**GREEN.** `node --test frontend/tests/` passes 28/28 (also runnable as
-`npm run test:frontend` from the repo root). Every test is pure logic — no browser, no
-WebGL, no real WebSocket — per the task brief.
+**GREEN.** `node --test frontend/tests/` passes 44/44 (also `npm run test:frontend`), plus
+`npm run test:frontend:browser` for 10 smoke tests in real Chromium via Puppeteer.
+The module tests are pure logic — no browser, no WebGL, no real WebSocket. The browser
+suite exists because that purity is also a blind spot: it is how a camera that could only
+turn left and right shipped.
 
 ## Commands
 
@@ -57,6 +59,14 @@ independently discovered) rather than harmful — leave it in place regardless.
 - `viewport.js` never imports `scene-renderer.js`, and vice versa. The only file allowed
   to import both is `main.js` — that is what keeps `viewport.js` testable with a fake
   renderer instead of a real canvas. See README's "Why `viewport.js` has no three.js".
+- **`camera.js` holds the orbit camera's arithmetic and `scene-renderer.js` holds the
+  pixels.** That seam was cut after a user found the view would not tilt or zoom: the
+  camera lived inside the one file this module's own docs exempt from `node:test`, so
+  there was nothing to catch it. Anything about yaw/pitch/zoom belongs in `camera.js`,
+  where it is covered; anything about drawing belongs in the renderer.
+- **Every `*.test.js` must be imported by `tests/index.js`** — see the quirk above. A file
+  that is not listed passes when run directly and is silently invisible to
+  `npm run test:frontend`.
 - `controls.js`'s message builders (`buildRollbackMessage` etc.) are pure and imported by
   `attachControls` in the same file, not duplicated — `main.js` only ever calls
   `attachControls`, never the builders directly.

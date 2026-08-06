@@ -2,9 +2,14 @@
 // fetch, no dependency (see frontend/CLAUDE.md "Why no three.js"). Implements the exact
 // four-method shape frontend/src/viewport.js drives against a fake in tests:
 // createNode / updateTransform / removeNode / setHighlighted, plus start()/stop() for
-// its own render loop. Nothing in this file is imported by frontend/tests/ — it is the
-// "browser adapter" half of the split the assumptions call out, and it is intentionally
-// the one file in this module that is exercised by eye, not by node:test.
+// its own render loop.
+//
+// Most of this file is a browser adapter and is exercised by eye. The camera is NOT: it
+// lives in ./camera.js and is covered by frontend/tests/camera.test.js. That split exists
+// because this file's "exercised by eye" exemption used to include the camera, and a user
+// found what eyes miss — the view turned left and right and would not tilt or zoom, since
+// `pointermove` read only `clientX`, the tilt was the module constant below, and nothing
+// listened for `wheel` at all.
 //
 // Colors are never hard-coded here: every stroke/fill comes from getComputedStyle of a
 // `--token` custom property defined in tokens.css, read once per resize/theme change and
@@ -12,6 +17,8 @@
 // than hand-parsed rgba(), so no hex digit ever appears as a literal in this file. The
 // fallbacks below are CSS color keywords, not hex, for the same reason. That is what
 // lets frontend/tests/tokens.test.js scan this file for a raw hex literal and find none.
+
+import { OrbitCamera } from './camera.js';
 
 function readColor(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -41,8 +48,9 @@ function rotateByQuaternion([x, y, z], [qx, qy, qz, qw]) {
   return [x + 2 * qw * c1x + 2 * c2x, y + 2 * qw * c1y + 2 * c2y, z + 2 * qw * c1z + 2 * c2z];
 }
 
-const AUTO_ROTATE_RADIANS_PER_MS = (2 * Math.PI) / 40_000; // one slow turn per 40s — "live" without being busy
-const CAMERA_TILT = -0.5;
+// The view no longer turns on its own. It used to rotate one slow turn per 40s as a
+// "this is live" cue, which is a cue nobody asked for and which makes a model you are
+// trying to look at drift out from under you. Liveness is the action log's job.
 
 export class SceneRenderer {
   /** @param {HTMLCanvasElement} canvas */
@@ -53,12 +61,11 @@ export class SceneRenderer {
     this._nextHandleId = 0;
     this._running = false;
     this._rafId = null;
-    this._autoAngle = 0;
     this._lastFrameAt = 0;
-    this._dragYaw = 0;
+    this.camera = new OrbitCamera();
     this._dragging = false;
-    this._dragStartX = 0;
-    this._dragStartYaw = 0;
+    this._lastPointerX = 0;
+    this._lastPointerY = 0;
     this._colors = { ink: 'white', muted: 'gray', accent: 'slateblue', canvas: 'black' };
     this._bindPointer();
     this._resizeObserver = new ResizeObserver(() => this._resize());
@@ -108,7 +115,6 @@ export class SceneRenderer {
     this._lastFrameAt = performance.now();
     const tick = (now) => {
       if (!this._running) return;
-      this._autoAngle += (now - this._lastFrameAt) * AUTO_ROTATE_RADIANS_PER_MS;
       this._lastFrameAt = now;
       this._draw();
       this._rafId = requestAnimationFrame(tick);
@@ -133,33 +139,71 @@ export class SceneRenderer {
   _bindPointer() {
     this.canvas.addEventListener('pointerdown', (event) => {
       this._dragging = true;
-      this._dragStartX = event.clientX;
-      this._dragStartYaw = this._dragYaw;
+      this._lastPointerX = event.clientX;
+      this._lastPointerY = event.clientY;
       this.canvas.setPointerCapture(event.pointerId);
     });
+
+    // Incremental deltas rather than "current minus drag-start", because the pitch clamp
+    // makes the camera's state not a pure function of total displacement: drag past the
+    // pole and back and an absolute mapping teleports the view.
     this.canvas.addEventListener('pointermove', (event) => {
       if (!this._dragging) return;
-      const dx = event.clientX - this._dragStartX;
-      this._dragYaw = this._dragStartYaw + dx * 0.01;
+      this.camera.drag(event.clientX - this._lastPointerX, event.clientY - this._lastPointerY);
+      this._lastPointerX = event.clientX;
+      this._lastPointerY = event.clientY;
     });
+
     const release = () => {
       this._dragging = false;
     };
     this.canvas.addEventListener('pointerup', release);
     this.canvas.addEventListener('pointercancel', release);
+
+    // `passive: false` and preventDefault, or the wheel zooms the model *and* scrolls the
+    // page under it. Only over the canvas; the log beside it must still scroll normally.
+    this.canvas.addEventListener(
+      'wheel',
+      (event) => {
+        event.preventDefault();
+        this.camera.zoomByWheel(event.deltaY);
+      },
+      { passive: false },
+    );
+
+    // A canvas is not focusable by default, so a keyboard user could reach the controls
+    // beside the view and never the view itself. index.html gives it tabindex="0".
+    this.canvas.addEventListener('keydown', (event) => {
+      const step = event.shiftKey ? 40 : 12;
+      const keys = {
+        ArrowLeft: () => this.camera.drag(-step, 0),
+        ArrowRight: () => this.camera.drag(step, 0),
+        ArrowUp: () => this.camera.drag(0, -step),
+        ArrowDown: () => this.camera.drag(0, step),
+        '+': () => this.camera.zoomBySteps(-1),
+        '=': () => this.camera.zoomBySteps(-1),
+        '-': () => this.camera.zoomBySteps(1),
+        _: () => this.camera.zoomBySteps(1),
+        '0': () => this.camera.reset(),
+      };
+      const action = keys[event.key];
+      if (!action) return;
+      event.preventDefault();
+      action();
+    });
   }
 
   _worldVertices(handle) {
     const { positions } = handle.geometry;
     const { position, quaternion, scale } = handle.transform;
     const out = new Array(positions.length / 3);
-    const orbit = this._autoAngle + this._dragYaw;
+    const orbit = this.camera.yaw;
     for (let i = 0; i < positions.length; i += 3) {
       let v = [positions[i] * scale[0], positions[i + 1] * scale[1], positions[i + 2] * scale[2]];
       v = rotateByQuaternion(v, quaternion);
       v = [v[0] + position[0], v[1] + position[1], v[2] + position[2]];
       v = rotateY(v, orbit);
-      v = rotateX(v, CAMERA_TILT);
+      v = rotateX(v, this.camera.pitch);
       out[i / 3] = v;
     }
     return out;
@@ -184,7 +228,7 @@ export class SceneRenderer {
         radius = Math.max(radius, Math.hypot(x, y, z));
       }
     }
-    const camDist = radius * 2.6 + 1;
+    const camDist = this.camera.distanceFor(radius);
     const focal = Math.min(width, height) * 0.9;
     const project = ([x, y, z]) => {
       const denom = camDist - z;
