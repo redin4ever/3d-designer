@@ -105,6 +105,30 @@ class MeshOps(Protocol):
         """``kind`` is one of: cube, cylinder, sphere, plane, cone, torus."""
         ...
 
+    def replace_mesh(
+        self,
+        object_id: str,
+        vertices: Sequence[Vec3],
+        faces: Sequence[Sequence[int]],
+    ) -> None:
+        """Swap an existing object's mesh data, keeping everything that is not geometry.
+
+        The object's transform, material slots, per-face material indices and UV layers
+        survive. Only vertices and faces change.
+
+        Without this, the only way to rewrite an object's triangles is ``delete`` then
+        ``create_mesh`` under the same id — which loses all four of those. That is a real
+        limit, not a theoretical one: ``detail.cleanup_bevel_topology`` has to *decline* on
+        any object that has been UV unwrapped or carries more than one material slot,
+        because rebuilding it would silently throw the unwrap away. Filed as a contract
+        request by the module that hit it, rather than worked around by losing data.
+
+        Implementations must reject a vertex/face set that does not describe a mesh at all,
+        the same way ``create_mesh`` does — a caller handing over an empty list has a bug,
+        and emptying the object is the least useful possible interpretation of it.
+        """
+        ...
+
     def duplicate(self, object_id: str, new_id: str, transform: Transform | None = None) -> str: ...
 
     def delete(self, object_id: str) -> None: ...

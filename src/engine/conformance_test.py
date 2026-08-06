@@ -294,3 +294,15 @@ def test_bake_raises_engine_unavailable_when_capability_is_absent(
     conformance.check_bake_raises_engine_unavailable_when_capability_is_absent(
         engine_without_bake
     )
+
+def test_replace_mesh_swaps_geometry_and_keeps_the_transform(engine) -> None:
+    conformance.check_replace_mesh_swaps_geometry_and_keeps_the_transform(engine)
+
+
+def test_replace_mesh_keeps_material_slots(engine) -> None:
+    conformance.check_replace_mesh_keeps_material_slots(engine)
+
+
+def test_replace_mesh_rejects_an_empty_vertex_set(engine) -> None:
+    conformance.check_replace_mesh_rejects_an_empty_vertex_set(engine)
+

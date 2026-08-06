@@ -389,3 +389,15 @@ def test_object_creation_does_not_degrade_quadratically(engine) -> None:
         f"creating 100 objects cost {early:.3f}s early and {late:.3f}s at ~500 objects — "
         "the per-object cost is growing with scene size again"
     )
+
+def test_replace_mesh_swaps_geometry_and_keeps_the_transform(engine) -> None:
+    conformance.check_replace_mesh_swaps_geometry_and_keeps_the_transform(engine)
+
+
+def test_replace_mesh_keeps_material_slots(engine) -> None:
+    conformance.check_replace_mesh_keeps_material_slots(engine)
+
+
+def test_replace_mesh_rejects_an_empty_vertex_set(engine) -> None:
+    conformance.check_replace_mesh_rejects_an_empty_vertex_set(engine)
+

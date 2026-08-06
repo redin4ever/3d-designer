@@ -111,6 +111,37 @@ class FakeEngine(FakeSurfacingMixin):
         self._record("create_mesh", oid)
         return oid
 
+    def replace_mesh(
+        self,
+        object_id: str,
+        vertices: Sequence[Vec3],
+        faces: Sequence[Sequence[int]],
+    ) -> None:
+        """Swap geometry, keep everything that is not geometry.
+
+        Transform, material slots and the unwrapped flag survive; that is the whole point
+        of this existing alongside delete-then-``create_mesh``.
+
+        The UV layer is the one thing that *cannot* survive, and it is dropped honestly
+        rather than kept and left wrong: UVs are stored per split vertex, so a new vertex
+        set has no correspondence to the old coordinates. Seams are indices into the old
+        edge numbering and go with it. A caller that needs UVs after this re-unwraps —
+        which is a real cost, and better than a silently mismatched unwrap.
+        """
+        obj = self._get(object_id)
+        if not vertices:
+            raise EngineError(
+                "engine.empty_mesh",
+                "a mesh needs at least one vertex",
+                "pass the replacement geometry, or call delete() if the object should go",
+            )
+        obj.vertices = list(vertices)
+        obj.faces = [tuple(f) for f in faces]
+        obj.uvs = None
+        obj.unwrapped = False
+        obj.seams = set()
+        self._record("replace_mesh", object_id)
+
     def create_primitive(
         self, object_id: str, kind: str, size: Vec3, transform: Transform | None = None
     ) -> str:

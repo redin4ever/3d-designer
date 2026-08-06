@@ -25,6 +25,9 @@ __all__ = [
     "check_duplicate_produces_an_independent_copy",
     "check_delete_removes_exactly_the_named_object",
     "check_join_brings_source_vertices_into_the_targets_local_space",
+    "check_replace_mesh_swaps_geometry_and_keeps_the_transform",
+    "check_replace_mesh_keeps_material_slots",
+    "check_replace_mesh_rejects_an_empty_vertex_set",
 ]
 
 
@@ -196,3 +199,47 @@ def check_snapshot_carries_vertices_no_face_references(engine) -> None:
     )
     referenced = {i for tri in snap.triangles for i in tri}
     assert len(referenced) == 3, "the loose vertex should belong to no triangle"
+
+
+def check_replace_mesh_swaps_geometry_and_keeps_the_transform(engine: EngineProtocol) -> None:
+    """The reason this method exists. Rewriting an object's triangles by delete-then-create
+    loses its transform, so a cleanup pass that improved topology would also silently move
+    the object back to the origin — a worse defect than the one it set out to fix."""
+    verts, faces = unit_cube()
+    engine.create_mesh("part", verts, faces, Transform(translation=Vec3(3.0, 1.0, -2.0)))
+    before = engine.snapshot("part").transform
+
+    bigger = [Vec3(v.x * 2.0, v.y * 2.0, v.z * 2.0) for v in verts]
+    engine.replace_mesh("part", bigger, faces)
+
+    after = engine.snapshot("part")
+    assert after.transform.translation.x == pytest.approx(before.translation.x)
+    assert after.transform.translation.y == pytest.approx(before.translation.y)
+    assert after.transform.translation.z == pytest.approx(before.translation.z)
+    bounds = engine.world_bounds("part")
+    assert bounds.size.x == pytest.approx(2.0), "the new geometry did not take effect"
+
+
+def check_replace_mesh_keeps_material_slots(engine: EngineProtocol) -> None:
+    """`detail.cleanup_bevel_topology` has to decline on any multi-material object while
+    the only route is delete-then-create. If slots do not survive this, it still does."""
+    verts, faces = unit_cube()
+    engine.create_mesh("part", verts, faces)
+    engine.create_material("paint", base_color=(0.5, 0.5, 0.5, 1.0))
+    engine.assign_material("part", "paint")
+    assert engine.snapshot("part").material_slots, "setup failed: no slot to preserve"
+
+    engine.replace_mesh("part", verts, faces)
+
+    assert engine.snapshot("part").material_slots == ("paint",)
+
+
+def check_replace_mesh_rejects_an_empty_vertex_set(engine: EngineProtocol) -> None:
+    """Emptying the object is the least useful reading of a caller that passed nothing, and
+    it fails silently: the object still exists, still exports, and contains no geometry."""
+    verts, faces = unit_cube()
+    engine.create_mesh("part", verts, faces)
+    with pytest.raises(EngineError) as exc:
+        engine.replace_mesh("part", [], [])
+    assert exc.value.rule == "engine.empty_mesh"
+    assert engine.snapshot("part").vertices, "the object was emptied by a rejected call"

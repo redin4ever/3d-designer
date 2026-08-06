@@ -85,6 +85,9 @@ from .conformance_mesh import (
     check_duplicate_produces_an_independent_copy,
     check_join_brings_source_vertices_into_the_targets_local_space,
     check_primitive_has_expected_world_bounds,
+    check_replace_mesh_swaps_geometry_and_keeps_the_transform,
+    check_replace_mesh_keeps_material_slots,
+    check_replace_mesh_rejects_an_empty_vertex_set,
     check_unknown_object_error_names_what_exists,
 )
 from .conformance_modifiers import (
@@ -149,6 +152,9 @@ UNIVERSAL_CHECKS = (
     check_duplicate_produces_an_independent_copy,
     check_delete_removes_exactly_the_named_object,
     check_join_brings_source_vertices_into_the_targets_local_space,
+    check_replace_mesh_swaps_geometry_and_keeps_the_transform,
+    check_replace_mesh_keeps_material_slots,
+    check_replace_mesh_rejects_an_empty_vertex_set,
     check_reset_leaves_zero_objects,
     check_bevel_refuses_unapplied_scale,
     check_bevel_edges_with_explicit_selection_increases_triangle_count,
