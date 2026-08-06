@@ -53,7 +53,7 @@ def test_an_operator_edit_is_logged_like_any_other_operation(scene) -> None:
 
     orch.apply_operator_edit(_move())
 
-    assert scene.calls or scene.applied, "the edit never reached the scene"
+    assert scene.document.head == 1, "the edit never reached the operation log"
 
 
 def test_an_operator_edit_tells_the_agent_what_changed(scene) -> None:
@@ -71,13 +71,28 @@ def test_an_operator_edit_tells_the_agent_what_changed(scene) -> None:
 def test_a_failing_operator_edit_comes_back_as_a_report_not_an_exception(scene) -> None:
     """A refusal has to reach the browser as something the operator can read. An exception
     escaping here would surface as a dropped socket message and a UI that simply did nothing
-    — the failure mode Q-21 ("let me, then tell me what broke") is written against."""
-    orch = Orchestrator(scene)
+    — the failure mode Q-21 ("let me, then tell me what broke") is written against.
+
+    Driven by making the scene raise, because the real refusals this guards live down there:
+    an unknown operation kind, an object deleted between selecting it and dragging it, a
+    degenerate scale. The double accepts anything, so asserting on it would prove nothing."""
+
+    class RefusingScene:
+        """Everything ``apply_operator_edit`` touches, with ``apply`` raising."""
+
+        def __init__(self, real):
+            self._real = real
+
+        def __getattr__(self, name):
+            return getattr(self._real, name)
+
+        def apply(self, *_args, **_kwargs):
+            raise ValueError("no object named 'box'")
+
+    orch = Orchestrator(RefusingScene(scene))
     orch.pause()
 
-    report = orch.apply_operator_edit(
-        Operation(op_id="edit-2", kind="no_such_operation", params={})
-    )
+    report = orch.apply_operator_edit(_move())
 
     assert report.ok is False
-    assert report.error_detail or report.summary
+    assert "box" in report.error_detail

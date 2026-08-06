@@ -196,3 +196,55 @@ def test_a_greeting_with_nothing_focused_does_not_send_an_empty_focus_message(re
     bridge = _bridge(real_scene, recording_orchestrator, add_cube_op)
 
     assert not [m for m in bridge.greeting() if m.type is ServerMessageType.FOCUS]
+
+
+# ─── an edit made with the handles ──────────────────────────────────────────────────
+
+
+def _edit(kind: str, **params):
+    return ClientMessage(
+        type=ClientMessageType.ANNOTATE,
+        data={"object_ids": [params.get("object_id", "")], "edit": {"kind": kind, "params": params}},
+    )
+
+
+def test_an_edit_made_with_the_handles_actually_applies(real_scene, recording_orchestrator, add_cube_op) -> None:
+    """Without this the edit tools are decoration: the browser sends a well-formed message,
+    the socket accepts it, and nothing anywhere changes — the exact shape of failure this
+    feature's gate exists to catch."""
+    bridge = _bridge(real_scene, recording_orchestrator, add_cube_op)
+
+    bridge.handle_client(_edit("move_object", object_id="box", translation=[1.0, 0.0, 0.0]))
+
+    applied = [c for c in recording_orchestrator.calls if c[0] == "apply_operator_edit"]
+    assert len(applied) == 1
+    assert applied[0][1][0].kind == "move_object"
+
+
+def test_a_refused_edit_tells_the_operator_why(real_scene, recording_orchestrator, add_cube_op) -> None:
+    """Q-21 chose "let me, then tell me what broke". An edit that failed silently would leave
+    the operator watching a part snap back with nothing saying why."""
+    recording_orchestrator.next_edit_fails = "no object named 'box'"
+    bridge = _bridge(real_scene, recording_orchestrator, add_cube_op)
+
+    produced = bridge.handle_client(_edit("move_object", object_id="box", translation=[1.0, 0, 0]))
+
+    logs = [m for m in produced if m.type is ServerMessageType.LOG]
+    assert any("no object named" in m.text for m in logs)
+
+
+def test_an_edit_to_a_backend_that_cannot_do_it_says_so(real_scene, add_cube_op) -> None:
+    """An older backend, or a viewer attached read-only. Saying so beats raising, which would
+    lose the whole message including any words the operator typed with it."""
+    from viewer import ViewerBridge
+
+    class OldOrchestrator:
+        def add_annotation(self, _a): pass
+        def set_focus(self, _ids): pass
+
+    real_scene.apply(add_cube_op("op1", "box"))
+    bridge = ViewerBridge(real_scene, OldOrchestrator())
+
+    produced = bridge.handle_client(_edit("move_object", object_id="box", translation=[1.0, 0, 0]))
+
+    assert any(m.type is ServerMessageType.ERROR for m in produced)

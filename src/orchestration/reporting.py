@@ -281,6 +281,65 @@ class ReportingMixin:
         with self._notes_mutex:
             self._focus = tuple(object_ids)
 
+    def apply_operator_edit(self, op: Operation) -> ActionReport:
+        """Apply one edit the human made themselves, from the live view (Q-14, Q-17, Q-19).
+
+        **Why this is not just ``perform``.** ``perform`` refuses while the run is paused, and
+        Q-17 made pausing the *precondition* for editing. The pause exists to stop the agent
+        writing; a person who pressed Pause in order to change something is the one caller it
+        must not stop. Routing the operator through ``perform`` would mean the precondition
+        for using the manual tools is also the thing refusing them.
+
+        It is otherwise an ordinary operation, deliberately: logged, replayable,
+        checkpointed and reachable by roll-back-N-steps, because Q-19 chose one shared
+        history. A direct engine write would have produced a second timeline over one scene.
+
+        Takes its own short-lived lease rather than requiring the caller to hold one. The
+        browser has no lease and should not have to reason about them — and because this only
+        happens while the agent is paused, there is nothing to contend with.
+
+        Never raises. A refusal comes back as a failed report, because the caller is a socket
+        handler: an exception here surfaces as a dropped message and a UI that does nothing,
+        which is precisely the silent failure Q-21 chose against.
+        """
+        lease = self.acquire("operator", self.phase)
+        try:
+            with self._write_mutex:
+                result = self._scene.apply(op, lease=lease)
+            changed = _touched(result)
+            report = ActionReport(
+                op_id=op.op_id,
+                ok=result.ok,
+                summary=f"the operator {op.kind} applied" if result.ok else f"{op.kind} failed",
+                changed=changed,
+                removed=result.removed_objects,
+                # Q-18 chose "yes, always". Without this the agent works from a picture of
+                # the scene that is quietly wrong, and undoes the operator's fix without ever
+                # knowing it existed.
+                operator_notes=(
+                    f"the operator changed {', '.join(changed) or op.kind} themselves "
+                    f"({op.kind}) — re-measure before assuming the scene is as you left it",
+                ),
+                operator_focus=self.focus,
+                error_rule=result.error_rule,
+                error_detail=result.error_detail,
+                error_suggestion=result.error_suggestion,
+            )
+        except Exception as exc:  # noqa: BLE001 — a socket handler is the caller
+            report = ActionReport(
+                op_id=op.op_id,
+                ok=False,
+                summary=f"{op.kind} could not be applied",
+                error_rule=getattr(exc, "rule", type(exc).__name__),
+                error_detail=str(exc),
+                error_suggestion=getattr(exc, "suggestion", ""),
+            )
+        finally:
+            self.release(lease)
+
+        self._publish(report)
+        return report
+
     def hold_annotation_image(self, annotation_id: str, data_url: str) -> None:
         """Keep one annotation's crop until an agent asks for it.
 

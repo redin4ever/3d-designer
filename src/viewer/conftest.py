@@ -222,6 +222,21 @@ class RecordingOrchestrator:
     def add_annotation(self, annotation) -> None:
         self.calls.append(("add_annotation", (annotation,)))
 
+    def apply_operator_edit(self, operation):
+        """Mirrors the real method's contract: never raises, always returns a report — the
+        guarantee the socket handler depends on. `next_edit_fails` lets a test drive the
+        refusal path, which is the branch an operator actually notices."""
+        from contracts import ActionReport
+
+        self.calls.append(("apply_operator_edit", (operation,)))
+        detail = getattr(self, "next_edit_fails", "")
+        return ActionReport(
+            op_id=operation.op_id,
+            ok=not detail,
+            summary=f"the operator {operation.kind} applied" if not detail else f"{operation.kind} failed",
+            error_detail=detail,
+        )
+
     def hold_annotation_image(self, annotation_id: str, data_url: str) -> None:
         self._images = getattr(self, "_images", {})
         self._images[annotation_id] = data_url

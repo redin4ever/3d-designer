@@ -100,6 +100,14 @@ class AnnotateMixin:
         if not self._ensure_orchestrator():
             return
 
+        # An edit the operator made with the handles, riding the annotation channel rather
+        # than a message type of its own. Q-18 chose "tell the agent, always", so an edit IS
+        # something they are telling it about — it belongs in the same ordered stream as the
+        # words about it, not in a parallel one that could arrive out of order with them.
+        edit = msg.data.get("edit")
+        if isinstance(edit, dict) and edit.get("kind"):
+            self._apply_operator_edit(edit)
+
         annotation_id = ""
         if payload.image:
             self._annotation_seq += 1
@@ -138,6 +146,54 @@ class AnnotateMixin:
                 seq=self._next_seq(),
                 text=said,
                 data={"role": "operator", "object_ids": list(payload.object_ids)},
+            )
+        )
+
+    def _apply_operator_edit(self, edit: dict) -> None:
+        """Run one hand-made edit through the orchestrator and report what happened.
+
+        The result is enqueued as a LOG rather than swallowed, because Q-21 chose "let me,
+        then tell me what broke": a refused edit that produced no message would leave the
+        operator watching a part snap back with nothing anywhere saying why.
+
+        An orchestrator with no ``apply_operator_edit`` — an older backend, or a read-only
+        viewer — says so instead of raising, keeping the whole message from being lost.
+        """
+        from contracts import Operation
+
+        apply = getattr(self._orchestrator, "apply_operator_edit", None)
+        if apply is None:
+            self._enqueue(
+                ServerMessage(
+                    type=ServerMessageType.ERROR,
+                    seq=self._next_seq(),
+                    text="this build does not support editing from the browser",
+                )
+            )
+            return
+
+        params = dict(edit.get("params") or {})
+        target = params.get("object_id", "")
+        self._edit_seq = getattr(self, "_edit_seq", 0) + 1
+        report = apply(
+            Operation(
+                op_id=f"operator-edit-{self._edit_seq}",
+                kind=str(edit["kind"]),
+                params=params,
+                target_objects=(target,) if target else (),
+            )
+        )
+
+        self._enqueue(
+            ServerMessage(
+                type=ServerMessageType.LOG,
+                seq=self._next_seq(),
+                text=(
+                    report.summary
+                    if report.ok
+                    else f"{report.summary}: {report.error_detail or 'refused'}"
+                ),
+                data={"role": "system", "ok": report.ok},
             )
         )
 
