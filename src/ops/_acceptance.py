@@ -128,6 +128,61 @@ def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, 
             ),
         )
 
+    # ---- the direct edits (Q-14) -------------------------------------------------------
+    #
+    # These move, resize or copy something that already exists rather than building
+    # something new, so "did it work" is a different question and the query has to be
+    # different too. The one thing every one of them must not do is destroy the object it
+    # was pointed at — a scale that collapses a mesh to a plane, a rotate that produces a
+    # degenerate transform, a duplicate that copies nothing. Positive volume is exactly that
+    # check and it is re-measurable from live geometry, which is ADR-005's requirement.
+    #
+    # Deliberately NOT "no intersection": Q-21 chose to let an operator place something badly
+    # and then be told what broke. Forbidding intersection here would turn every deliberate
+    # overlap into an acceptance failure and make the tools fight the person using them.
+
+    if kind in ("move_object", "rotate_object", "scale_object", "set_object_material"):
+        return (
+            AcceptanceQuery(
+                query_id=f"{object_id}_survived_edit",
+                description=f"{object_id} still has positive volume after the edit",
+                metric=MetricKind.VOLUME,
+                subject=object_id,
+                expected=1e-9,
+                comparison=Comparison.GTE,
+            ),
+        )
+
+    if kind in ("duplicate_object", "rename_object"):
+        # The subject is the *new* object: the copy is what has to exist and be whole, and
+        # asserting on the source would pass just as happily if the copy were never made.
+        new_id = params.get("new_id") or f"{object_id}_copy"
+        return (
+            AcceptanceQuery(
+                query_id=f"{new_id}_has_volume",
+                description=f"{new_id} exists and carries the geometry it was copied from",
+                metric=MetricKind.VOLUME,
+                subject=new_id,
+                expected=1e-9,
+                comparison=Comparison.GTE,
+            ),
+        )
+
+    if kind == "delete_object":
+        # The only kind whose definition-of-done is about absence. Triangle count rather than
+        # volume because a deleted object measures zero triangles and an evaluator can say so;
+        # "volume of a thing that is not there" has no honest answer.
+        return (
+            AcceptanceQuery(
+                query_id=f"{object_id}_is_gone",
+                description=f"{object_id} contributes no geometry to the scene any more",
+                metric=MetricKind.TRIANGLE_COUNT,
+                subject=object_id,
+                expected=0.0,
+                comparison=Comparison.LTE,
+            ),
+        )
+
     # add_modular_kit
     return (
         AcceptanceQuery(

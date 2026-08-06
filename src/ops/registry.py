@@ -29,8 +29,17 @@ from .arrays import add_lod_chain, add_modular_kit, array_along
 from .primitives import add_primitive
 from .railing import add_railing
 from .stairs import add_staircase
+from .transform import (
+    delete_object,
+    duplicate_object,
+    move_object,
+    rename_object,
+    rotate_object,
+    scale_object,
+    set_object_material,
+)
 
-__all__ = ["OPS", "OP_SPECS"]
+__all__ = ["OPS", "OP_SPECS", "EDIT_SPECS"]
 
 _VEC3_SCHEMA = {
     "type": "array",
@@ -62,8 +71,152 @@ OPS: HandlerRegistry = {
     "array_along": array_along,
     "add_lod_chain": add_lod_chain,
     "add_modular_kit": add_modular_kit,
+    # The direct edits (Q-14). Registered here with everything else, deliberately: Q-19 chose
+    # one shared history, and OPS is what `scene` replays through. An operator's nudge and an
+    # agent's staircase are the same kind of thing to everything downstream of this dict.
+    "move_object": move_object,
+    "rotate_object": rotate_object,
+    "scale_object": scale_object,
+    "delete_object": delete_object,
+    "duplicate_object": duplicate_object,
+    "rename_object": rename_object,
+    "set_object_material": set_object_material,
 }
 
+
+
+#: The direct edits (Q-14). BLOCKOUT and REFINE both, because moving a part four centimetres
+#: is as much a polish action as a roughing-out one — and because the operator reaching for
+#: these should not depend on which phase the run happens to be in.
+_EDIT_ROLES = (ToolRole.BLOCKOUT, ToolRole.REFINE)
+
+_SNAP_SCHEMA = {
+    "type": "number",
+    "minimum": 0,
+    "description": "Grid to snap to, in metres. 0 disables snapping. Defaults to 0.1.",
+}
+
+EDIT_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name="move_object",
+        description=(
+            "Put one existing object at a world position. Snaps to a 0.1 m grid unless "
+            "snap=0. The smallest correction there is: use it instead of rebuilding "
+            "something that is only in the wrong place."
+        ),
+        roles=_EDIT_ROLES,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "translation": _VEC3_SCHEMA,
+                "snap": _SNAP_SCHEMA,
+            },
+            "required": ["object_id", "translation"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="rotate_object",
+        description=(
+            "Turn one existing object about a world axis. Snaps to 15 degrees unless "
+            "snap_degrees=0."
+        ),
+        roles=_EDIT_ROLES,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "axis": {"type": "string", "enum": ["x", "y", "z"]},
+                "degrees": {"type": "number"},
+                "snap_degrees": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Angle to snap to, in degrees. 0 disables. Defaults to 15.",
+                },
+            },
+            "required": ["object_id", "axis", "degrees"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="scale_object",
+        description="Resize one existing object. Every component must be non-zero.",
+        roles=_EDIT_ROLES,
+        input_schema={
+            "type": "object",
+            "properties": {"object_id": {"type": "string"}, "scale": _VEC3_SCHEMA},
+            "required": ["object_id", "scale"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="delete_object",
+        description="Remove one object from the scene.",
+        roles=_EDIT_ROLES,
+        input_schema={
+            "type": "object",
+            "properties": {"object_id": {"type": "string"}},
+            "required": ["object_id"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="duplicate_object",
+        description=(
+            "Copy one object. Pass an offset, or the copy sits exactly inside the original "
+            "and looks like nothing happened."
+        ),
+        roles=_EDIT_ROLES,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "new_id": {"type": "string"},
+                "offset": _VEC3_SCHEMA,
+                "snap": _SNAP_SCHEMA,
+            },
+            "required": ["object_id", "new_id"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="rename_object",
+        description=(
+            "Give one object a different id. Refused if the new name is taken — the engine "
+            "uniquifies on collision, so it would otherwise silently produce a third name."
+        ),
+        roles=_EDIT_ROLES,
+        input_schema={
+            "type": "object",
+            "properties": {"object_id": {"type": "string"}, "new_id": {"type": "string"}},
+            "required": ["object_id", "new_id"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="set_object_material",
+        description="Point one of an object's material slots at an existing material.",
+        roles=_EDIT_ROLES,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "material_id": {"type": "string"},
+                "slot": {"type": "integer", "minimum": 0},
+            },
+            "required": ["object_id", "material_id"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+)
 
 OP_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec(
@@ -300,4 +453,4 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         },
         mutating=True,
     ),
-)
+) + EDIT_SPECS

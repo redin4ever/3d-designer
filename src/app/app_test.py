@@ -27,8 +27,11 @@ from app import build_app, build_handlers
 
 
 RECORDED_TOOL_COUNTS: dict[str, int] = {
-    "blockout": 5,
-    "refine": 4,
+    # blockout and refine both gained the seven direct edits added at Q-14 — move, rotate,
+    # scale, delete, duplicate, rename, set material. Updated deliberately, which is the
+    # measurement Gate B 3.3 asked for; not capped, which is the one response ruled out.
+    "blockout": 12,
+    "refine": 11,
     "repair": 8,
     "align": 7,
     "detail": 4,

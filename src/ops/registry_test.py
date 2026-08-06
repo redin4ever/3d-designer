@@ -53,12 +53,20 @@ def test_every_op_tool_role_is_blockout_or_refine() -> None:
         assert set(spec.roles) <= allowed, spec.name
 
 
-def test_registry_covers_exactly_the_nine_operations_this_library_declares() -> None:
-    """Nine kinds are this library's stated public surface (ADR-004's construction
-    library). A registry short of that count silently drops an operation nobody can call
-    through ``scene`` or ``mcp``; one over it is exposing something the barrel does not."""
-    assert len(OPS) == 9
-    assert len(OP_SPECS) == 9
+def test_registry_covers_exactly_the_sixteen_operations_this_library_declares() -> None:
+    """Sixteen kinds are this library's stated public surface: ADR-004's nine construction
+    operations, plus the seven direct edits added at Q-14 (move, rotate, scale, delete,
+    duplicate, rename, set material).
+
+    A registry short of that count silently drops an operation nobody can call through
+    ``scene`` or ``mcp``; one over it is exposing something the barrel does not.
+
+    The seven were added rather than kept in a module of their own because Q-19 chose one
+    shared history for the operator's edits and the agent's: ``OPS`` is what ``scene``
+    replays through, so being here is what makes a manual nudge undoable, replayable and
+    reachable by roll-back-N-steps."""
+    assert len(OPS) == 16
+    assert len(OP_SPECS) == 16
 
 
 def test_every_op_tool_has_a_non_empty_input_schema() -> None:
