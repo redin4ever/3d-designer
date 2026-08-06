@@ -14,12 +14,13 @@ from __future__ import annotations
 
 from .bridge import ViewerBridge
 from .payloads import snapshot_to_payload, transform_payload
-from .server import ViewerTransportUnavailable, serve
+from .server import ViewerSocketServer, ViewerTransportUnavailable, serve
 
 __all__ = [
     "ViewerBridge",
     "snapshot_to_payload",
     "transform_payload",
     "serve",
+    "ViewerSocketServer",
     "ViewerTransportUnavailable",
 ]

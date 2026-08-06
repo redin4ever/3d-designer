@@ -55,21 +55,35 @@ class TranslateMixin:
         (``events_test.py::test_other_listeners_still_receive_the_event_when_one_raises``),
         but this module does not rely on that alone; see ``bridge.py``'s ``_enqueue``."""
         try:
-            message = self._translate(event)
+            messages = self._translate(event)
         except Exception:
             return
-        if message is not None:
+        for message in messages:
             self._enqueue(message)
 
-    def _translate(self, event: SceneChangeEvent) -> ServerMessage | None:
-        """Map one ``ChangeKind`` to one wire message (or ``None``).
+    def _translate(self, event: SceneChangeEvent) -> tuple[ServerMessage, ...]:
+        """One ``SceneChangeEvent`` to every wire message it implies, in send order.
 
-        Once implemented: ``TRANSFORMS_ONLY`` -> ``TRANSFORM_UPDATE`` with transforms
-        only, never mesh buffers (the cheap path, ADR-011). ``OBJECTS_ADDED``/
-        ``OBJECTS_MODIFIED``/``TOPOLOGY_CHANGED`` -> ``MESH_UPSERT`` with buffers
-        resent. ``OBJECTS_REMOVED`` -> ``OBJECTS_REMOVED``. ``FULL_RESYNC``/``ROLLBACK``
-        -> a full-scene resend (neither carries reliable per-object ids from the current
-        ``scene`` implementation — see ``README.md``'s "Assumptions").
+        Geometry first, then the two things the event says *about* that geometry. The
+        order is load-bearing rather than cosmetic: ``frontend``'s ``applyHighlight``
+        looks each id up in the node map it already holds, so a ``HIGHLIGHT`` that
+        overtakes the ``MESH_UPSERT`` which created the node marks nothing at all — and
+        marks it silently.
+        """
+        geometry = self._geometry_message(event)
+        messages = [] if geometry is None else [geometry]
+        messages.extend(self._context_messages(event))
+        return tuple(messages)
+
+    def _geometry_message(self, event: SceneChangeEvent) -> ServerMessage | None:
+        """Map one ``ChangeKind`` to the one wire message that carries its geometry.
+
+        ``TRANSFORMS_ONLY`` -> ``TRANSFORM_UPDATE`` with transforms only, never mesh
+        buffers (the cheap path, ADR-011). ``OBJECTS_ADDED``/``OBJECTS_MODIFIED``/
+        ``TOPOLOGY_CHANGED`` -> ``MESH_UPSERT`` with buffers resent. ``OBJECTS_REMOVED``
+        -> ``OBJECTS_REMOVED``. ``FULL_RESYNC``/``ROLLBACK`` -> a full-scene resend
+        (neither carries reliable per-object ids from the current ``scene``
+        implementation — see ``README.md``'s "Assumptions").
         """
         kind = event.kind
         if kind in _BUFFER_KINDS:
@@ -103,6 +117,42 @@ class TranslateMixin:
             )
         return None
 
+    def _context_messages(self, event: SceneChangeEvent) -> list[ServerMessage]:
+        """``HIGHLIGHT`` and ``LOG`` from the two fields on the event that nothing read.
+
+        ``scene.apply`` has always set ``highlight`` to what it touched, and
+        ``scene.history`` sets ``log_line`` on exactly the rebuilds that did not fully
+        complete. Both were being dropped here, which is why "the latest change is
+        highlighted" (Gate A 5.3) showed nothing in a real session while both ends of the
+        protocol looked fully implemented.
+
+        A ``HIGHLIGHT`` is emitted only when there is something to point at: an empty one
+        *clears* the previous highlight (``frontend``'s ``applyHighlight`` replaces the
+        set rather than adding to it), so sending one per event would erase the last real
+        highlight moments after it appeared.
+        """
+        messages: list[ServerMessage] = []
+        if event.highlight:
+            highlight = tuple(event.highlight)
+            self._last_highlight = highlight
+            messages.append(
+                ServerMessage(
+                    type=ServerMessageType.HIGHLIGHT,
+                    seq=self._next_seq(),
+                    object_ids=highlight,
+                )
+            )
+        if event.log_line:
+            messages.append(
+                ServerMessage(
+                    type=ServerMessageType.LOG,
+                    seq=self._next_seq(),
+                    text=event.log_line,
+                    data={"op_id": event.op_id, "head": event.head},
+                )
+            )
+        return messages
+
     def _snapshots_for(self, event: SceneChangeEvent) -> tuple[MeshSnapshot, ...]:
         """Prefer ``event.snapshots`` if populated; otherwise read through
         ``self._scene.snapshot_of`` for each ``event.object_ids``."""
@@ -110,13 +160,19 @@ class TranslateMixin:
             return event.snapshots
         return tuple(self._scene.snapshot_of(oid) for oid in event.object_ids)
 
-    def _build_full_scene_message(self) -> ServerMessage:
-        """Every object currently in the engine, as one ``FULL_SCENE`` message."""
+    def _build_full_scene_message(self, seq: int | None = None) -> ServerMessage:
+        """Every object currently in the engine, as one ``FULL_SCENE`` message.
+
+        ``seq=None`` takes the next number, which is what a resync mid-stream is: a new
+        event in the one ordered stream. An explicit ``seq`` is for the greeting a new
+        connection gets, which is a *snapshot at* the current point rather than a new
+        event — see :meth:`ViewerBridge.greeting`.
+        """
         object_ids = enumerate_object_ids(self._scene)
         snapshots = [self._scene.snapshot_of(oid) for oid in object_ids]
         return ServerMessage(
             type=ServerMessageType.FULL_SCENE,
-            seq=self._next_seq(),
+            seq=self._next_seq() if seq is None else seq,
             meshes=tuple(snapshot_to_payload(s) for s in snapshots),
             transforms=tuple(transform_payload(s) for s in snapshots),
             object_ids=tuple(object_ids),

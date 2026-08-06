@@ -25,6 +25,7 @@ engine/
   __init__.py            barrel — exports BlenderEngine, create_engine
   session.py              bpy lifecycle: construction, backend_name, reset()
   mesh.py                 MeshOps       — create/edit/inspect geometry
+  replacing.py             MeshOps.replace_mesh — swap geometry, keep what is not geometry
   modifiers.py             ModifierOps   — bevel, boolean, array-along-curve, repairs
   surfacing.py             MaterialOps + UVBakeOps — materials, unwrap, bake
   exporting.py             ExportOps     — glTF/GLB via Blender's own exporter
@@ -40,11 +41,21 @@ engine/
   conformance_test.py       every universal + fake-only check, against FakeEngine — no marker
   blender_test.py           every universal + Blender-only check, against real BlenderEngine
                              — needs_blender
+  scale_test.py             the object-creation cost curve to 3,000 objects
+                             — needs_blender + slow
+  conftest.py               registers the `slow` marker for this package only
 ```
 
-`BlenderEngine` is `MeshOpsMixin` + `ModifierOpsMixin` + `SurfacingMixin` + `ExportingMixin`
-+ `RawOpsMixin`, composed in `session.py`, which also owns what belongs to none of them:
-construction, `backend_name`, `reset()`.
+`BlenderEngine` is `MeshOpsMixin` + `MeshReplaceMixin` + `ModifierOpsMixin` + `SurfacingMixin`
++ `ExportingMixin` + `RawOpsMixin`, composed in `session.py`, which also owns what belongs to
+none of them: construction, `backend_name`, `reset()`.
+
+`replace_mesh` has a file to itself because its decision is *preservation* across a swap —
+which of an object's non-geometric attachments survive a new vertex set — where every method
+in `mesh.py` starts from nothing and has no such question. Transform and material slots
+survive; UVs and seams are dropped honestly, because Blender stores UVs per face-corner and a
+new vertex set has no correspondence to the old ones. `FakeEngine.replace_mesh` drops them for
+the same reason, so the two backends agree.
 
 ## The conformance suite
 
@@ -96,4 +107,15 @@ which checks are in each of the other two registries, and why.
 pytest src/engine -q                 # conformance_test.py always runs; blender_test.py
                                       # skips automatically without bpy
 pytest src/engine -q -m needs_blender  # only the real-bpy suite
+pytest src/engine -q -m "not slow"     # skip scale_test.py's 3,000-object build (~6s)
 ```
+
+### Never touch `Material.use_nodes`
+
+It is deprecated in Blender 5.2 (removal in 6.0) and warns on read *and* write. This repo
+runs pytest with `filterwarnings = ["error::DeprecationWarning"]`, so touching it raises
+inside a C-level RNA accessor that cannot propagate the exception: bpy leaves Python's error
+indicator set, the next RNA type registration fails with `failed to register 'ShaderNodeTree'`,
+and the *next* `node_tree.nodes` read dies with `MemoryError: couldn't create BPy_rna object`
+several calls from the cause. Every material from `bpy.data.materials.new()` already has a
+node tree with a Principled BSDF, so nothing needs it. See `surfacing._find_principled`.

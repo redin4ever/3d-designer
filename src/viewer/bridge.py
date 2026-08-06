@@ -16,15 +16,16 @@ from __future__ import annotations
 
 from typing import Callable
 
-from contracts import ServerMessage
+from contracts import WIRE_VERSION, ServerMessage, ServerMessageType
 
 from .client import ClientMixin
+from .report import ReportMixin
 from .translate import TranslateMixin
 
 __all__ = ["ViewerBridge"]
 
 
-class ViewerBridge(TranslateMixin, ClientMixin):
+class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
     """Subscribes to one ``scene`` and optionally routes control messages through one
     ``orchestrator``. See ``README.md`` for the full contract.
 
@@ -38,6 +39,21 @@ class ViewerBridge(TranslateMixin, ClientMixin):
         self._unsubscribe: Callable[[], None] | None = None
         self._queue: list[ServerMessage] = []
         self._seq_counter = 0
+        self._notifier: Callable[[], None] | None = None
+        self._last_highlight: tuple[str, ...] = ()
+        self._seen_conflicts: set[str] = set()
+
+    def set_notifier(self, notifier: Callable[[], None] | None) -> None:
+        """Register a zero-argument callback fired whenever a message is queued.
+
+        Deliberately a *wake-up*, not a delivery: the callback is told there is work and
+        collects it with :meth:`pending`, so the queue stays the single place an outbound
+        message lives. A sink that received the message directly would double-send
+        everything ``handle_client`` already returns to its own caller, and would have to
+        be re-entrant with ``scene``'s synchronous ``_emit`` — which runs on whatever
+        thread called ``scene.apply``, never the event loop's.
+        """
+        self._notifier = notifier
 
     def attach(self) -> None:
         """Subscribe to ``scene``. Idempotent — calling it twice does not register a
@@ -64,10 +80,22 @@ class ViewerBridge(TranslateMixin, ClientMixin):
         return self._seq_counter
 
     def _enqueue(self, message: ServerMessage) -> None:
-        """Append to the outbound queue, defensively — a queue that raises must not
-        propagate into ``scene``'s call stack."""
+        """Append to the outbound queue and wake whoever is draining it.
+
+        Both halves are defensive, and independently so: a queue that raises must not
+        propagate into ``scene``'s call stack, and neither must a transport whose loop has
+        already closed underneath it. ``scene.apply`` completing correctly is not allowed
+        to depend on anything about the browser.
+        """
         try:
             self._queue.append(message)
+        except Exception:
+            return
+        notifier = self._notifier
+        if notifier is None:
+            return
+        try:
+            notifier()
         except Exception:
             pass
 
@@ -79,6 +107,37 @@ class ViewerBridge(TranslateMixin, ClientMixin):
 
     def full_scene(self) -> ServerMessage:
         """Every object currently in the engine, as one ``FULL_SCENE`` message. Does not
-        touch the outbound queue — this is a pull, for an explicit resync request or the
-        first message on a new connection, not a push."""
+        touch the outbound queue — this is a pull, for an explicit resync request, not a
+        push."""
         return self._build_full_scene_message()
+
+    def greeting(self) -> tuple[ServerMessage, ...]:
+        """Everything a freshly-connected client needs before the first change arrives.
+
+        Run state first, then ``HELLO``, then the scene — and every one of them carries
+        the sequence number already reached rather than taking new ones. That is what
+        makes a second watcher connecting free for the first (Gate A 10.1): a greeting
+        that consumed three numbers would put every already-connected client one gap past
+        its baseline, and ``frontend``'s seq rule turns a gap into a full resync of the
+        whole scene. Ordering ``RUN_STATE`` *before* ``HELLO`` is the other half of the
+        same arithmetic — ``HELLO`` and ``FULL_SCENE`` reset the client's baseline to
+        their own seq, so a same-numbered ``RUN_STATE`` sent after them would be dropped
+        as a duplicate and a run paused before anyone connected would display as running.
+        """
+        seq = self._seq_counter
+        messages: list[ServerMessage] = []
+        run_state = self._run_state_message(seq=seq)
+        if run_state is not None:
+            messages.append(run_state)
+        messages.append(
+            ServerMessage(
+                type=ServerMessageType.HELLO,
+                seq=seq,
+                data={
+                    "wire_version": WIRE_VERSION,
+                    "scene_id": getattr(getattr(self._scene, "document", None), "scene_id", ""),
+                },
+            )
+        )
+        messages.append(self._build_full_scene_message(seq=seq))
+        return tuple(messages)

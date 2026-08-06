@@ -39,7 +39,46 @@ _BAKE_TYPES = {
 }
 
 
+def _rgba(base_color: Sequence[float]) -> tuple[float, float, float, float]:
+    """Normalise a caller's base colour to the RGBA every bpy colour property expects.
+
+    ``MaterialOps`` types ``base_color`` as RGB, but RGBA is what a caller round-tripping a
+    colour out of anything Blender-shaped actually holds, and ``FakeEngine`` — which stores
+    the tuple verbatim — accepts either. This engine used to append an alpha unconditionally,
+    so the RGBA form became a 5-float sequence and bpy raised a raw ``ValueError`` naming
+    neither the argument nor the caller. See
+    ``conformance_materials.check_create_material_accepts_an_rgba_base_color``.
+    """
+    channels = tuple(float(c) for c in base_color)
+    if len(channels) == 4:
+        return channels
+    if len(channels) == 3:
+        return (*channels, 1.0)
+    raise EngineError(
+        "engine.bad_color",
+        f"base_color has {len(channels)} components, expected 3 (RGB) or 4 (RGBA)",
+        "pass (r, g, b) or (r, g, b, a) with each channel in 0..1",
+    )
+
+
 def _find_principled(node_tree):
+    """The material's Principled BSDF, or ``None`` if it has no node tree or no such node.
+
+    Never enable ``Material.use_nodes`` to get one. In Blender 5.2 every material returned by
+    ``bpy.data.materials.new()`` already carries a shader node tree with a Principled BSDF and
+    an Output — ``use_nodes`` is vestigial, and bpy marks it *deprecated, to be removed in
+    Blender 6.0*, warning on **both** read and write.
+
+    That deprecation is not cosmetic here. This repo runs pytest with
+    ``filterwarnings = ["error::DeprecationWarning"]``, so touching ``use_nodes`` raises
+    inside a C-level RNA setter, which cannot propagate it: bpy leaves the Python error
+    indicator set and the *next* RNA type registration fails with
+    ``ERROR failed to register 'ShaderNodeTree'``. Reading ``node_tree.nodes`` after that
+    raises ``MemoryError: couldn't create BPy_rna object`` — a wrong, alarming error, several
+    calls away from the line that actually caused it.
+    """
+    if node_tree is None:
+        return None
     for node in node_tree.nodes:
         if node.type == "BSDF_PRINCIPLED":
             return node
@@ -70,14 +109,14 @@ class SurfacingMixin:
     def create_material(self, name: str, base_color: tuple[float, float, float]) -> str:
         import bpy
 
+        rgba = _rgba(base_color)
         mat = bpy.data.materials.new(name)
-        mat.use_nodes = True
-        mat.diffuse_color = (*base_color, 1.0)
+        mat.diffuse_color = rgba
         bsdf = _find_principled(mat.node_tree)
         if bsdf is not None:
             socket = _find_input(bsdf, "Base Color", "Color")
             if socket is not None:
-                socket.default_value = (*base_color, 1.0)
+                socket.default_value = rgba
         return mat.name
 
     def set_pbr(
@@ -89,16 +128,15 @@ class SurfacingMixin:
         metallic: float | None = None,
     ) -> None:
         mat = get_material(material_id)
-        if not mat.use_nodes:
-            mat.use_nodes = True
-        bsdf = _find_principled(mat.node_tree)
+        bsdf = _find_principled(mat.node_tree)  # never via use_nodes — see _find_principled
 
         if base_color is not None:
-            mat.diffuse_color = (*base_color, 1.0)
+            rgba = _rgba(base_color)
+            mat.diffuse_color = rgba
             if bsdf is not None:
                 socket = _find_input(bsdf, "Base Color", "Color")
                 if socket is not None:
-                    socket.default_value = (*base_color, 1.0)
+                    socket.default_value = rgba
         if roughness is not None and bsdf is not None:
             socket = _find_input(bsdf, "Roughness")
             if socket is not None:
@@ -200,7 +238,6 @@ class SurfacingMixin:
 
         if not any(m is not None for m in obj.data.materials):
             mat = bpy.data.materials.new(f"{obj.name}_bake_material")
-            mat.use_nodes = True
             if obj.data.materials:
                 obj.data.materials[0] = mat
             else:
@@ -219,9 +256,9 @@ class SurfacingMixin:
             image = bpy.data.images.new(f"{obj.name}_{channel}_bake", width=resolution, height=resolution)
 
             for mat in obj.data.materials:
-                if mat is None or not mat.use_nodes:
-                    continue
-                nt = mat.node_tree
+                if mat is None or mat.node_tree is None:  # not `use_nodes` — deprecated,
+                    continue                              # and reading it poisons bpy's
+                nt = mat.node_tree                        # error state (see _find_principled)
                 for node in nt.nodes:
                     node.select = False
                 img_node = nt.nodes.new("ShaderNodeTexImage")

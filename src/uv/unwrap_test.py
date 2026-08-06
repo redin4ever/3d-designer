@@ -119,3 +119,77 @@ def test_unwrap_result_detail_names_the_method(engine: FakeEngine) -> None:
     result = unwrap(engine, "box", method="conformal")
 
     assert "conformal" in result.detail
+
+
+# --- Gate A 4.2 / Gate B 5.4: the rejection has to name the rule ---------------------------
+
+
+def test_the_out_of_range_seam_rejection_names_the_rule_and_what_to_do(
+    engine: FakeEngine,
+) -> None:
+    """Rejecting the index is only half the job. Gate A 4.2, verbatim, is that the agent is
+    told *what rule it broke* — and this rejection currently arrives as a bare ``ValueError``
+    carrying one long sentence, which reaches the agent as a raw Python traceback with no
+    rule to match on and no separable next step.
+
+    The consequence is the one the research names: an agent handed an opaque error retries
+    the identical call. Here it has an obvious correct move available — ask
+    ``suggest_seams`` for indices, or clamp to the mesh's real edge count — and nothing in
+    the message tells it so.
+    """
+    from contracts import RuleError
+
+    engine.create_primitive("box", "cube", Vec3(1.0, 1.0, 1.0))
+    edge_count = len(engine.snapshot("box").edges())
+
+    with pytest.raises(RuleError) as caught:
+        unwrap(engine, "box", seams=(edge_count + 5,))
+
+    error = caught.value
+    assert error.rule, "a failure with no rule is exactly what Gate A 4.2 forbids"
+    assert error.suggestion, "an agent given no next step retries the same call"
+    assert "box" in error.detail, "the agent must know which object it was working on"
+    assert str(edge_count + 5) in error.detail, (
+        f"the offending index must be named, not just counted: {error.detail!r}"
+    )
+    assert str(edge_count) in error.detail, (
+        f"the valid range is what makes the error fixable in one attempt: {error.detail!r}"
+    )
+
+
+def test_the_seam_rejection_is_still_a_valueerror_for_callers_that_already_catch_one(
+    engine: FakeEngine,
+) -> None:
+    """The named error must not cost an existing caller its ``except``.
+
+    ``uv/CLAUDE.md`` recorded this rejection as a plain ``ValueError`` on purpose — a
+    decision-layer input check, not an engine-reported failure — and
+    ``test_out_of_range_explicit_seams_are_rejected_before_reaching_the_engine`` above pins
+    it. Adding a rule must widen what the failure *carries*, never narrow what it *is*;
+    ``orchestration.PromotionRefused`` sets the precedent of keeping both bases for exactly
+    this reason.
+    """
+    engine.create_primitive("box", "cube", Vec3(1.0, 1.0, 1.0))
+    edge_count = len(engine.snapshot("box").edges())
+
+    with pytest.raises(ValueError):
+        unwrap(engine, "box", seams=(edge_count + 5,))
+
+
+def test_a_negative_seam_index_is_named_the_same_way(engine: FakeEngine) -> None:
+    """Python indexing makes ``-1`` mean "the last edge", so a negative index is not an
+    obvious error to an agent that reasons in Python — it is a plausible thing to send.
+
+    ``EngineProtocol.mark_seams`` does not read it that way, so accepting it would seam a
+    different edge than the agent asked for, with no error at all: the exact silent-wrong-
+    answer failure ``MeshSnapshot.edges()``'s own docstring exists to prevent.
+    """
+    from contracts import RuleError
+
+    engine.create_primitive("box", "cube", Vec3(1.0, 1.0, 1.0))
+
+    with pytest.raises(RuleError) as caught:
+        unwrap(engine, "box", seams=(-1,))
+
+    assert caught.value.rule
+    assert "-1" in caught.value.detail

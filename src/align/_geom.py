@@ -20,11 +20,13 @@ from __future__ import annotations
 
 import math
 
-from contracts import Quat, Transform, Vec3, WORLD_UP
+from contracts import EPSILON, Quat, ToolError, Transform, Vec3, WORLD_UP
 
 __all__ = [
     "AXIS_NAMES",
+    "DIRECTION_RULE",
     "axis_vector",
+    "require_direction",
     "rotation_aligning",
     "perpendicular_in_plane",
     "z_swing_twist",
@@ -32,6 +34,37 @@ __all__ = [
 ]
 
 AXIS_NAMES = ("x", "y", "z")
+
+#: Raised when a direction argument has no direction. Named so a caller — and the boundary
+#: in ``app/handlers.py`` — can match on it rather than on message text.
+DIRECTION_RULE = "align.unusable_direction"
+
+
+def require_direction(vector: Vec3, *, parameter: str, context: str = "") -> Vec3:
+    """``vector`` normalised, or a :class:`~contracts.ToolError` naming ``parameter``.
+
+    Gate A 4.2 asks that a failing agent be told what rule it broke. Every other validation
+    in this package already does (``_util.require_object``, ``_util.require_axis`` both raise
+    ``ToolError``); the geometry did not, and fell through to
+    ``contracts.Vec3.normalized()``'s ``ValueError: cannot normalize a zero-length vector``.
+    Nothing in ``align`` catches ``ValueError`` on those paths, so that reached the agent as
+    a raw traceback naming a ``contracts`` file and no parameter — and an agent given an
+    opaque error retries the same call unchanged.
+
+    ``ToolError`` rather than a new class: it is already this package's error shape and
+    already a :class:`contracts.RuleError`, so the boundary recognises it with the same
+    single ``isinstance`` it uses for every other named failure. ``constraints._geom``'s
+    duplicate of this guard raises ``constraints``' own named error for the same reason —
+    same shape, each module's own type.
+    """
+    if vector.length() < EPSILON:
+        raise ToolError(
+            DIRECTION_RULE,
+            f"{parameter} is {vector.as_tuple()}, which has no direction"
+            + (f" ({context})" if context else ""),
+            "give it a non-zero direction, e.g. Vec3(1, 0, 0)",
+        )
+    return vector.normalized()
 
 _AXIS_VECTORS = {
     "x": Vec3(1.0, 0.0, 0.0),
@@ -57,11 +90,15 @@ def axis_vector(axis: str) -> Vec3:
 def rotation_aligning(from_axis: Vec3, to_direction: Vec3) -> Quat:
     """The minimal rotation taking ``from_axis`` onto ``to_direction``.
 
-    Identical formula to ``constraints._geom.rotation_aligning`` — see the module
-    docstring for why this is a deliberate, bounded duplication rather than an import.
+    Identical formula *and* identical degenerate-input guard to
+    ``constraints._geom.rotation_aligning`` — see the module docstring for why this is a
+    deliberate, bounded duplication rather than an import. The one thing that differs is
+    which named error each raises (``ToolError`` here, ``ConstraintRuleError`` there); both
+    are :class:`contracts.RuleError` s, and ``align/duplicated_geometry_test.py`` pins that
+    everything else about the two stays identical.
     """
-    f = from_axis.normalized()
-    t = to_direction.normalized()
+    f = require_direction(from_axis, parameter="from_axis", context="rotation_aligning")
+    t = require_direction(to_direction, parameter="to_direction", context="rotation_aligning")
     dot = max(-1.0, min(1.0, f.dot(t)))
     axis = f.cross(t)
     if axis.length() < 1e-9:
@@ -81,8 +118,11 @@ def perpendicular_in_plane(direction: Vec3) -> Vec3:
     vector satisfies "perpendicular", so this exists only to make the choice repeatable
     rather than depend on incidental floating-point order — the same rationale as the
     original.
+
+    A zero-length ``direction`` raises :class:`~contracts.ToolError`: there is no plane to
+    be perpendicular *in*, so any answer would be a guess presented as a measurement.
     """
-    d = direction.normalized()
+    d = require_direction(direction, parameter="direction", context="perpendicular_in_plane")
     perp = d.cross(WORLD_UP)
     if perp.length() < 1e-6:
         perp = d.cross(Vec3(1.0, 0.0, 0.0))

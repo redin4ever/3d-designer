@@ -17,6 +17,7 @@ from contracts import EngineProtocol, Vec3
 
 __all__ = [
     "check_create_material_and_assign_material_reach_the_snapshot",
+    "check_create_material_accepts_an_rgba_base_color",
     "check_set_pbr_updates_roughness_observably",
 ]
 
@@ -37,6 +38,32 @@ def check_create_material_and_assign_material_reach_the_snapshot(
 
     slots = engine.snapshot(oid).material_slots
     assert mat_id in slots, f"assigned material {mat_id!r} not present in slots {slots!r}"
+
+
+def check_create_material_accepts_an_rgba_base_color(engine: EngineProtocol) -> None:
+    """A four-component base colour must work as well as a three-component one.
+
+    ``MaterialOps`` types ``base_color`` as RGB, but RGBA is what a caller reading a colour
+    back out of anything Blender-shaped has in hand — every bpy colour property, and
+    ``FakeEngine``'s own stored value if it was given one — so a round-trip hands four
+    components straight back in. ``FakeEngine`` stores whatever it is passed and so accepts
+    both; the real engine wrote ``(*base_color, 1.0)`` into a 4-float bpy property and died
+    with ``ValueError: sequences of dimension 0 should contain 4 items, not 5`` on the RGBA
+    form. That is exactly the class of divergence this suite exists to catch: the fake said
+    the call was fine, so every module tested against it believed a call that only the real
+    backend rejects.
+
+    Asserted through ``material_slots`` rather than by reading the colour back, because
+    ``MaterialOps`` has no Protocol-level colour readback by design (see this module's
+    docstring) — the observable is that the material exists and is usable, not its value.
+    """
+    oid = engine.create_primitive("box", "cube", Vec3(1, 1, 1))
+    mat_id = engine.create_material("rgba_grey", (0.5, 0.5, 0.5, 1.0))
+    engine.assign_material(oid, mat_id, slot=0)
+    assert mat_id in engine.snapshot(oid).material_slots
+
+    engine.set_pbr(mat_id, base_color=(0.2, 0.4, 0.6, 1.0), roughness=0.7)
+    assert mat_id in engine.snapshot(oid).material_slots
 
 
 # ------------------------------------------------------------------------------ fake-only

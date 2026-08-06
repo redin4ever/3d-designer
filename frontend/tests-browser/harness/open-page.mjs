@@ -71,20 +71,65 @@ export async function openConsolePage(browser, options) {
   };
 }
 
+/**
+ * Accept either a session or a bare page, and recover both.
+ * The collectors are what make a timeout diagnosable, so keep them when they exist.
+ */
+function unwrap(target) {
+  return target?.page ? { page: target.page, session: target } : { page: target, session: null };
+}
+
+/**
+ * Re-throw a wait timeout with everything the browser complained about attached.
+ *
+ * This exists because of a real debugging failure: a broken WebSocket handshake in the
+ * harness made all ten tests die on `waitForConnected` with a bare "15000ms exceeded",
+ * which names the symptom and hides the cause. The console had said exactly what was
+ * wrong the whole time. A timeout that discards the collectors turns a one-line fix into
+ * a bisect.
+ */
+async function waitOrExplain(target, description, run) {
+  const { session } = unwrap(target);
+  try {
+    await run();
+  } catch (cause) {
+    if (!session) throw cause;
+    const said = complaints(session);
+    const section = (name, lines) => (lines.length ? `\n  ${name}:\n    ${lines.join('\n    ')}` : '');
+    throw new Error(
+      `timed out waiting for ${description}` +
+        section('page errors', said.pageErrors) +
+        section('console errors', said.consoleErrors) +
+        section('failed requests', said.failedRequests) +
+        section('bad responses', said.badResponses) +
+        (Object.values(said).every((l) => l.length === 0)
+          ? '\n  the browser reported nothing at all — the condition simply never became true'
+          : ''),
+      { cause },
+    );
+  }
+}
+
 /** Wait until the status pill says the socket is open — proves main.js actually ran. */
-export async function waitForConnected(page) {
-  await page.waitForFunction(
-    () => document.getElementById('connection-status')?.dataset.status === 'open',
-    { timeout: CONDITION_TIMEOUT_MS, polling: 50 },
+export async function waitForConnected(target) {
+  const { page } = unwrap(target);
+  await waitOrExplain(target, 'the socket to report status=open', () =>
+    page.waitForFunction(
+      () => document.getElementById('connection-status')?.dataset.status === 'open',
+      { timeout: CONDITION_TIMEOUT_MS, polling: 50 },
+    ),
   );
 }
 
 /** Wait until the action log has rendered at least `count` rows. */
-export async function waitForLogRows(page, count) {
-  await page.waitForFunction(
-    (n) => document.querySelectorAll('#action-log li').length >= n,
-    { timeout: CONDITION_TIMEOUT_MS, polling: 50 },
-    count,
+export async function waitForLogRows(target, count) {
+  const { page } = unwrap(target);
+  await waitOrExplain(target, `${count} action-log rows`, () =>
+    page.waitForFunction(
+      (n) => document.querySelectorAll('#action-log li').length >= n,
+      { timeout: CONDITION_TIMEOUT_MS, polling: 50 },
+      count,
+    ),
   );
 }
 

@@ -24,12 +24,20 @@ from .exporting import ExportingMixin
 from .mesh import MeshOpsMixin
 from .modifiers import ModifierOpsMixin
 from .raw import RawOpsMixin
+from .replacing import MeshReplaceMixin
 from .surfacing import SurfacingMixin
 
 __all__ = ["BlenderEngine", "create_engine"]
 
 
-class BlenderEngine(MeshOpsMixin, ModifierOpsMixin, SurfacingMixin, ExportingMixin, RawOpsMixin):
+class BlenderEngine(
+    MeshOpsMixin,
+    MeshReplaceMixin,
+    ModifierOpsMixin,
+    SurfacingMixin,
+    ExportingMixin,
+    RawOpsMixin,
+):
     """The real ``EngineProtocol`` implementation, against Blender 5.2's data API.
 
     Construction alone must not raise ``NotImplementedError`` — a caller needs to be able to

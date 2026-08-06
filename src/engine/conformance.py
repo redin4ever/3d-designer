@@ -72,6 +72,7 @@ from .conformance_exporting import (
     check_export_gltf_writes_a_nonempty_file,
 )
 from .conformance_materials import (
+    check_create_material_accepts_an_rgba_base_color,
     check_create_material_and_assign_material_reach_the_snapshot,
     check_set_pbr_updates_roughness_observably,
 )
@@ -177,6 +178,7 @@ UNIVERSAL_CHECKS = (
     check_bake_requires_unwrap_first,
     check_bake_succeeds_or_raises_capability_error,
     check_create_material_and_assign_material_reach_the_snapshot,
+    check_create_material_accepts_an_rgba_base_color,
     check_export_gltf_threads_the_full_conversion_through,
     check_execute_runs_against_live_context,
     check_execute_propagates_a_raising_source,

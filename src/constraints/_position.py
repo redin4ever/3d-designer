@@ -12,8 +12,9 @@ from dataclasses import dataclass
 
 from contracts import Constraint, ConstraintKind, EngineProtocol, Vec3
 
-from ._geom import half_extent_along, replace_along_axis, support_along
+from ._geom import half_extent_along, replace_along_axis, require_direction, support_along
 from .anchors import resolve_anchor
+from .errors import UNSUPPORTED_KIND_RULE, ConstraintRuleError
 
 __all__ = [
     "PositionEffect",
@@ -92,29 +93,54 @@ def position_effect(
     kind = constraint.kind
     resolution = resolve_anchor(engine, constraint.target)
 
+    def direction(vector: Vec3, *, parameter: str = "axis") -> Vec3:
+        """``vector`` as a usable direction, or a named failure that says which constraint.
+
+        Every branch below needs the same thing and used to get it three different ways —
+        ``axis.normalized()`` inline, or handing a raw ``axis`` to ``support_along`` /
+        ``half_extent_along`` and letting *them* normalise. All three ended at
+        ``Vec3.normalized()``'s bare ``ValueError: cannot normalize a zero-length vector``,
+        which names no rule, no parameter, no constraint and no object.
+
+        The context is the point. ``_geom.require_direction`` already produces a good
+        message, but on its own it says only "measuring a bounding extent" — and an agent
+        holding a set of twelve constraints cannot act on that without bisecting the set to
+        find which one carried the bad axis. Naming the kind, the mover and the target makes
+        it fixable in one attempt, which is the whole of Gate A 4.2's reason for existing.
+        """
+        return require_direction(
+            vector,
+            parameter=parameter,
+            context=(
+                f"{kind.value} constraint on {object_id!r} "
+                f"targeting {constraint.target.object_id!r}"
+            ),
+        )
+
     if kind == ConstraintKind.ON:
-        axis = resolution.normal if resolution.normal is not None else Vec3(0.0, 0.0, 1.0)
-        scalar = axis.normalized().dot(resolution.point) + _mover_half_extent(engine, object_id, axis)
+        raw = resolution.normal if resolution.normal is not None else Vec3(0.0, 0.0, 1.0)
+        axis = direction(raw, parameter="the anchor's surface normal")
+        scalar = axis.dot(resolution.point) + _mover_half_extent(engine, object_id, axis)
         return PositionEffect(axis=axis, scalar=scalar)
 
     if kind == ConstraintKind.FLUSH_WITH:
         # Deliberately mirrors the *target's* own half-extent, never the mover's: the
         # mover need not exist yet for this to be checkable (see residual_test.py's
         # flush_with case, which measures a placement for an object never created).
-        axis = constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0)
+        axis = direction(constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0))
         bounds = engine.world_bounds(constraint.target.object_id)
         scalar = support_along(bounds, axis) + half_extent_along(bounds, axis)
         return PositionEffect(axis=axis, scalar=scalar)
 
     if kind == ConstraintKind.OFFSET_FROM:
-        axis = constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0)
-        scalar = axis.normalized().dot(resolution.point) + _numeric_value(constraint)
+        axis = direction(constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0))
+        scalar = axis.dot(resolution.point) + _numeric_value(constraint)
         return PositionEffect(axis=axis, scalar=scalar)
 
     if kind == ConstraintKind.SPACING:
         # Clear opening between neighbouring *surfaces*, not centre-to-centre pitch: the
         # target's own face plus the mover's own half-width plus the stated gap.
-        axis = constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0)
+        axis = direction(constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0))
         bounds = engine.world_bounds(constraint.target.object_id)
         scalar = (
             support_along(bounds, axis)
@@ -124,7 +150,7 @@ def position_effect(
         return PositionEffect(axis=axis, scalar=scalar)
 
     if kind == ConstraintKind.CLEAR_OF:
-        axis = constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0)
+        axis = direction(constraint.axis if constraint.axis is not None else Vec3(1.0, 0.0, 0.0))
         bounds = engine.world_bounds(constraint.target.object_id)
         minimum = (
             support_along(bounds, axis)
@@ -134,8 +160,9 @@ def position_effect(
         return PositionEffect(axis=axis, scalar=minimum, one_sided=True)
 
     if kind == ConstraintKind.COPLANAR_WITH:
-        axis = resolution.normal if resolution.normal is not None else Vec3(0.0, 0.0, 1.0)
-        scalar = axis.normalized().dot(resolution.point)
+        raw = resolution.normal if resolution.normal is not None else Vec3(0.0, 0.0, 1.0)
+        axis = direction(raw, parameter="the anchor's surface normal")
+        scalar = axis.dot(resolution.point)
         return PositionEffect(axis=axis, scalar=scalar)
 
     if kind == ConstraintKind.CENTRED_ON:
@@ -149,7 +176,19 @@ def position_effect(
     if kind == ConstraintKind.ENDS_AT:
         return PositionEffect(full=resolution.point)
 
-    raise ValueError(f"{kind!r} is not a position-affecting constraint kind")
+    raise ConstraintRuleError(
+        rule=UNSUPPORTED_KIND_RULE,
+        detail=(
+            f"{kind.value!r} is not a position-affecting constraint kind, so it has no "
+            "position effect to compute"
+        ),
+        suggestion=(
+            "position-affecting kinds are: "
+            + ", ".join(sorted(k.value for k in POSITION_KINDS))
+            + ". If this kind is new, add it to POSITION_KINDS, FORWARD_KINDS or UP_KINDS "
+            "and give it a branch in the matching module"
+        ),
+    )
 
 
 def apply_position_effect(position: Vec3, effect: PositionEffect) -> Vec3:

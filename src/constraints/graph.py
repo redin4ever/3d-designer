@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from contracts import CYCLE_RULE, ConstraintError, ConstraintSet
+from contracts import CYCLE_RULE, ConstraintSet
+
+from .errors import ConstraintRuleError
 
 __all__ = ["dependency_order"]
 
@@ -20,7 +22,7 @@ __all__ = ["dependency_order"]
 def dependency_order(sets: Sequence[ConstraintSet]) -> tuple[str, ...]:
     """Object ids ordered so every target precedes its dependent.
 
-    Raises :class:`~contracts.ConstraintError` with ``rule == CYCLE_RULE``
+    Raises :class:`~constraints.ConstraintRuleError` with ``rule == CYCLE_RULE``
     (``contracts.CYCLE_RULE``) when the dependency graph has a cycle — ``A follows B`` and
     ``B follows A`` has no solvable order, and returning a partial or arbitrary order here
     would let :func:`constraints.solve_all` silently solve one of the two against stale
@@ -43,7 +45,7 @@ def dependency_order(sets: Sequence[ConstraintSet]) -> tuple[str, ...]:
         if status == 2:
             return
         if status == 1:
-            raise ConstraintError(
+            raise ConstraintRuleError(
                 rule=CYCLE_RULE,
                 detail=f"constraint dependency cycle detected at {object_id!r}",
                 suggestion="break the cycle by removing or redirecting one of the constraints involved",

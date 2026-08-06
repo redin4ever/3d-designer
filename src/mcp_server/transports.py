@@ -2,17 +2,20 @@
 HTTP for ChatGPT developer-mode connectors — plus ``SERVER_INFO``, the identity both
 advertise.
 
-The ``mcp`` Python SDK is an optional dependency. It **is** installed and importable in
-this environment (2.0.0), and the ``mcp``/``mcp_server`` package-name collision that used
-to shadow it is fixed and pinned by a test — but importing it eagerly at module load would
-still make the registry and ``dispatch()`` unusable on a machine that has not installed it.
-Both ``serve_*`` functions import it lazily, inside the function body, and turn its absence
-— or an SDK whose API this is not written against — into one clear, named ``RuntimeError``
-rather than a bare ``ModuleNotFoundError`` or ``AttributeError`` surfacing from several
-frames deep inside someone else's package.
+Two transports rather than one because they reach different customers: stdio is what a
+local editor spawns as a subprocess, and streamable HTTP is what a hosted connector dials.
+Gate A 7.4, verbatim: *"also make sure it supports my subscriptions eg: chatgpt subscription
+so that i can use it with it."* Both run the **same** server object from
+:mod:`mcp_server.sdk_bridge`, so there is one tool catalogue and one set of rules, not two
+that can drift.
 
-``SERVER_INFO`` is real, constructed data — not a stub — same reasoning as
-``raw.RAW_TOOL_SPEC``: there is no implementation to defer, only a value to declare.
+This file owns transport *policy* — the identity, where it binds, and the ADR-009 warning.
+Everything about the SDK's shape lives in ``sdk_bridge``; the split is what kept the last
+SDK-version break to one file.
+
+The SDK is imported lazily, inside each ``serve_*``, so the registry and ``dispatch()``
+stay fully usable on a machine that has not installed it. That is most of this repository's
+test suite.
 """
 
 from __future__ import annotations
@@ -20,14 +23,16 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .dispatch import dispatch
-from .registry import build_registry
+from .sdk_bridge import build_server, load_sdk
 
-__all__ = ["SERVER_INFO", "serve_stdio", "serve_http"]
+__all__ = ["SERVER_INFO", "serve_stdio", "serve_http", "http_app"]
 
 _LOG = logging.getLogger(__name__)
 
 _LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+DEFAULT_HTTP_PORT = 8765
+DEFAULT_HTTP_PATH = "/mcp"
 
 SERVER_INFO: dict[str, Any] = {
     "name": "blender-agent-mcp",
@@ -41,133 +46,96 @@ SERVER_INFO: dict[str, Any] = {
     ),
 }
 
-_SDK_MISSING = (
-    "the `mcp` Python SDK is not importable (pip install mcp) — {transport} needs it to "
-    "actually speak the protocol. The tool registry and dispatch() work without it; only "
-    "serving a live connection over {transport} does not."
-)
 
-_SDK_INCOMPATIBLE = (
-    "the installed `mcp` SDK does not expose the low-level decorator API this module wires "
-    "against (`Server.list_tools` / `Server.call_tool`, SDK 1.x). Installed here: {version}, "
-    "whose `mcp.server.Server` instead offers `MCPServer.add_tool`. Refusing to serve "
-    "{transport} rather than failing with an AttributeError from inside the SDK. Rewiring "
-    "`_build_server` onto `mcp.server.MCPServer` is a live-client task — see CLAUDE.md."
-)
+def _warn_if_exposed(host: str) -> None:
+    """ADR-009 in one line, before anything binds.
 
-_LEASE_HOLDER = "mcp-session"
-"""One logical writer per server process.
+    Gate A 7.2 chose unrestricted arbitrary code execution for connected agents and 7.4
+    chose unrestricted filesystem access, both with the risk stated in the option text. On
+    loopback the trust boundary is the user's own machine, which is what makes that a
+    reasonable trade. Off loopback it is whoever can route to the port, and the same choice
+    is a different decision entirely — so it is never made silently.
 
-The MCP session model has no native "role" or "lease" concept, so a connected client is
-treated as a single writer that keeps renewing its own lease. Same-holder re-acquire
-renews rather than contends, and the lease expires on its own if this process dies (Rule 6
-— agents die, and a lock nobody can release wedges the run). A second server process still
-contends properly, which is ADR-007's actual guarantee.
-"""
-
-
-def _sdk_version() -> str:
-    try:
-        import importlib.metadata as metadata
-
-        return metadata.version("mcp")
-    except Exception:  # noqa: BLE001 — a missing version must not mask the real error
-        return "unknown"
-
-
-def _load_sdk(transport: str) -> Any:
-    """Import the third-party MCP SDK lazily — never at module load — so the registry and
-    ``dispatch()`` stay fully usable on a machine that has not installed it.
-
-    This package used to be called ``mcp``, which is also the SDK's top-level import name.
-    Since the root ``conftest.py`` puts ``src/`` first on ``sys.path``, ``import mcp`` from
-    inside this very package resolved back to *this* package regardless of install order,
-    and the SDK was permanently unreachable — which would have meant no subscription client
-    could ever connect, the one thing Gate A 7.4 asked for. Renaming the package to
-    ``mcp_server`` fixed it, and ``transports_test.py`` pins the fix: ``import mcp`` now
-    resolves to the real SDK, which is installed and importable in this environment.
-    """
-    try:
-        import mcp.server  # the third-party MCP SDK — see the collision note above
-    except ImportError as exc:
-        raise RuntimeError(_SDK_MISSING.format(transport=transport)) from exc
-    return mcp.server
-
-
-def _build_server(sdk_server_module: Any, orchestrator: Any) -> Any:
-    """Wire the full tool catalogue onto the SDK's low-level ``Server``.
-
-    Every call still goes through ``dispatch()``, which validates parameters, authorises
-    against the phase and the lease, and takes the write lock — regardless of what the
-    transport layer does. Per-role partitioning for one *live* session remains a follow-up:
-    the MCP session model has no native role concept, so it wants one server process per
-    role rather than something inferred here from a single ``orchestrator``.
-
-    Refuses by name when the installed SDK does not offer the decorator API this is written
-    against. That is not hypothetical — SDK 2.0 replaced it, and an ``AttributeError``
-    raised from three frames inside someone else's package is precisely the opaque failure
-    Gate A 4.2 asked about.
-    """
-    server_class = getattr(sdk_server_module, "Server", None)
-    if server_class is None or not hasattr(server_class, "list_tools"):
-        raise RuntimeError(
-            _SDK_INCOMPATIBLE.format(version=_sdk_version(), transport="this transport")
-        )
-
-    server = server_class(SERVER_INFO["name"])
-    registry = build_registry()
-    spec_by_name = {spec.name: spec for specs in registry.values() for spec in specs}
-
-    @server.list_tools()
-    async def _list_tools() -> list[dict[str, Any]]:
-        return [
-            {"name": spec.name, "description": spec.description, "inputSchema": spec.input_schema}
-            for spec in spec_by_name.values()
-        ]
-
-    @server.call_tool()
-    async def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
-        spec = spec_by_name[name]
-        if not spec.mutating:
-            # Read-only tools take no lease at all, so many readers run beside the one
-            # writer (ADR-007). This is also why an INSPECT client works with no lock.
-            return dispatch(name, arguments, orchestrator=orchestrator)
-        lease = orchestrator.acquire(_LEASE_HOLDER, orchestrator.phase)
-        return dispatch(name, arguments, orchestrator=orchestrator, lease=lease)
-
-    return server
-
-
-def serve_stdio(orchestrator: Any) -> None:
-    """Run the MCP server over stdio until the client disconnects. Blocking — call from a
-    script's own entry point, never from a request handler."""
-    sdk = _load_sdk("stdio")
-    server = _build_server(sdk, orchestrator)
-
-    import anyio
-
-    async def _run() -> None:
-        async with sdk.stdio.stdio_server() as streams:
-            await server.run(*streams, server.create_initialization_options())
-
-    anyio.run(_run)
-
-
-def serve_http(orchestrator: Any, *, host: str = "127.0.0.1", port: int = 8765) -> Any:
-    """Run the MCP server over streamable HTTP. Binds loopback by default; a non-loopback
-    ``host`` is a real, unauthenticated network surface reaching every registered tool —
-    including unrestricted raw code execution — and must never happen silently (ADR-009).
-    The warning below runs before the SDK is ever imported, so it fires even when the SDK
-    is not installed.
+    Deliberately fires before the SDK is imported, so an operator who mistypes ``--host``
+    is told even on a machine where the server cannot start at all.
     """
     if host not in _LOOPBACK_HOSTS:
         _LOG.warning(
             "serve_http binding to non-loopback host %r exposes every registered tool — "
-            "including unrestricted raw code execution — to anything that can route to "
-            "this host. There is no sandbox and no authentication layer (ADR-009).",
+            "including unrestricted raw code execution and full filesystem access — to "
+            "anything that can route to this host. There is no sandbox and no "
+            "authentication layer (ADR-009).",
             host,
         )
 
-    sdk = _load_sdk("streamable HTTP")
-    server = _build_server(sdk, orchestrator)
-    return sdk.streamable_http.serve(server, host=host, port=port)
+
+def serve_stdio(orchestrator: Any) -> None:
+    """Run the MCP server over stdio until the client disconnects.
+
+    Blocking — call it from a process's own entry point (``python -m mcp_server``), never
+    from a request handler.
+
+    While this is serving, the SDK points file descriptor 1 at stderr and serves the wire
+    from a private duplicate, so a stray ``print`` — or Blender's own C-level chatter during
+    an export — misses the JSON-RPC stream instead of corrupting it. Nothing protects the
+    *startup* that happens before this call, which is why ``__main__`` diverts stdout for
+    the duration of engine construction.
+    """
+    sdk = load_sdk("stdio")
+    server = build_server(
+        sdk, orchestrator, name=SERVER_INFO["name"], version=SERVER_INFO["version"],
+    )
+
+    import anyio
+
+    async def _run() -> None:
+        async with sdk.stdio.stdio_server() as (read_stream, write_stream):
+            await server.run(read_stream, write_stream, server.create_initialization_options())
+
+    anyio.run(_run)
+
+
+def http_app(
+    orchestrator: Any,
+    *,
+    host: str = "127.0.0.1",
+    path: str = DEFAULT_HTTP_PATH,
+    json_response: bool = False,
+) -> Any:
+    """The streamable-HTTP endpoint as a plain ASGI application, bound to nothing.
+
+    Separate from :func:`serve_http` so the app can be mounted inside someone else's ASGI
+    server — a hosted connector behind their own TLS and auth — and so it can be built and
+    inspected without starting a listener. ``serve_http`` is then just this plus uvicorn.
+
+    On a loopback host the SDK enables DNS-rebinding protection by itself: without it, a web
+    page the user visits could reach this port through their browser, and every tool here
+    runs arbitrary code (ADR-009).
+    """
+    _warn_if_exposed(host)
+    sdk = load_sdk("streamable HTTP")
+    server = build_server(
+        sdk, orchestrator, name=SERVER_INFO["name"], version=SERVER_INFO["version"],
+    )
+    return server.streamable_http_app(
+        streamable_http_path=path, host=host, json_response=json_response,
+    )
+
+
+def serve_http(
+    orchestrator: Any,
+    *,
+    host: str = "127.0.0.1",
+    port: int = DEFAULT_HTTP_PORT,
+    path: str = DEFAULT_HTTP_PATH,
+) -> None:
+    """Run the MCP server over streamable HTTP until interrupted. Blocking.
+
+    Binds loopback by default; see :func:`_warn_if_exposed` for what a non-loopback host
+    actually means here.
+    """
+    app = http_app(orchestrator, host=host, path=path)
+
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port, log_level="info")

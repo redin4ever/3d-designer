@@ -1,5 +1,4 @@
-"""Stub — ``unwrap``: mark seams (agent-supplied or suggested), then unwrap through the
-engine.
+"""``unwrap``: mark seams (agent-supplied or suggested), then unwrap through the engine.
 
 See ``src/uv/README.md``. ``seams=None`` is not "no seams" — it means "decide for me":
 :func:`uv.suggest_seams` runs against the object's current snapshot and its result is what
@@ -7,22 +6,50 @@ gets marked. Passing an explicit sequence, even an empty one, always wins outrig
 never merged with or filtered against the suggestion — that override is the one the user
 asked for by name ("full UV unwrap ... with the agent able to override seams"), and this
 function's whole job is making sure it reaches ``EngineProtocol.mark_seams`` unchanged.
-
-Nothing here computes anything yet; the function raises until an implementer replaces the
-body (Rule 4 — tests come first).
 """
 
 from __future__ import annotations
 
 from typing import Sequence
 
-from contracts import EngineProtocol
+from contracts import EngineProtocol, RuleError
 
 from .quality import compute_uv_proxies
 from .results import UVResult
 from .seams import suggest_seams
 
-__all__ = ["unwrap"]
+__all__ = ["unwrap", "SeamIndexError"]
+
+
+class SeamIndexError(ValueError, RuleError):
+    """An explicit seam index that does not exist on the mesh.
+
+    Two bases, deliberately, and in that order:
+
+    ``ValueError`` first because ``uv/CLAUDE.md`` recorded this rejection as a plain
+    ``ValueError`` on purpose — it is a decision-layer input check, not an engine-reported
+    failure — and an existing test pins that. Adding a rule must widen what the failure
+    *carries* and never narrow what it *is*.
+
+    ``RuleError`` second because Gate A 4.2, verbatim, is that the agent is told *what rule
+    it broke*, and the boundary recognises a named failure by a single ``isinstance`` rather
+    than by knowing every module's own exception type. As a bare ``ValueError`` this arrived
+    as a raw traceback carrying one long sentence: no rule to match on, and no separable
+    next step — while an obviously correct move (ask ``suggest_seams`` for indices) existed
+    the whole time.
+
+    ``orchestration.PromotionRefused`` and ``constraints.ConstraintRuleError`` are built the
+    same way for the same reason.
+
+    The explicit ``__init__`` is not ceremony. With ``ValueError`` first in the MRO, the
+    inherited ``__init__`` is ``ValueError``'s, which takes no keyword arguments — so
+    constructing this with ``rule=``/``detail=`` raises ``TypeError`` at the very moment the
+    caller is trying to report a different failure. ``ConstraintRuleError`` avoids it only
+    because its first base already accepts the same three keywords.
+    """
+
+    def __init__(self, rule: str, detail: str, suggestion: str = "") -> None:
+        RuleError.__init__(self, rule=rule, detail=detail, suggestion=suggestion)
 
 
 def unwrap(
@@ -55,10 +82,17 @@ def unwrap(
         seam_indices = tuple(seams)
         out_of_range = sorted({i for i in seam_indices if not (0 <= i < edge_count)})
         if out_of_range:
-            raise ValueError(
-                f"unwrap({object_id!r}): seam edge indices {out_of_range} are outside "
-                f"range(0, {edge_count}) of snapshot.edges() — an out-of-range index would "
-                "seam the wrong edge silently"
+            raise SeamIndexError(
+                rule="uv.seam_index_out_of_range",
+                detail=(
+                    f"unwrap({object_id!r}): seam edge indices {out_of_range} are outside "
+                    f"range(0, {edge_count}) of snapshot.edges() — an out-of-range index "
+                    "would seam the wrong edge silently"
+                ),
+                suggestion=(
+                    f"{object_id!r} has {edge_count} edges. Call suggest_seams(snapshot) for "
+                    "indices that exist, or drop the out-of-range ones"
+                ),
             )
 
     engine.mark_seams(object_id, seam_indices)

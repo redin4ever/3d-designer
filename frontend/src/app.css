@@ -4,6 +4,13 @@
  * implements: dense, quiet, dark, with the accent reserved for focus and the highlight.
  */
 
+/* Dark-only design (tokens.css has no light ladder). Declaring it stops a light-preference
+ * browser painting *its* scrollbars, <select> popup and number spinners over this near-black
+ * page — those come from color-scheme, not from our CSS. */
+:root {
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }

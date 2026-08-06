@@ -1,18 +1,26 @@
 """Tests for ``SERVER_INFO`` and the two MCP transports (ADR-003, ADR-009).
 
-The ``mcp`` SDK **is** installed and importable here (2.0.0) — an earlier version of this
-docstring said it was not, and the package-name collision that shadowed it was fixed and is
-pinned below. What still cannot be driven end to end is a live client session, so these
-tests hold the guarantees that do not need one: the registry and ``dispatch`` stay usable
-whatever the SDK's state, ``serve_stdio``/``serve_http`` fail with one clear, named error
-rather than a bare ``ModuleNotFoundError`` or an ``AttributeError`` from inside someone
-else's package, and ``import mcp`` resolves to the real SDK rather than back to this
-package.
+These hold transport *policy*: the advertised identity, what happens when the SDK is
+absent, where the HTTP transport binds and what it says when that is not loopback. The
+SDK-facing wiring is ``sdk_bridge_test.py``'s subject and a live client session is
+``live_client_test.py``'s.
+
+**One test here was replaced rather than kept.**
+``test_an_sdk_whose_api_this_is_not_written_against_is_refused_by_name`` asserted that the
+transports refuse to serve because the installed SDK (2.0.0) lacks the 1.x
+``Server.list_tools`` / ``Server.call_tool`` decorators. That refusal was honest and it was
+also the defect: nothing could connect over either transport. The transports are now wired
+against 2.0's ``on_list_tools`` / ``on_call_tool`` constructor callbacks, so the old
+assertion describes a state that must never come back. The knowledge it encoded — *an SDK
+this is not written against produces one named sentence, never an ``AttributeError`` or
+``TypeError`` from three frames inside someone else's package* — is not lost: it is
+``sdk_bridge_test.py::test_an_sdk_without_the_2_0_callback_api_is_refused_by_name``, which
+makes the same assertion against the API actually in use.
 
 Each SDK-absence test explicitly rejects ``NotImplementedError`` rather than merely catching
 ``RuntimeError`` — ``NotImplementedError`` is itself a ``RuntimeError`` subclass, so a bare
-``pytest.raises(RuntimeError)`` would have spuriously passed against the original throwing
-stub and never verified anything. The check is kept: the same trap catches any future stub.
+``pytest.raises(RuntimeError)`` would have spuriously passed against a throwing stub and
+never verified anything. The check is kept: the same trap catches any future stub.
 """
 
 from __future__ import annotations
@@ -21,14 +29,14 @@ import logging
 import sys
 
 import pytest
-from mcp_server import SERVER_INFO, serve_http, serve_stdio
+from mcp_server import SERVER_INFO, http_app, serve_http, serve_stdio
 
 
 def _assert_real_runtime_error(excinfo: pytest.ExceptionInfo) -> None:
-    """Fail loudly if what was raised is the throwing stub's ``NotImplementedError``
-    rather than the real "SDK not installed" ``RuntimeError`` — see module docstring."""
+    """Fail loudly if what was raised is a stub's ``NotImplementedError`` rather than the
+    real "SDK not installed" ``RuntimeError`` — see module docstring."""
     assert not isinstance(excinfo.value, NotImplementedError), (
-        "caught the throwing stub's NotImplementedError, not a real SDK-missing error"
+        "caught a stub's NotImplementedError, not a real SDK-missing error"
     )
 
 
@@ -54,6 +62,8 @@ def no_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "mcp.server", None)
 
 
+# ------------------------------------------------------------- the SDK is not installed
+
 def test_serve_stdio_raises_a_clear_named_error_when_the_sdk_is_not_installed(
     orchestrator, no_sdk,
 ) -> None:
@@ -74,6 +84,17 @@ def test_serve_http_raises_a_clear_named_error_when_the_sdk_is_not_installed(
     assert "mcp" in message and "install" in message
 
 
+def test_the_registry_and_dispatch_survive_a_missing_sdk(orchestrator, no_sdk) -> None:
+    """The reason the SDK import is lazy. Most of this repository's suite runs with no SDK
+    at all, and a module-scope import would take the whole decision layer down with it."""
+    from mcp_server import build_registry, dispatch
+
+    assert build_registry()
+    assert dispatch("get_phase", {}, orchestrator=orchestrator)["phase"]
+
+
+# --------------------------------------------------------------- ADR-009: where it binds
+
 def test_serve_http_on_the_default_loopback_host_logs_no_adr_009_warning(
     orchestrator, caplog, no_sdk,
 ) -> None:
@@ -89,7 +110,9 @@ def test_serve_http_on_a_non_loopback_host_logs_a_warning_naming_adr_009(
 ) -> None:
     """ADR-009: the HTTP transport binds loopback by default; binding to a non-loopback
     address is a real, unauthenticated network surface reaching every registered tool,
-    including raw code execution, and must never happen silently."""
+    including raw code execution and full filesystem access, and must never happen
+    silently. The warning fires before the SDK is even imported, so an operator who
+    mistypes ``--host`` is told even on a machine where the server cannot start."""
     caplog.set_level(logging.WARNING)
     with pytest.raises(RuntimeError) as excinfo:
         serve_http(orchestrator, host="0.0.0.0")
@@ -97,22 +120,47 @@ def test_serve_http_on_a_non_loopback_host_logs_a_warning_naming_adr_009(
     assert any("ADR-009" in record.message for record in caplog.records)
 
 
-def test_an_sdk_whose_api_this_is_not_written_against_is_refused_by_name(
-    orchestrator,
-) -> None:
-    """The SDK installed here is 2.0.0, whose ``mcp.server.Server`` no longer carries the
-    ``list_tools``/``call_tool`` decorators this module wires against (they were 1.x). An
-    operator who runs the server gets one sentence naming the installed version and what
-    it offers instead — not an ``AttributeError`` three frames inside someone else's
-    package, which tells them nothing about which side is wrong."""
-    with pytest.raises(RuntimeError) as excinfo:
-        serve_stdio(orchestrator)
-    _assert_real_runtime_error(excinfo)
-    assert not isinstance(excinfo.value, AttributeError)
-    message = str(excinfo.value)
-    assert "mcp" in message.lower()
-    assert "MCPServer" in message or "install" in message
+# ------------------------------------------------------------- it actually builds an app
 
+def test_http_app_builds_a_real_asgi_app_serving_the_mcp_path(orchestrator) -> None:
+    """The streamable-HTTP half of ADR-003 — the path a ChatGPT developer-mode connector
+    dials. ``live_client_test.py`` drives stdio end to end; this transport has no client
+    available in this environment (``mcp.client.streamable_http`` needs ``httpx``, which is
+    not installed), so what is asserted here is that the app is real and routed, not that a
+    session completes over it. That gap is stated in ``CLAUDE.md`` rather than papered
+    over."""
+    pytest.importorskip("mcp.server.lowlevel", reason="the MCP SDK is not installed here")
+
+    app = http_app(orchestrator)
+
+    assert callable(app), "not an ASGI application"
+    paths = {getattr(route, "path", None) for route in app.routes}
+    assert "/mcp" in paths
+
+
+def test_http_app_returns_a_separately_mountable_app_per_call(orchestrator) -> None:
+    """It is a factory, not a singleton: a hosted deployment mounts it inside its own ASGI
+    stack behind its own TLS and auth, and two mounts must not share one session manager."""
+    pytest.importorskip("mcp.server.lowlevel", reason="the MCP SDK is not installed here")
+
+    assert http_app(orchestrator, path="/a") is not http_app(orchestrator, path="/b")
+
+
+def test_a_non_loopback_bind_still_builds_rather_than_refusing(orchestrator, caplog) -> None:
+    """Gate A 7.2 and 7.4 chose unrestricted execution and unrestricted filesystem access
+    with the risk stated in the option text. Refusing a non-loopback bind would be this
+    module quietly overriding that; warning loudly and proceeding is the decision the user
+    actually made."""
+    pytest.importorskip("mcp.server.lowlevel", reason="the MCP SDK is not installed here")
+    caplog.set_level(logging.WARNING)
+
+    app = http_app(orchestrator, host="0.0.0.0")
+
+    assert callable(app)
+    assert any("ADR-009" in record.message for record in caplog.records)
+
+
+# ------------------------------------------------------------------ the name collision
 
 def test_the_sdk_resolves_to_the_real_package_not_this_one() -> None:
     """This package used to be named ``mcp``, so ``import mcp`` from inside it resolved

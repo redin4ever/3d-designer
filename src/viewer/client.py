@@ -87,30 +87,26 @@ class ClientMixin:
             return False
         return True
 
-    def _enqueue_run_state(self) -> None:
-        state = self._orchestrator.state
-        self._enqueue(
-            ServerMessage(
-                type=ServerMessageType.RUN_STATE,
-                seq=self._next_seq(),
-                data={"state": state.value},
-            )
-        )
-
     def _handle_pause(self, msg: ClientMessage) -> None:
         """PAUSE calls through to ``orchestrator.pause()`` and reports the new run
         state — the only way an operator watching the live view takes the wheel without
-        stopping the run outright."""
+        stopping the run outright.
+
+        Reported through ``report_run_state`` (``report.py``) rather than a second
+        hand-rolled ``RUN_STATE`` here, so the shape the browser reads is decided in one
+        place. It was not, and the one built here carried the state in ``data`` only while
+        ``frontend`` renders ``message.text``.
+        """
         if not self._ensure_orchestrator():
             return
         self._orchestrator.pause()
-        self._enqueue_run_state()
+        self.report_run_state()
 
     def _handle_resume(self, msg: ClientMessage) -> None:
         if not self._ensure_orchestrator():
             return
         self._orchestrator.resume()
-        self._enqueue_run_state()
+        self.report_run_state()
 
     def _handle_rollback(self, msg: ClientMessage) -> None:
         """Routes to ``scene.undo`` or ``scene.rollback_to`` depending on which of

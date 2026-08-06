@@ -23,9 +23,32 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from contracts import EPSILON, MeshSnapshot, Vec3
+from contracts import MeshSnapshot, Vec3
 
 __all__ = ["EdgeSelection", "select_bevel_edges", "bevel_width_for"]
+
+#: The floor below which a triangle has no representable orientation at all.
+#:
+#: A **numerical** floor, not a product one — the same 1e-15 ``topology.py::_face_normal``
+#: already normalises against, and named here so the two files in this module stop
+#: disagreeing about what "degenerate" means.
+#:
+#: It used to be ``EPSILON`` (1e-4), inherited from ``Vec3.normalized()``, which raises
+#: below that. Guarding on the threshold of the call being guarded was a correct fix to a
+#: crash and the wrong number for this question: ``EPSILON`` is 0.1 mm of *distance*, and
+#: what is being compared here is a cross-product length — twice a triangle's **area**. A
+#: right triangle only has to be about 14 mm on a side before its area crosses 1e-4 m², so
+#: on real geometry that test does not reject slivers, it rejects small triangles.
+#:
+#: Measured on real Blender output rather than argued: ``bevel_width_for`` returns exactly
+#: 4 mm for a 1 m object, and a 4 mm 2-segment bevel on a 0.28 x 1.0 x 0.18 m stair tread
+#: (built as ``ops.add_staircase`` builds one) produces 156 triangles, of which **72 —
+#: 46%** have a cross-product length in [9.4e-6, 9.3e-5]: every one under ``EPSILON``.
+#: Discarding them left **144 of the mesh's 234 candidate edges unmeasurable**, so
+#: ``select_bevel_edges`` assessed 90 edges and reported as though it had assessed the
+#: mesh. The count of genuinely zero-area triangles on that same mesh is **0** — nothing
+#: real sits near this floor, which is what makes it safe to put it at the numerical limit.
+DEGENERATE_CROSS_LENGTH = 1e-15
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,9 +146,9 @@ def select_bevel_edges(
         (t1, _opp1), (t2, opp2) = occurrences
         n1, n2 = normals[t1], normals[t2]
         if n1 is None or n2 is None:
-            # One side is a degenerate sliver, so there is no dihedral angle to read.
-            # Not a rejection — nothing was assessed — so it must not inflate `rejected`,
-            # for the same reason a boundary edge does not.
+            # One side has literally zero area (see DEGENERATE_CROSS_LENGTH), so there is no
+            # dihedral angle to read. Not a rejection — nothing was assessed — so it must not
+            # inflate `rejected`, for the same reason a boundary edge does not.
             continue
         cosine = max(-1.0, min(1.0, n1.dot(n2)))
         dihedral_deg = math.degrees(math.acos(cosine))
@@ -160,25 +183,32 @@ def select_bevel_edges(
 
 
 def _triangle_normal(verts: list[Vec3], tri: tuple[int, int, int]) -> Vec3 | None:
-    """The triangle's unit normal, or ``None`` if it is degenerate.
+    """The triangle's unit normal, or ``None`` if it has no orientation at all.
 
-    Real geometry contains zero-area triangles — a bevel on real Blender produces them, and
-    so does any imported mesh with slivers. An earlier version called ``normalized()``
-    unconditionally and raised on the first one, which meant `realism_report` crashed on
-    exactly the post-bevel geometry it exists to assess. Nothing caught it because the test
-    engine's bevel duplicates a face rather than producing real geometry.
+    **On a degenerate triangle this returns ``None``**, as every other copy of this function
+    does (``uv.seams``, ``align.position``, ``constraints.anchors``). The four copies are
+    pinned against each other by ``align/duplicated_geometry_test.py``, which is what stops
+    "make the odd one out match its siblings" from being a silent behaviour change.
 
-    A degenerate triangle has no meaningful orientation, so it contributes no dihedral
-    angle and is skipped rather than guessed at.
+    **What it does *not* share with its siblings is the floor**, and that difference is the
+    point. This copy and ``uv.seams``' feed a dihedral-angle proxy, so the only triangle
+    they must reject is one with no representable direction —
+    :data:`DEGENERATE_CROSS_LENGTH`. ``align.position``'s and ``constraints.anchors``' copies
+    feed *face grouping*, where every surviving triangle becomes a face an anchor can
+    resolve onto, so they keep a much coarser product floor on purpose. Neither is the
+    "correct" threshold; they are answering different questions.
+
+    Deliberately **not** ``Vec3.normalized()``, which raises below ``EPSILON`` (1e-4) — the
+    same trap ``topology.py::_face_normal`` documents from the other direction. Normalising
+    by hand is what makes the floor a decision this file gets to make rather than one
+    inherited from the tolerance of an unrelated distance comparison.
     """
     a, b, c = verts[tri[0]], verts[tri[1]], verts[tri[2]]
     normal = (b - a).cross(c - a)
-    # Guard on exactly the threshold `Vec3.normalized()` itself raises below, not a tighter
-    # one. A first attempt used 1e-12 and still crashed: a sliver whose cross product falls
-    # between the two thresholds passes the check and then trips the very call it guards.
-    if normal.length() < EPSILON:
+    length = normal.length()
+    if length <= DEGENERATE_CROSS_LENGTH:
         return None
-    return normal.normalized()
+    return Vec3(normal.x / length, normal.y / length, normal.z / length)
 
 
 def _build_adjacency(

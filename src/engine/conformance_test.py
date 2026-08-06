@@ -205,6 +205,12 @@ def test_create_material_and_assign_material_reach_the_snapshot(engine: FakeEngi
     conformance.check_create_material_and_assign_material_reach_the_snapshot(engine)
 
 
+def test_create_material_accepts_an_rgba_base_color(engine: FakeEngine) -> None:
+    """If wrong: a four-component colour is accepted by one backend and rejected by the
+    other, so every module tested against the fake believes a call the real engine dies on."""
+    conformance.check_create_material_accepts_an_rgba_base_color(engine)
+
+
 def test_export_gltf_threads_the_full_conversion_through(engine: FakeEngine, tmp_path) -> None:
     """If wrong: mirror_x/negate_rotation/scale are silently dropped before reaching the
     exporter — the exact round-trip mirroring bug those parameters exist to prevent."""

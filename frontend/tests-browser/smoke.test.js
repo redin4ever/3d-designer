@@ -79,8 +79,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   test('index.html loads with zero console errors and zero uncaught exceptions', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {
-      await waitForConnected(s.page);
-      await waitForLogRows(s.page, 4);
+      await waitForConnected(s);
+      await waitForLogRows(s, 4);
 
       assert.deepEqual(s.pageErrors, [], 'an uncaught exception on load still paints a page that looks fine');
       assert.deepEqual(s.consoleErrors, [], 'the browser logged an error while loading the console');
@@ -95,7 +95,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
     const from = statics.requests.length;
     const s = await withScene(FULL_SCENE_GREETING);
     try {
-      await waitForConnected(s.page);
+      await waitForConnected(s);
       const served = statics.requests.slice(from);
       const paths = served.map((r) => r.path);
 
@@ -125,7 +125,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   test('the page exposes the main landmark and the h1, in the live DOM', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {
-      await waitForConnected(s.page);
+      await waitForConnected(s);
       const structure = await s.page.evaluate(() => ({
         mains: document.querySelectorAll('main').length,
         h1s: [...document.querySelectorAll('h1')].map((h) => h.textContent.trim()),
@@ -150,8 +150,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   test('the action log renders one row per narrative message from the wire', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {
-      await waitForConnected(s.page);
-      await waitForLogRows(s.page, 6);
+      await waitForConnected(s);
+      await waitForLogRows(s, 6);
       const rows = await s.page.evaluate(() =>
         [...document.querySelectorAll('#action-log li')].map((li) => ({
           text: li.textContent.trim(),
@@ -177,7 +177,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   test('the 3D canvas is sized in device pixels and actually draws the scene', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {
-      await waitForConnected(s.page);
+      await waitForConnected(s);
       await waitForCanvasDrawn(s.page, 500);
       const probe = await probeCanvas(s.page);
 
@@ -199,8 +199,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   test('a connected-but-empty scene leaves the canvas flat — the pixel check discriminates', async () => {
     const s = await withScene(EMPTY_GREETING);
     try {
-      await waitForConnected(s.page);
-      await waitForLogRows(s.page, 3);
+      await waitForConnected(s);
+      await waitForLogRows(s, 3);
       const probe = await probeCanvas(s.page);
 
       assert.equal(
@@ -217,8 +217,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   test('no horizontal page scroll at a narrow viewport', async () => {
     const s = await withScene(FULL_SCENE_GREETING, { viewport: NARROW });
     try {
-      await waitForConnected(s.page);
-      await waitForLogRows(s.page, 4);
+      await waitForConnected(s);
+      await waitForLogRows(s, 4);
       const overflow = await s.page.evaluate(() => {
         const doc = document.documentElement;
         const widest = [...document.querySelectorAll('body *')]
@@ -253,7 +253,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
     test(`the theme resolves and renders under prefers-color-scheme: ${scheme}`, async () => {
       const s = await withScene(FULL_SCENE_GREETING, { colorScheme: scheme });
       try {
-        await waitForConnected(s.page);
+        await waitForConnected(s);
         await waitForCanvasDrawn(s.page, 500);
         const theme = await s.page.evaluate(() => {
           const root = getComputedStyle(document.documentElement);
@@ -273,9 +273,21 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         assert.deepEqual(theme.unresolved, [], 'a CSS custom property the renderer reads did not resolve');
         assert.notEqual(theme.bodyBackground, theme.bodyColor, 'text must not be the same colour as the page');
         assert.notEqual(theme.bodyBackground, 'rgba(0, 0, 0, 0)', 'the page background token did not apply');
-        assert.ok(
-          theme.bannerBackground.startsWith('rgb'),
-          `color-mix() in the connection banner did not resolve: ${theme.bannerBackground}`,
+        // Chrome serialises a resolved `color-mix(in srgb, …)` as `color(srgb r g b / a)`,
+        // not as `rgb(...)`. Asserting the `rgb` prefix tested the serialisation form
+        // rather than the thing that matters, which is that the mix resolved at all: an
+        // unsupported or malformed color-mix() is an invalid declaration, so
+        // background-color falls back to the transparent initial value and the banner's
+        // text sits directly on the 3D view with nothing behind it.
+        assert.match(
+          theme.bannerBackground,
+          /^(?:rgba?|color)\(/,
+          `the connection banner's background did not resolve to a colour: ${theme.bannerBackground}`,
+        );
+        assert.notEqual(
+          theme.bannerBackground,
+          'rgba(0, 0, 0, 0)',
+          'color-mix() was dropped as invalid — the banner scrim is fully transparent',
         );
         assert.ok(
           theme.declaredColorScheme.includes('dark'),
@@ -296,7 +308,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   test('a keyboard alone can drive the controls, and focus is visible', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {
-      await waitForConnected(s.page);
+      await waitForConnected(s);
 
       await s.page.keyboard.press('Tab');
       const focused = await s.page.evaluate(() => {

@@ -19,7 +19,6 @@ from typing import Sequence
 
 from contracts import (
     Constraint,
-    ConstraintError,
     ConstraintKind,
     ConstraintSet,
     EngineProtocol,
@@ -31,6 +30,7 @@ from contracts import (
 )
 
 from ._geom import rotation_aligning
+from .errors import ConstraintRuleError
 from ._orientation import follows_rotation, forward_for, up_for
 from ._position import POSITION_KINDS, apply_position_effect, position_effect, position_residual
 from .graph import dependency_order
@@ -80,7 +80,7 @@ def _solve_position(
             key = _axis_key(effect.axis)
             claimed = axis_claims.get(key)
             if claimed is not None and abs(claimed - effect.scalar) > c.tolerance:
-                raise ConstraintError(
+                raise ConstraintRuleError(
                     rule=_CONTRADICTION_RULE,
                     detail=(
                         f"{object_id!r}: two hard constraints require different positions "
@@ -159,14 +159,14 @@ def solve(
     says it moves.
 
     A HARD constraint (the default — see :attr:`contracts.Constraint.hard`) that cannot be
-    met raises :class:`~contracts.ConstraintError`. A SOFT constraint that cannot be met is
+    met raises :class:`~constraints.ConstraintRuleError`. A SOFT constraint that cannot be met is
     satisfied on a best-effort basis; its shortfall is reported in
     :attr:`contracts.Placement.residuals` and
     :attr:`~contracts.Placement.satisfied_all_hard` stays ``True`` as long as every HARD
     constraint was actually met.
 
     A constraint naming an object that does not exist raises
-    :class:`~contracts.ConstraintError` — never a bare ``KeyError`` — carrying the missing
+    :class:`~constraints.ConstraintRuleError` — never a bare ``KeyError`` — carrying the missing
     id and a ``suggestion`` (Gate A 4.2).
 
     ``others`` names sibling objects already placed earlier in this ``solve_all`` batch,
@@ -203,7 +203,7 @@ def solve(
 def solve_all(engine: EngineProtocol, sets: Sequence[ConstraintSet]) -> tuple[Placement, ...]:
     """Solve every set in dependency order, each target resolved before its dependent.
 
-    Raises :class:`~contracts.ConstraintError` with ``rule == CYCLE_RULE`` on a cyclic
+    Raises :class:`~constraints.ConstraintRuleError` with ``rule == CYCLE_RULE`` on a cyclic
     graph, via :func:`constraints.dependency_order` — the same failure, not a re-derived
     one, so a caller only ever handles one cycle-detection code path.
     """

@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from contracts import EPSILON, Anchor, AnchorKind, ConstraintError, EngineProtocol, Vec3, WORLD_UP
+from contracts import EPSILON, Anchor, AnchorKind, EngineProtocol, Vec3, WORLD_UP
+
+from .errors import ConstraintRuleError
 
 __all__ = ["AnchorResolution", "resolve_anchor"]
 
@@ -66,33 +68,83 @@ _FACE_DIRECTIONS: dict[str, Vec3] = {
 }
 
 
-def _unknown_object_error(engine: EngineProtocol, object_id: str) -> ConstraintError:
+def _unknown_object_error(engine: EngineProtocol, object_id: str) -> ConstraintRuleError:
     known = ", ".join(sorted(engine.list_objects())) or "(none)"
-    return ConstraintError(
+    return ConstraintRuleError(
         rule="constraints.unknown_object",
         detail=f"anchor references unknown object {object_id!r}",
         suggestion=f"known objects: {known}",
     )
 
 
-def _triangle_normal(vertices, triangle: tuple[int, int, int]) -> Vec3:
+#: The smallest triangle that may count towards a face an :class:`~contracts.Anchor` can
+#: name. A **product** floor, not a numerical one, and identical to
+#: ``align.position.MIN_ANCHORABLE_FACE_CROSS_LENGTH`` — the two run the same formula for the
+#: same purpose and ``align/duplicated_geometry_test.py`` fails if they diverge.
+#:
+#: Deliberately coarser than ``detail.edges``' and ``uv.seams``' floor, which run the same
+#: formula for a *different* purpose (a dihedral angle, where every triangle a bevel produces
+#: must be readable). Every triangle that survives this test becomes a group in
+#: :func:`_face_groups`, and every group is a face :func:`_resolve_face` may return — via
+#: ``max(..., key=score)`` for a named feature, and via ``groups[sorted(groups)[0]]`` for an
+#: unrecognised one. A real 4 mm bevel on a 1 m object contributes 72 corner triangles of
+#: roughly 5-10 mm to a 156-triangle mesh; admitting them would put dozens of chamfer slivers
+#: into that sorted fallback, so a plain ``Anchor(kind=FACE)`` could resolve onto a 5 mm
+#: chamfer and everything constrained to it would be placed against the wrong plane.
+#:
+#: ``EPSILON`` is reused as the value because 1e-4 m² of area is about a 14 mm triangle —
+#: the right order for "too small to have been meant" — not because ``Vec3.normalized()``
+#: raises below it. Those were the same number for the wrong reason, which is how this file
+#: ended up carrying a second, unexplained ``1e-9`` at the call site below to compensate.
+MIN_ANCHORABLE_FACE_CROSS_LENGTH = EPSILON
+
+
+def _triangle_normal(vertices, triangle: tuple[int, int, int]) -> Vec3 | None:
+    """The triangle's unit normal, or ``None`` when it is too small to be part of a face an
+    anchor can name (:data:`MIN_ANCHORABLE_FACE_CROSS_LENGTH`).
+
+    **This used to return ``Vec3(0, 0, 0)``** while its three sibling copies
+    (``align.position``, ``detail.edges``, ``uv.seams``) returned ``None`` for the same
+    input. Nothing broke, because :func:`_face_groups` re-tested the result against a
+    second, undocumented ``1e-9`` — but the two lines were a single decision spelled in two
+    places, so normalising the return value on its own (the obvious tidy-up) fed a
+    zero-length vector into ``rotation.rotate(normal).normalized()`` and crashed anchor
+    resolution. All four copies now answer ``None``, pinned by
+    ``align/duplicated_geometry_test.py``.
+
+    The **floor** still differs from the ``detail``/``uv`` copies' and must: they read a
+    dihedral angle and have to see every triangle a bevel produces; this one decides what
+    counts as a face. See the constant above for the measured consequence of confusing the
+    two.
+
+    Normalises by hand rather than through ``Vec3.normalized()`` so the floor above is the
+    only thing rejecting anything.
+    """
     a, b, c = (vertices[i] for i in triangle)
     n = (b - a).cross(c - a)
-    # EPSILON, not 1e-12 — below EPSILON is exactly where normalized() raises.
-    if n.length() < EPSILON:
-        return Vec3(0.0, 0.0, 0.0)
-    return n.normalized()
+    length = n.length()
+    if length < MIN_ANCHORABLE_FACE_CROSS_LENGTH:
+        return None
+    return Vec3(n.x / length, n.y / length, n.z / length)
 
 
 def _face_groups(snapshot) -> dict[tuple[float, float, float], dict]:
     """Group the snapshot's (already-triangulated) triangles back into faces by shared
     local-space normal. A polygon triangulated by ``FakeObject.triangulated()``'s vertex
     fan always keeps every one of its triangles in the same plane, so grouping by normal
-    recovers the original face without needing a second, parallel polygon representation."""
+    recovers the original face without needing a second, parallel polygon representation.
+
+    Every group's ``normal`` is unit length by construction: :func:`_triangle_normal` returns
+    either a unit vector or ``None``, and ``None`` is skipped here. That invariant is
+    load-bearing — :func:`_resolve_face` calls ``rotation.rotate(group["normal"]).normalized()``
+    on it, which raises for a zero vector. It replaces the ``n.length() < 1e-9`` test that
+    used to sit on this line, which was not a geometric threshold at all but a sentinel check
+    for the zero vector the old ``_triangle_normal`` returned.
+    """
     groups: dict[tuple[float, float, float], dict] = {}
     for tri in snapshot.triangles:
         n = _triangle_normal(snapshot.vertices, tri)
-        if n.length() < 1e-9:
+        if n is None:
             continue
         key = (round(n.x, 4), round(n.y, 4), round(n.z, 4))
         group = groups.setdefault(key, {"normal": n, "indices": set()})
@@ -125,7 +177,7 @@ def _resolve_vertex(engine: EngineProtocol, anchor: Anchor) -> AnchorResolution:
     snap = engine.snapshot(anchor.object_id)
     idx = anchor.index if anchor.index is not None else 0
     if idx < 0 or idx >= len(snap.vertices):
-        raise ConstraintError(
+        raise ConstraintRuleError(
             rule="constraints.bad_vertex_index",
             detail=f"{anchor.object_id!r} has no vertex index {idx}",
             suggestion=f"valid range is 0..{len(snap.vertices) - 1}",
@@ -138,7 +190,7 @@ def _resolve_edge(engine: EngineProtocol, anchor: Anchor) -> AnchorResolution:
     edges = snap.edges()
     idx = anchor.index if anchor.index is not None else 0
     if idx < 0 or idx >= len(edges):
-        raise ConstraintError(
+        raise ConstraintRuleError(
             rule="constraints.bad_edge_index",
             detail=f"{anchor.object_id!r} has no edge index {idx}",
             suggestion=f"valid range is 0..{len(edges) - 1}",
@@ -155,7 +207,7 @@ def _resolve_face(engine: EngineProtocol, anchor: Anchor) -> AnchorResolution:
     snap = engine.snapshot(anchor.object_id)
     groups = _face_groups(snap)
     if not groups:
-        raise ConstraintError(
+        raise ConstraintRuleError(
             rule="constraints.no_face",
             detail=f"{anchor.object_id!r} has no facial geometry to anchor to",
             suggestion="use a mesh with at least one face, or a different anchor kind",
@@ -205,7 +257,7 @@ def resolve_anchor(engine: EngineProtocol, anchor: Anchor) -> AnchorResolution:
     all — ``direction`` is world up, ``point`` is the origin. Every other kind resolves
     through ``anchor.object_id``.
 
-    Raises :class:`~contracts.ConstraintError` — never a bare ``KeyError`` or
+    Raises :class:`~constraints.ConstraintRuleError` — never a bare ``KeyError`` or
     ``AttributeError`` — when ``anchor.object_id`` does not name a live object. Gate A 4.2
     requires an agent be told which id was missing and what to try next, not handed a
     traceback it cannot act on; ``engine.exists()``/``engine.list_objects()`` are what
@@ -215,7 +267,7 @@ def resolve_anchor(engine: EngineProtocol, anchor: Anchor) -> AnchorResolution:
         return _resolve_world(anchor)
 
     if not anchor.object_id:
-        raise ConstraintError(
+        raise ConstraintRuleError(
             rule="constraints.missing_object_id",
             detail=f"a {anchor.kind.value!r} anchor needs an object_id and none was given",
             suggestion="set Anchor.object_id to the target object's id",
@@ -226,7 +278,7 @@ def resolve_anchor(engine: EngineProtocol, anchor: Anchor) -> AnchorResolution:
 
     resolver = _RESOLVERS.get(anchor.kind)
     if resolver is None:
-        raise ConstraintError(
+        raise ConstraintRuleError(
             rule="constraints.unsupported_anchor_kind",
             detail=f"{anchor.kind!r} is not a supported anchor kind",
             suggestion="",

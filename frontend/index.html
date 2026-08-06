@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gate A Console</title>
   <meta name="description" content="Live 3D view, action log and operator controls for a running build." />
+  <!-- Without a declared icon the browser auto-requests /favicon.ico, which this static
+       origin does not serve, and every single page load logs a 404 to the console. An
+       empty data: URI satisfies the request without shipping an asset or a network fetch.
+       Not an image file, because an SVG icon would have to hardcode a hex colour and
+       every colour in this frontend comes from src/tokens.css. -->
+  <link rel="icon" href="data:," />
   <link rel="stylesheet" href="src/tokens.css" />
   <link rel="stylesheet" href="src/app.css" />
 </head>

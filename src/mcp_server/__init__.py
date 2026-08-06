@@ -27,7 +27,7 @@ from __future__ import annotations
 from .dispatch import dispatch
 from .images import downscale_image
 from .registry import build_registry, tools_for
-from .transports import SERVER_INFO, serve_http, serve_stdio
+from .transports import SERVER_INFO, http_app, serve_http, serve_stdio
 
 __all__ = [
     "build_registry",
@@ -35,6 +35,7 @@ __all__ = [
     "dispatch",
     "serve_stdio",
     "serve_http",
+    "http_app",
     "downscale_image",
     "SERVER_INFO",
 ]

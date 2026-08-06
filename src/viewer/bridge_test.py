@@ -101,14 +101,19 @@ def test_seq_is_monotonic_and_assigned_by_the_bridge_not_a_caller(real_scene) ->
 
 
 def test_seq_increases_across_queued_scene_driven_messages(real_scene, add_cube_op) -> None:
+    """Strictly increasing across *every* queued message, not merely across the geometry
+    ones. One event now produces several (the mesh, and the ``HIGHLIGHT`` naming what it
+    touched); a counter that restarted or repeated between them would have the client
+    discard the second as a duplicate under ``wire.py``'s seq rules."""
     bridge = ViewerBridge(real_scene)
     bridge.attach()
 
     real_scene.apply(add_cube_op("op1", "a"))
     real_scene.apply(add_cube_op("op2", "b"))
 
-    first, second = bridge.pending()
-    assert first.seq < second.seq
+    seqs = [m.seq for m in bridge.pending()]
+    assert len(seqs) >= 2
+    assert seqs == sorted(set(seqs))
 
 
 def test_detach_really_unsubscribes(real_scene, add_cube_op) -> None:
@@ -127,12 +132,29 @@ def test_detach_really_unsubscribes(real_scene, add_cube_op) -> None:
 
 
 def test_attach_is_idempotent(real_scene, add_cube_op) -> None:
-    bridge = ViewerBridge(real_scene)
-    bridge.attach()
-    bridge.attach()  # must not register a second listener
-    real_scene.apply(add_cube_op("op1", "a"))
+    """A second ``attach`` must not register a second listener — otherwise every change is
+    delivered twice, the viewer draws each mesh twice, and the action log doubles up.
 
-    assert len(bridge.pending()) == 1
+    Compared against a single-attach baseline rather than a hardcoded count. It used to
+    assert exactly one message, which was never what this test is about: one scene change
+    legitimately produces more than one message now that a mutation also emits ``HIGHLIGHT``
+    (Gate A 5.3, "the latest change is highlighted"). Pinning the number here made an
+    unrelated feature look like a regression in subscription bookkeeping, and would have
+    done so again for ``LOG`` and ``PROBLEMS``. What must hold is that attaching twice
+    changes nothing, whatever that number happens to be.
+    """
+    once = ViewerBridge(real_scene)
+    once.attach()
+    real_scene.apply(add_cube_op("op1", "a"))
+    baseline = len(once.pending())
+    assert baseline >= 1, "a scene change produced no messages at all"
+
+    twice = ViewerBridge(real_scene)
+    twice.attach()
+    twice.attach()  # must not register a second listener
+    real_scene.apply(add_cube_op("op2", "b"))
+
+    assert len(twice.pending()) == baseline
 
 
 def test_a_bridge_whose_queue_raises_does_not_break_scene_apply(real_scene, add_cube_op) -> None:

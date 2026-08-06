@@ -33,10 +33,27 @@ def dispatch(name: str, params: dict, *, role=None, orchestrator, lease=None) ->
     # execute -> JSON-serialisable result.  `role` is accepted and IGNORED (ADR-013).
 
 def serve_stdio(orchestrator) -> None       # blocking; Claude Desktop/Code/Cursor
-def serve_http(orchestrator, *, host="127.0.0.1", port=8765) -> object   # ChatGPT connectors
+def serve_http(orchestrator, *, host="127.0.0.1", port=8765, path="/mcp") -> None
+    # blocking; ChatGPT developer-mode connectors
+def http_app(orchestrator, *, host="127.0.0.1", path="/mcp", json_response=False) -> ASGIApp
+    # the same endpoint as a plain ASGI app, bound to nothing — mount it inside your own
+    # server behind your own TLS and auth, or build it to inspect without listening
 def downscale_image(data: bytes, *, max_edge: int = 1024) -> bytes
 SERVER_INFO: dict
 ```
+
+### Connecting a client
+
+```jsonc
+// claude_desktop_config.json / Cursor MCP settings
+{ "mcpServers": { "forge3d": {
+    "command": "<python>", "args": ["-X", "utf8", "-m", "mcp_server"],
+    "env": { "PYTHONPATH": "<repo>/src" } } } }
+```
+
+`python -m mcp_server` is the entry point (`__main__.py`): stdio by default, `--http` for a
+streamable-HTTP connector, `--host/--port/--no-blender/--no-raw/--no-viewer` alongside.
+`live_client_test.py` drives exactly this command with the SDK's own client.
 
 ## Layout
 
@@ -55,7 +72,9 @@ One file per responsibility:
 | `serialize.py` | dataclass/`StrEnum`/tuple -> plain JSON-serialisable values |
 | `dispatch.py` | `dispatch` — ties lookup, validation, authorisation, the lock and execution together |
 | `images.py` | `downscale_image` |
-| `transports.py` | `SERVER_INFO`, `serve_stdio`, `serve_http` |
+| `transports.py` | `SERVER_INFO`, `serve_stdio`, `serve_http`, `http_app` — transport policy: identity, where it binds, the ADR-009 warning |
+| `sdk_bridge.py` | the **only** file that touches the third-party `mcp` SDK: registry -> `tools/list`, `tools/call` -> `dispatch`, refusals -> error results |
+| `__main__.py` | `python -m mcp_server` — the command a client launches |
 | `conftest.py` | test-only — `FakeScene`/`orchestrator`/`write_lease` fixtures |
 
 ## Invariants
@@ -86,7 +105,19 @@ One file per responsibility:
 - **The HTTP transport binds loopback by default; a non-loopback bind logs a warning naming
   ADR-009** before the transport SDK is ever imported.
 - **The registry and `dispatch` are fully usable whatever the SDK's state.** Only
-  `serve_stdio`/`serve_http` need it, imported lazily inside the function body.
+  `serve_stdio`/`serve_http`/`http_app` need it, imported lazily inside the function body.
+- **A refusal crosses the transport as an error *result*, never as an exception.** An
+  exception escaping the SDK's `on_call_tool` reaches the client as an opaque JSON-RPC
+  internal error with the rule, the detail and the suggestion all discarded — the exact
+  opaque failure Gate A 4.2 was asked about. `sdk_bridge.call_tool` catches `RuleError` and
+  returns `isError: true` carrying `{rule, detail, suggestion}`; anything that was *not* a
+  `RuleError` still gets a rule (`mcp.unhandled_failure`) and never a traceback.
+- **Every tool is declared to the client with its role and mutating flag** in `_meta`. A
+  client has no other way to learn either, and both change what an agent should do before it
+  calls.
+- **Both transports run the same server object.** ADR-003 chose dual transport so a local
+  editor and a consumer subscription get identical behaviour; two wirings would be two
+  chances to drift.
 
 ## The tool-count budget (Gate B 3.3)
 
@@ -131,11 +162,16 @@ renamed to `mcp_server`, the SDK is installed and importable in this environment
 and `transports_test.py::test_the_sdk_resolves_to_the_real_package_not_this_one` fails
 immediately if the rename is ever undone. No gate decision is outstanding.
 
-What *is* outstanding is the SDK version: `_build_server` is written against the 1.x
-low-level decorator API (`Server.list_tools()` / `Server.call_tool()`), and 2.0.0 replaced it
-with `mcp.server.MCPServer.add_tool`. `_build_server` detects the mismatch and refuses by
-name rather than raising an `AttributeError` from inside the SDK, so no live session can
-start until it is rewired — which is a task needing a real client to verify against.
+The SDK **version** gap is closed too. The transports were written against 1.x's low-level
+decorator API (`Server.list_tools()` / `Server.call_tool()`), which 2.0.0 removed; they are
+now wired against 2.0's `mcp.server.lowlevel.Server(on_list_tools=…, on_call_tool=…)`
+constructor callbacks, in `sdk_bridge.py`. A real `mcp.client.session.ClientSession` connects
+over a real stdio pipe and completes the whole journey — see `live_client_test.py`.
+
+The callback seam is chosen over `MCPServer.add_tool` on purpose: `add_tool` derives a tool's
+JSON Schema by introspecting a Python signature, and every `ToolSpec` here already carries a
+hand-written schema with enums, `exclusiveMinimum` and `additionalProperties: false` that no
+signature can express. The callbacks hand our schema through untouched.
 
 ## What this module deliberately does not do
 

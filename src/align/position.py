@@ -37,14 +37,47 @@ from .results import AlignResult
 
 __all__ = ["make_coplanar", "make_flush"]
 
+#: The smallest triangle that may count towards a face an :class:`~contracts.Anchor` can
+#: name. A **product** floor, not a numerical one — and deliberately coarser than
+#: ``detail.edges.DEGENERATE_CROSS_LENGTH`` / ``uv.seams.DEGENERATE_CROSS_LENGTH``, which
+#: run the same formula for a different purpose.
+#:
+#: Every triangle that survives this test joins a group in :func:`_nth_face`, and every
+#: group is a face ``make_coplanar(face=i)`` can be pointed at. A real 4 mm bevel on a 1 m
+#: object contributes 72 corner triangles of roughly 5-10 mm to a 156-triangle mesh; letting
+#: those through would add dozens of chamfer-sliver groups ahead of the real faces in the
+#: sorted order this function indexes by, so ``face=0`` would quietly stop meaning the face
+#: it meant yesterday. A face too small to see is not a face a caller meant to align to.
+#:
+#: ``EPSILON`` is reused as that floor because 1e-4 m² of area is about a 14 mm triangle,
+#: which is the right order of magnitude for "too small to have been meant" — not because
+#: ``Vec3.normalized()`` happens to raise below it. That coincidence is what previously made
+#: this number look like a numerical guard, and it is why ``constraints.anchors`` needed a
+#: second, unexplained threshold at its own call site to make the pair behave.
+MIN_ANCHORABLE_FACE_CROSS_LENGTH = EPSILON
+
 
 def _triangle_normal(vertices, triangle: tuple[int, int, int]) -> Vec3 | None:
+    """The triangle's unit normal, or ``None`` when it is too small to be part of a face
+    an anchor can name (:data:`MIN_ANCHORABLE_FACE_CROSS_LENGTH`).
+
+    ``None`` for "no answer" is shared with all three sibling copies (``constraints.anchors``,
+    ``detail.edges``, ``uv.seams``) and pinned by ``align/duplicated_geometry_test.py``.
+    **The floor is not shared, on purpose**: the two dihedral-angle copies must read every
+    triangle a bevel produces, and this one must not — see the constant's own note. Lowering
+    it "for consistency" changes which physical face ``make_coplanar(face=i)`` selects.
+
+    Normalises by hand rather than calling ``Vec3.normalized()``, so that the floor above is
+    the only thing deciding what is rejected. Routing through ``normalized()`` would tie this
+    product decision to a distance tolerance, which is how the two numbers came to look like
+    one number in the first place.
+    """
     a, b, c = (vertices[i] for i in triangle)
     n = (b - a).cross(c - a)
-    # EPSILON, not 1e-12, and None rather than an unnormalized near-zero vector: a
-    # sliver between the two thresholds trips normalized(), and returning the raw
-    # cross product silently hands callers a non-unit 'normal' they treat as unit.
-    return None if n.length() < EPSILON else n.normalized()
+    length = n.length()
+    if length < MIN_ANCHORABLE_FACE_CROSS_LENGTH:
+        return None
+    return Vec3(n.x / length, n.y / length, n.z / length)
 
 
 def _nth_face(engine: EngineProtocol, object_id: str, face: int) -> tuple[Vec3, Vec3]:
@@ -61,7 +94,7 @@ def _nth_face(engine: EngineProtocol, object_id: str, face: int) -> tuple[Vec3, 
     for tri in snap.triangles:
         n = _triangle_normal(snap.vertices, tri)
         if n is None:
-            continue  # degenerate sliver — no orientation to group by
+            continue  # too small to be a face a caller meant to align to
         key = (round(n.x, 4), round(n.y, 4), round(n.z, 4))
         group = groups.setdefault(key, {"normal": n, "indices": set()})
         group["indices"].update(tri)
