@@ -8,7 +8,7 @@ the entire mechanism that makes "many readers, one writer" real rather than a su
 
 Nothing here computes anything yet — every method raises until an implementer replaces
 the body (Rule 4 — tests come first). The lease itself is expected to live in exactly one
-place: ``self._scene.document().active_lease`` (``contracts.SceneDocument``), which
+place: ``self._scene.document.active_lease`` (``contracts.SceneDocument``), which
 already carries a ``require_lease()`` check with the right error shape — this mixin's
 ``verify`` should delegate to it rather than re-deriving the comparison, so there is
 exactly one place "is this lease live" is decided.
@@ -32,7 +32,7 @@ class LockingMixin:
         Once implemented:
 
         - If no lease is live, or the live one is stale (``WriteLease.is_stale`` against
-          ``self._scene.document().head`` — the operation count is the run's only clock,
+          ``self._scene.document.head`` — the operation count is the run's only clock,
           deliberately not wall-clock time, so a paused run does not burn a holder's
           lease and tests stay deterministic), grant a new one: ``granted_at_op`` is the
           current head, ``expires_at_op`` is ``granted_at_op + ttl_ops``.
@@ -43,11 +43,11 @@ class LockingMixin:
         - Re-acquiring by the *same* holder while their own lease is still live is left
           open (renew vs. contend with self) — no test in ``locking_test.py`` pins it
           down.
-        - The granted lease is written to ``self._scene.document().active_lease`` — it
+        - The granted lease is written to ``self._scene.document.active_lease`` — it
           must be held in exactly that one place. A lease value an agent builds itself
           proves nothing (``contracts.WriteLease``'s own docstring).
         """
-        doc = self._scene.document()
+        doc = self._scene.document
         current = doc.active_lease
         if current is not None and not current.is_stale(doc.head) and current.holder != holder:
             raise LockContention(holder=current.holder, expires_at_op=current.expires_at_op)
@@ -71,22 +71,22 @@ class LockingMixin:
         its actual holder would not be, and must never happen from a mismatched
         ``lease``.
         """
-        doc = self._scene.document()
+        doc = self._scene.document
         if doc.active_lease is not None and doc.active_lease.lease_id == lease.lease_id:
             doc.active_lease = None
 
     def current(self) -> WriteLease | None:
         """The live lease, or ``None``. Once implemented, read straight from
-        ``self._scene.document().active_lease`` — one field, one truth, never a second
+        ``self._scene.document.active_lease`` — one field, one truth, never a second
         copy this class keeps of its own."""
-        return self._scene.document().active_lease
+        return self._scene.document.active_lease
 
     def verify(self, lease: WriteLease) -> None:
         """Raise :class:`contracts.LockContention` unless ``lease`` is the live one.
 
         Called before every mutation (``reporting.perform``, ``proposals.accept``) — this
         is the one check that makes the write lock real rather than advisory. Expected to
-        delegate to ``self._scene.document().require_lease(lease)``, which already
+        delegate to ``self._scene.document.require_lease(lease)``, which already
         implements exactly this comparison and this error shape.
         """
-        self._scene.document().require_lease(lease)
+        self._scene.document.require_lease(lease)

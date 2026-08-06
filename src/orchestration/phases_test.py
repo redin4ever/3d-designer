@@ -63,7 +63,7 @@ def test_promote_with_force_overrides_a_failing_check_and_records_it(scene) -> N
     new_phase = orch.promote(force=True)
 
     assert new_phase is Phase.REFINE
-    logged = scene.document().operations
+    logged = scene.document.operations
     assert any(
         op.kind == "phase_promotion" and op.params.get("forced") is True
         for op in logged

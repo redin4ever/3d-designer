@@ -40,7 +40,7 @@ def test_perform_while_paused_raises_and_applies_nothing(scene) -> None:
     with pytest.raises(RunPaused):
         orch.perform(op, lease)
 
-    assert scene.document().head == 0, "a paused run must not have applied the operation"
+    assert scene.document.head == 0, "a paused run must not have applied the operation"
 
 
 def test_resume_restores_running_state(scene) -> None:

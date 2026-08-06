@@ -76,7 +76,7 @@ def test_mutating_dispatch_without_a_lease_fails_with_a_lock_error_and_changes_n
         )
     message = str(excinfo.value).lower()
     assert "lock" in message or "lease" in message
-    assert fake_scene.document().head == 0
+    assert fake_scene.document.head == 0
 
 
 def test_mutating_dispatch_with_a_lease_someone_else_holds_raises_lock_contention_and_changes_nothing(
@@ -93,7 +93,7 @@ def test_mutating_dispatch_with_a_lease_someone_else_holds_raises_lock_contentio
             "add_primitive", _ADD_PRIMITIVE_PARAMS,
             role=ToolRole.BLOCKOUT, orchestrator=orchestrator, lease=forged,
         )
-    assert fake_scene.document().head == 0
+    assert fake_scene.document.head == 0
 
 
 # ------------------------------------------------------------------------ the happy path
@@ -107,7 +107,7 @@ def test_a_successful_mutating_dispatch_applies_the_operation_and_returns_a_json
     )
 
     assert result["ok"] is True
-    assert fake_scene.document().head == 1
+    assert fake_scene.document.head == 1
     json.dumps(result)  # must be real JSON, not just dict-shaped (StrEnum, tuples, ...)
 
 
@@ -123,7 +123,7 @@ def test_dispatching_raw_execute_records_an_opaque_operation(orchestrator, fake_
     )
 
     assert result["ok"] is True
-    logged = fake_scene.document().operations[-1]
+    logged = fake_scene.document.operations[-1]
     assert logged.opaque is True
 
 

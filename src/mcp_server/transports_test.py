@@ -20,6 +20,7 @@ the word "mcp"). ``SERVER_INFO`` is real, already-constructed data — its test 
 from __future__ import annotations
 
 import logging
+import sys
 
 import pytest
 from mcp_server import SERVER_INFO, serve_http, serve_stdio
@@ -42,8 +43,21 @@ def test_server_info_names_both_transports() -> None:
     assert "http" in text
 
 
+@pytest.fixture
+def no_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the SDK unimportable for the duration of one test.
+
+    These tests originally just called the transports and relied on the SDK genuinely being
+    absent from the machine. That made them assertions about the environment rather than
+    about the code, and they inverted the moment the dependency was actually installed —
+    passing for the wrong reason before, failing for the wrong reason after. Simulating the
+    absence keeps the guarantee under test either way.
+    """
+    monkeypatch.setitem(sys.modules, "mcp.server", None)
+
+
 def test_serve_stdio_raises_a_clear_named_error_when_the_sdk_is_not_installed(
-    orchestrator,
+    orchestrator, no_sdk,
 ) -> None:
     with pytest.raises(RuntimeError) as excinfo:
         serve_stdio(orchestrator)
@@ -53,7 +67,7 @@ def test_serve_stdio_raises_a_clear_named_error_when_the_sdk_is_not_installed(
 
 
 def test_serve_http_raises_a_clear_named_error_when_the_sdk_is_not_installed(
-    orchestrator,
+    orchestrator, no_sdk,
 ) -> None:
     with pytest.raises(RuntimeError) as excinfo:
         serve_http(orchestrator)
@@ -63,7 +77,7 @@ def test_serve_http_raises_a_clear_named_error_when_the_sdk_is_not_installed(
 
 
 def test_serve_http_on_the_default_loopback_host_logs_no_adr_009_warning(
-    orchestrator, caplog,
+    orchestrator, caplog, no_sdk,
 ) -> None:
     caplog.set_level(logging.WARNING)
     with pytest.raises(RuntimeError) as excinfo:
@@ -73,7 +87,7 @@ def test_serve_http_on_the_default_loopback_host_logs_no_adr_009_warning(
 
 
 def test_serve_http_on_a_non_loopback_host_logs_a_warning_naming_adr_009(
-    orchestrator, caplog,
+    orchestrator, caplog, no_sdk,
 ) -> None:
     """ADR-009: the HTTP transport binds loopback by default; binding to a non-loopback
     address is a real, unauthenticated network surface reaching every registered tool,
@@ -83,3 +97,18 @@ def test_serve_http_on_a_non_loopback_host_logs_a_warning_naming_adr_009(
         serve_http(orchestrator, host="0.0.0.0")
     _assert_real_runtime_error(excinfo)
     assert any("ADR-009" in record.message for record in caplog.records)
+
+
+def test_the_sdk_resolves_to_the_real_package_not_this_one() -> None:
+    """This package used to be named ``mcp``, so ``import mcp`` from inside it resolved
+    back to itself and the SDK was permanently unreachable — meaning no subscription
+    client could ever have connected, which is the one thing Gate A 7.4 asked for. If the
+    rename is ever undone, this catches it immediately rather than at a customer's first
+    connection attempt."""
+    pytest.importorskip("mcp.server", reason="SDK not installed here")
+    import mcp
+
+    assert not (mcp.__file__ or "").replace("\\", "/").endswith("src/mcp_server/__init__.py")
+    assert "mcp_server" not in (mcp.__file__ or ""), (
+        "`import mcp` resolved to this package — the SDK is shadowed and unreachable"
+    )

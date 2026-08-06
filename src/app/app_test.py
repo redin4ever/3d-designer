@@ -1,0 +1,260 @@
+"""End-to-end tests for the composition root.
+
+Every other suite tests one module against a fake. This one drives the whole stack the way
+an agent would — registry, write lock, scene log, real handlers, real measurement, real
+export — and is the only place that can catch a wire that was never connected. Sixteen
+green modules that do not talk to each other is the failure mode this file exists to find.
+
+The Blender-backed tests are marked ``needs_blender`` and skip automatically without it.
+The rest run on the in-memory engine, so the wiring itself stays verifiable anywhere.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from contracts import (
+    CheckCadence,
+    DefectClass,
+    JoineryIntent,
+    Operation,
+    Phase,
+    ToolRole,
+    Vec3,
+)
+
+from app import build_app, build_handlers
+
+
+# --------------------------------------------------------------------- wiring
+
+def test_the_handler_registry_is_not_empty() -> None:
+    """`scene` replays by looking each Operation.kind up in this registry. If it is empty
+    every agent tool call resolves to nothing, and the whole system is inert while every
+    module's own suite stays green."""
+    handlers = build_handlers()
+    assert handlers, "no operations registered — nothing can be built"
+
+
+def test_every_operation_module_reaches_the_registry() -> None:
+    """Each module was built in isolation with its own calling convention. A module whose
+    adapter is missing loses all of its tools silently."""
+    handlers = build_handlers()
+    for kind in (
+        "add_railing",        # ops
+        "repair",             # gaps
+        "make_plumb",         # align
+        "apply_edge_treatment",  # detail
+        "unwrap_uvs",         # uv
+        "raw_execute",        # raw
+    ):
+        assert kind in handlers, f"{kind} is not registered — its module is unreachable"
+
+
+def test_no_operation_module_is_missing() -> None:
+    """A guarded import that swallowed a real breakage would show up here rather than as
+    an agent getting 'unknown operation' halfway through a build."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    assert app.missing == (), f"unavailable modules: {app.missing}"
+
+
+def test_every_registered_tool_has_a_handler() -> None:
+    """A tool an agent can see but nothing can execute fails at call time, after the agent
+    has already committed to a plan."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    exposed = {t.name for tools in app.registry.values() for t in tools}
+    missing = exposed - set(app.handlers) - {"check_export_budget", "export_scene"}
+    assert missing == set(), f"tools with no handler: {sorted(missing)}"
+
+
+def test_no_role_exceeds_the_visible_tool_bound() -> None:
+    """The accuracy-optimal visible set measures around 2-7 tools; past ~10-15 agents
+    start inventing tool names and borrowing argument schemas from the wrong tool. This
+    bound is the reason roles exist at all."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    for role, tools in app.registry.items():
+        assert len(tools) <= 8, f"{role} exposes {len(tools)} tools: {[t.name for t in tools]}"
+
+
+def test_inspect_role_gets_no_mutating_tool() -> None:
+    """Many inspect agents run concurrently precisely because none of their tools can
+    mutate. One mutating tool here breaks the guarantee the multi-agent design rests on."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    for tool in app.registry.get(ToolRole.INSPECT, ()):
+        assert not tool.mutating, tool.name
+
+
+def test_the_scene_exposes_its_engine_so_measurements_can_run() -> None:
+    """B-000: without this, the check-after-every-geometry-change loop had no route to
+    geometry and carried placeholder measurements — the user's Gate A 3.1 answer silently
+    not running."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    assert app.scene.engine is app.engine
+
+
+def test_cadence_is_persisted_on_the_document_and_changeable() -> None:
+    """The user asked for a settings control that changes this mid-run, in their own words."""
+    app = build_app(prefer_blender=False, attach_viewer=False, cadence=CheckCadence.PHASE_BOUNDARIES)
+    assert app.scene.document.check_cadence is CheckCadence.PHASE_BOUNDARIES
+    app.orchestrator.set_cadence(CheckCadence.EVERY_GEOMETRY_CHANGE)
+    assert app.orchestrator._cadence is CheckCadence.EVERY_GEOMETRY_CHANGE  # noqa: SLF001
+
+
+def test_describe_says_which_engine_it_is_on() -> None:
+    """Running on the fake is legitimate for a smoke test and useless for an asset. The
+    difference has to be visible at startup, not discovered on export."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    assert "fake" in app.describe()
+
+
+# ------------------------------------------------------- the journey, end to end
+
+def _apply(app, op_kind: str, op_id: str, **params) -> object:
+    """Drive one operation the way an agent would: take the lock, apply, release.
+
+    ``op_kind`` rather than ``kind`` because several operations take a ``kind`` parameter
+    of their own (``add_primitive(kind="cube")``) and a collision here would silently
+    shadow it.
+    """
+    lease = app.orchestrator.acquire("test-writer", app.orchestrator.phase)
+    try:
+        return app.scene.apply(Operation(op_id=op_id, kind=op_kind, params=params), lease=lease)
+    finally:
+        app.orchestrator.release(lease)
+
+
+@pytest.mark.needs_blender
+def test_a_staircase_and_railing_come_out_of_the_real_stack() -> None:
+    """The user's own example, through the real path: registry -> lock -> log -> handler
+    -> Blender. If this fails, the product does not do the thing it was built for."""
+    app = build_app(prefer_blender=True, attach_viewer=False)
+    assert app.backend.startswith("bpy"), "this test is meaningless on the fake"
+
+    stair = _apply(app, "add_staircase", "op-stair", object_id="stair", treads=12,
+                   rise=0.18, run=0.28, width=1.0)
+    assert stair.ok, f"{stair.error_rule}: {stair.error_detail}"
+    assert stair.produced_objects, "a staircase produced no geometry"
+
+    rail = _apply(app, "add_railing", "op-rail", object_id="rail",
+                  path=[[0.0, 0.0, 0.0], [3.36, 0.0, 2.16]],
+                  height=0.95, post_spacing=1.0, baluster_gap=0.09)
+    assert rail.ok, f"{rail.error_rule}: {rail.error_detail}"
+    assert rail.produced_objects, "a railing produced no geometry"
+
+
+@pytest.mark.needs_blender
+def test_every_railing_post_stands_plumb_on_a_rake() -> None:
+    """Posts normal to the stair rake instead of vertical is *the* classic naive-generator
+    error and the single most visible thing this product exists to get right. Checked
+    through the whole stack, not against the module in isolation."""
+    from contracts import WORLD_UP
+
+    app = build_app(prefer_blender=True, attach_viewer=False)
+    result = _apply(app, "add_railing", "op-rail", object_id="rail",
+                    path=[[0.0, 0.0, 0.0], [3.0, 0.0, 1.8]],
+                    height=0.95, post_spacing=0.9, baluster_gap=0.09)
+    assert result.ok, f"{result.error_rule}: {result.error_detail}"
+
+    posts = [o for o in result.produced_objects if "post" in o]
+    assert posts, f"no posts among {result.produced_objects}"
+    for post in posts:
+        up = app.engine.snapshot(post).transform.rotation.rotate(Vec3(0, 0, 1)).normalized()
+        assert up.z == pytest.approx(WORLD_UP.z, abs=1e-4), f"{post} leans (up.z={up.z:.4f})"
+
+
+@pytest.mark.needs_blender
+def test_measurement_runs_against_the_real_scene_after_an_operation() -> None:
+    """The product's core promise: the tool computes the spatial facts so the model never
+    eyeballs them. A report with no measurements means the promise is not being kept."""
+    import measure
+
+    app = build_app(prefer_blender=True, attach_viewer=False)
+    _apply(app, "add_primitive", "op-box", object_id="box", kind="cube",
+           size=[2.0, 4.0, 1.0])
+
+    dims = measure.dimensions(app.engine, "box")
+    assert dims.value[0] == pytest.approx(2.0, abs=1e-3)
+    assert dims.value[1] == pytest.approx(4.0, abs=1e-3)
+
+
+@pytest.mark.needs_blender
+def test_clipping_is_detected_and_declared_joinery_silences_it() -> None:
+    """Distinguishing a post correctly socketed into a deck from two posts wrongly
+    overlapping is the capability the user named, and no library can infer it from
+    geometry — it has to be declared. Verified through the wired stack."""
+    import measure
+
+    app = build_app(prefer_blender=True, attach_viewer=False)
+    _apply(app, "add_primitive", "op-a", object_id="a", kind="cube", size=[1.0, 1.0, 1.0])
+    _apply(app, "add_primitive", "op-b", object_id="b", kind="cube", size=[1.0, 1.0, 1.0])
+    app.engine.set_transform("b", app.engine.snapshot("b").transform.__class__(
+        translation=Vec3(0.97, 0, 0)))
+
+    defects = measure.find_clipping(app.engine, [("a", "b")])
+    assert any(d.defect_class is DefectClass.PART_CLIPPING for d in defects), \
+        "a 30mm interpenetration went undetected"
+
+    permitted = measure.find_clipping(
+        app.engine, [("a", "b")],
+        joinery=[JoineryIntent(object_id="b", into_object_id="a", depth=0.05)],
+    )
+    assert permitted == (), "a declared socket was still reported as a clipping bug"
+
+
+@pytest.mark.needs_blender
+def test_a_model_exports_for_roblox_with_the_conversion_applied() -> None:
+    """The user's usual engine. An export that silently drops the unit conversion arrives
+    at 1/0.28 of its intended size, which is discovered in Roblox rather than here."""
+    import export
+
+    app = build_app(prefer_blender=True, attach_viewer=False)
+    _apply(app, "add_primitive", "op-box", object_id="box", kind="cube", size=[2.8, 2.8, 2.8])
+
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = str(Path(tmp) / "out.glb")
+        report = export.export_scene(app.engine, ["box"], path, profile_name="roblox")
+        assert report.ok
+        assert Path(report.path).exists() and Path(report.path).stat().st_size > 0
+        assert "roblox" in report.banner.lower()
+
+
+# ------------------------------------------------------------------ the loop
+
+def test_the_write_lock_is_enforced_through_the_wired_stack() -> None:
+    """Exactly one writer is the safety property the multi-agent design rests on. Tested
+    here against the real Scene rather than a per-module double."""
+    from contracts import LockContention
+
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    lease = app.orchestrator.acquire("writer-a", Phase.BLOCKOUT)
+    with pytest.raises(LockContention):
+        app.orchestrator.acquire("writer-b", Phase.BLOCKOUT)
+    app.orchestrator.release(lease)
+    app.orchestrator.acquire("writer-b", Phase.BLOCKOUT)  # now free
+
+
+def test_undo_is_a_pointer_move_through_the_wired_stack() -> None:
+    """No existing tool has undo; the user named losing work as an abandonment trigger."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    _apply(app, "add_primitive", "op-1", object_id="one", kind="cube", size=[1.0, 1.0, 1.0])
+    _apply(app, "add_primitive", "op-2", object_id="two", kind="cube", size=[1.0, 1.0, 1.0])
+    assert app.scene.document.head == 2
+
+    app.scene.undo(1)
+
+    assert app.scene.document.head == 1
+    assert not app.engine.exists("two"), "undo left the object behind"
+    assert app.engine.exists("one"), "undo removed more than it should have"
+
+
+def test_a_viewer_receives_events_from_a_real_operation() -> None:
+    """The live view is how the user watches an autonomous run. A bridge that attaches but
+    never receives leaves them staring at an empty viewport with no error."""
+    app = build_app(prefer_blender=False, attach_viewer=True)
+    if app.viewer is None:
+        pytest.skip("viewer unavailable in this environment")
+    _apply(app, "add_primitive", "op-1", object_id="one", kind="cube", size=[1.0, 1.0, 1.0])
+    assert app.viewer.pending(), "the viewer saw nothing after an operation was applied"

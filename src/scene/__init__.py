@@ -59,6 +59,19 @@ class Scene(DocumentMixin, HistoryMixin, CacheMixin, EventsMixin, PersistenceMix
         self._listeners: list[Listener] = []
 
     @property
+    def engine(self) -> EngineProtocol:
+        """The engine this scene draws on.
+
+        Public because `orchestration` needs it to run real measurements after an
+        operation. Without it, `Orchestrator.perform` had no way to reach geometry and
+        was carrying placeholder measurements — which silently disabled the
+        check-after-every-geometry-change loop, the one thing the user asked for by name
+        at Gate A 3.1 and the core promise of ADR-005. Reading the engine is not mutating
+        the scene, so exposing it costs nothing and closes B-000.
+        """
+        return self._engine
+
+    @property
     def document(self) -> SceneDocument:
         """The live, mutable source of truth — not a copy. ``scene`` is the only module
         that mutates it (``scene_doc.py``'s own docstring); everything else, including

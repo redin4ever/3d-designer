@@ -95,7 +95,7 @@ def test_a_stale_lease_is_reclaimable_by_a_different_holder(scene) -> None:
 def test_perform_without_a_valid_lease_raises_and_changes_nothing(scene) -> None:
     """A caller that never held the lock reaching ``self._scene.apply`` anyway would
     make the write lock purely cosmetic — any agent could mutate the scene by simply not
-    bothering to acquire first. ``scene.document()`` staying untouched is the proof that
+    bothering to acquire first. ``scene.document`` staying untouched is the proof that
     ``perform`` refused before doing any work, not after."""
     orch = Orchestrator(scene)
     op = Operation(op_id="op1", kind="add_cube", target_objects=("box",))
@@ -107,8 +107,8 @@ def test_perform_without_a_valid_lease_raises_and_changes_nothing(scene) -> None
     with pytest.raises(LockContention):
         orch.perform(op, forged)
 
-    assert scene.document().head == 0
-    assert scene.document().active_lease is None
+    assert scene.document.head == 0
+    assert scene.document.active_lease is None
 
 
 def test_orchestrator_structurally_satisfies_write_lock_manager(scene) -> None:

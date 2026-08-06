@@ -51,16 +51,12 @@ def _load_sdk(transport: str) -> Any:
     """Import the third-party MCP SDK lazily — never at module load — so the registry and
     ``dispatch()`` stay fully usable on a machine that has not installed it.
 
-    NOTE for whoever wires this up against a real install: this package's own name
-    (``src/mcp/``, required by this task's public interface) collides with the SDK's own
-    top-level import name. Because the repo's root ``conftest.py`` puts ``src/`` first on
-    ``sys.path``, ``import mcp`` from inside this very package resolves to *this* package
-    (already in ``sys.modules`` under that name) rather than the installed SDK, regardless
-    of install order. This function cannot fix that from inside ``src/mcp/`` — the fix
-    belongs to whatever process starts the server (alias the SDK into ``sys.modules``
-    under a different name before importing this package, or run it in a separate
-    interpreter/venv). Flagged here, in ``README.md`` and in this task's own
-    ``assumptions`` output rather than silently worked around.
+    This package used to be called ``mcp``, which is also the SDK's top-level import name.
+    Since the root ``conftest.py`` puts ``src/`` first on ``sys.path``, ``import mcp`` from
+    inside this very package resolved back to *this* package regardless of install order,
+    and the SDK was permanently unreachable — which would have meant no subscription client
+    could ever connect, the one thing Gate A 7.4 asked for. Renaming the package to
+    ``mcp_server`` fixed it at the composition root; verified against a real install.
     """
     try:
         import mcp.server  # the third-party MCP SDK — see the collision note above

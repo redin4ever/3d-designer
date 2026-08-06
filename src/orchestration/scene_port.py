@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from contracts import Operation, OperationResult, SceneDocument
+from contracts import EngineProtocol, Operation, OperationResult, SceneDocument
 
 __all__ = ["ScenePort"]
 
@@ -27,10 +27,23 @@ class ScenePort(Protocol):
     """Structural — a real ``scene`` module, and any test double, satisfy this by shape
     alone, with no inheritance required (``@runtime_checkable``)."""
 
+    @property
+    def engine(self) -> EngineProtocol:
+        """The engine behind this scene, so measurements can run against real geometry.
+
+        Added to close B-000. Without it ``reporting.perform`` had no route to geometry
+        and emitted placeholder measurements, which meant the
+        check-after-every-geometry-change loop — Gate A 3.1, in the user's own words, and
+        ADR-005's core promise — was not actually running. Read-only access; nothing here
+        mutates the scene.
+        """
+        ...
+
     def apply(self, op: Operation) -> OperationResult:
         """Append ``op`` to the operation log and evaluate it against the live engine."""
         ...
 
+    @property
     def document(self) -> SceneDocument:
         """The live scene document — phase, head, the operation log, and
         ``active_lease``, the one field the write lock is held in

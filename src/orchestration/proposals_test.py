@@ -116,4 +116,4 @@ def test_accept_refuses_a_conflicted_proposal_rather_than_picking_a_winner(scene
     with pytest.raises(ProposalConflict):
         orch.accept("p1", lease)
 
-    assert scene.document().head == 0, "a conflicted proposal must never be silently applied"
+    assert scene.document.head == 0, "a conflicted proposal must never be silently applied"

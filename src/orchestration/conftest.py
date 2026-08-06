@@ -38,6 +38,7 @@ class FakeScene:
             modified_objects=op.target_objects,
         )
 
+    @property
     def document(self) -> SceneDocument:
         return self._doc
 

@@ -27,9 +27,9 @@ class PhaseMixin:
     @property
     def phase(self) -> Phase:
         """The current phase. Once implemented, reads
-        ``self._scene.document().phase`` — ``contracts.SceneDocument`` already carries
+        ``self._scene.document.phase`` — ``contracts.SceneDocument`` already carries
         this field, so orchestration is not a second source of truth for it."""
-        return self._scene.document().phase
+        return self._scene.document.phase
 
     def can_promote(self) -> tuple[bool, tuple[AcceptanceResult, ...]]:
         """Whether the current phase's acceptance queries all pass right now, and the
@@ -37,7 +37,7 @@ class PhaseMixin:
         too. The boolean and the results must agree: ``False`` with every
         ``AcceptanceResult.passed`` ``True`` would itself be a bug in whatever computes
         this."""
-        doc = self._scene.document()
+        doc = self._scene.document
         current_phase = self.phase
         produced_this_phase = [
             op
@@ -77,7 +77,7 @@ class PhaseMixin:
           ``self._scene.apply(Operation(kind="phase_promotion", phase=new_phase.value,
           author="orchestrator", params={"from": old_phase.value, "to":
           new_phase.value, "forced": force, "failing": tuple(r.query_id for r in
-          results if not r.passed)}))`` and set ``self._scene.document().phase =
+          results if not r.passed)}))`` and set ``self._scene.document.phase =
           new_phase`` — reusing the log ``scene`` already keeps, and its existing
           subscriber notification (``ScenePort.subscribe``), rather than inventing a
           second audit channel. This is this module's own assumption, not yet frozen
@@ -116,7 +116,7 @@ class PhaseMixin:
             },
         )
         self._scene.apply(promotion_op)
-        self._scene.document().phase = new_phase
+        self._scene.document.phase = new_phase
         return new_phase
 
     def tools_for(self, role: ToolRole) -> tuple[ToolSpec, ...]:

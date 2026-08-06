@@ -26,7 +26,7 @@ the pass/fail count alone; see `transports_test.py`'s module docstring.
 
 ```bash
 # this module only
-python -m pytest src/mcp -q
+python -m pytest src/mcp_server -q
 
 # one file
 python -m pytest src/mcp_server/dispatch_test.py -q
@@ -46,10 +46,10 @@ way.
   `src/export/`, `src/raw/`, `src/gaps/`, `src/align/`, `src/uv/`, `src/measure/`,
   `src/detail/`, `src/orchestration/` — is a frozen or sibling-owned surface (Rule 5):
   read freely, never edit.
-- `mcp/__init__.py` is a barrel: re-exports only. If it grows logic, that logic belongs in
+- `mcp_server/__init__.py` is a barrel: re-exports only. If it grows logic, that logic belongs in
   one of the responsibility files instead.
 - Nothing outside `mcp/` may import `mcp.registry`, `mcp.dispatch`, etc. directly — only
-  `from mcp import <name>`, per `mcp/__init__.py`'s `__all__`. `mcp._cap`, `mcp.validation`
+  `from mcp_server import <name>`, per `mcp_server/__init__.py`'s `__all__`. `mcp._cap`, `mcp.validation`
   and `mcp.serialize` are module-private (leading underscore or simply not re-exported) —
   exercised transitively through `build_registry`/`dispatch`, the same pattern
   `orchestration/_tool_registry.py` uses.

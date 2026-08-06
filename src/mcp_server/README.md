@@ -17,7 +17,7 @@ costs 15-25k tokens instead of ~1,600 — lives here.
 
 ## Public interface
 
-Everything importable from `mcp_server` is declared in `mcp/__init__.py`:
+Everything importable from `mcp_server` is declared in `mcp_server/__init__.py`:
 
 ```python
 def build_registry(*, include_raw: bool = True) -> dict[ToolRole, tuple[ToolSpec, ...]]
