@@ -185,4 +185,16 @@ class ViewerBridge(TranslateMixin, ClientMixin, AnnotateMixin, ReportMixin):
             )
             for past in self._transcript
         )
+
+        # What the operator is watching, at the same seq as the rest of the greeting and for
+        # the same arithmetic. Focus lives on the orchestrator, so it outlives a page refresh
+        # — and a greeting that omitted it would show a reconnecting operator an unmarked
+        # scene while the agent went on being told those parts matter, with nothing anywhere
+        # saying the two disagreed. Sent only when there is something to say: a message per
+        # connection announcing that nothing is focused is noise on every reconnect, in the
+        # overwhelmingly common case of an autonomous run nobody has marked anything in.
+        focused = tuple(getattr(self._orchestrator, "focus", ()) or ())
+        if focused:
+            messages.append(self._focus_message(object_ids=focused, seq=seq))
+
         return tuple(messages)

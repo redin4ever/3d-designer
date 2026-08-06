@@ -75,3 +75,20 @@ def test_decode_reads_the_client_message_shape_frontend_sends() -> None:
 
     assert message.type is ClientMessageType.SET_CADENCE
     assert message.data == {"cadence": "on_request"}
+
+
+def test_the_transport_accepts_a_frame_large_enough_to_carry_an_annotation_image() -> None:
+    """A-011's filed caveat, made a test.
+
+    Annotations ride this socket and carry a crop (Q-03, Q-23 — up to 1024px). ``websockets``
+    defaults to a 1 MB frame limit, and it does not *error* on an over-length frame: it closes
+    the connection. The operator would watch the live view drop, with nothing anywhere saying
+    why, at the exact moment they tried to tell the agent something.
+
+    So the transport's limit must sit above the payload limit ``contracts.wire`` already
+    enforces — the two numbers are a pair, and this is what stops them drifting apart.
+    """
+    from contracts import MAX_ANNOTATION_IMAGE_BYTES
+    from viewer.server import MAX_FRAME_BYTES
+
+    assert MAX_FRAME_BYTES > MAX_ANNOTATION_IMAGE_BYTES
