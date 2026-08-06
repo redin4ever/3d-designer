@@ -29,9 +29,25 @@ __all__ = [
     "CadencePayload",
     "ServerMessage",
     "ClientMessage",
+    "AnnotatePayload",
+    "FocusPayload",
+    "MAX_ANNOTATION_IMAGE_BYTES",
 ]
 
 WIRE_VERSION = 1
+
+MAX_ANNOTATION_IMAGE_BYTES = 4_000_000
+"""The largest crop an :class:`AnnotatePayload` may carry, as encoded characters.
+
+Declared here rather than in either endpoint because both have to agree, and the failure when
+they do not is the ugly kind: ``websockets`` does not error on an over-length frame, it
+**closes the connection**. The operator would see the live view drop, with no reason given, at
+the exact moment they tried to say something.
+
+Four million leaves comfortable room for the 1024px crop chosen at Q-23 — such a crop of this
+renderer's flat-shaded output typically base64-encodes to a few hundred kilobytes — while
+staying far enough under a raised transport limit that a large one still arrives.
+"""
 
 
 class ServerMessageType(StrEnum):
@@ -63,6 +79,11 @@ class ServerMessageType(StrEnum):
     RESYNC_REQUIRED = "resync_required"
     ERROR = "error"
 
+    FOCUS = "focus"
+    """The parts the operator has marked as important, echoed to every watcher. Gate A 10.1
+    chose many watchers on one session, and a mark one of them puts up that the others never
+    see makes the build look like it is being redirected by nobody."""
+
 
 class ClientMessageType(StrEnum):
     """Operator controls (Gate A 5.4). The build runs fully autonomously; these exist so
@@ -81,6 +102,42 @@ class ClientMessageType(StrEnum):
     """Payload: :class:`CadencePayload`. The settings control asked for at Gate A 3.1."""
 
     SELECT = "select"
+
+    ANNOTATE = "annotate"
+    """Payload: :class:`AnnotatePayload`. What the operator is pointing at, what they said
+    about it, and optionally a picture of it."""
+
+    SET_FOCUS = "set_focus"
+    """Payload: :class:`FocusPayload`. The complete set of parts the operator has marked as
+    important — declarative, so an empty set is how you clear."""
+
+
+@dataclass(frozen=True, slots=True)
+class AnnotatePayload:
+    """The operator pointing at part of the scene, with optional words and an optional crop.
+
+    Nothing here is implemented yet (Rule 4 — tests come first).
+    """
+
+    object_ids: tuple[str, ...] = ()
+    text: str = ""
+    image: str = ""
+
+    def __post_init__(self) -> None:
+        raise NotImplementedError("contracts.AnnotatePayload: not implemented")
+
+
+@dataclass(frozen=True, slots=True)
+class FocusPayload:
+    """The complete set of parts the operator has marked as important.
+
+    Nothing here is implemented yet (Rule 4 — tests come first).
+    """
+
+    object_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        raise NotImplementedError("contracts.FocusPayload: not implemented")
 
 
 @dataclass(frozen=True, slots=True)

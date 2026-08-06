@@ -226,6 +226,36 @@ class Proposal:
 
 
 @dataclass(frozen=True, slots=True)
+class OperatorAnnotation:
+    """The operator pointed at part of the scene and said something about it.
+
+    Typed rather than rendered into an ``operator_notes`` string for the reason
+    ``operator_notes`` itself gives for existing: the alternative is smuggling structure into
+    free text, where two implementations will do it two different ways and the agent gets
+    neither reliably.
+
+    ``facts`` carries the measurements with the annotation rather than a pointer to them —
+    Q-02 chose "everything already measured", and the whole value of that answer is the agent
+    not having to spend a call asking what it is looking at.
+
+    ``has_image``/``annotation_id`` exist because this is text and an image is not. A report
+    cannot carry a picture, so it says one is waiting and names the call that returns it.
+    Dropping the half of Q-03 that the report cannot carry would be the quiet failure.
+
+    ``render`` is not implemented yet (Rule 4 — tests come first).
+    """
+
+    object_ids: tuple[str, ...] = ()
+    text: str = ""
+    facts: tuple[str, ...] = ()
+    has_image: bool = False
+    annotation_id: str = ""
+
+    def render(self) -> str:
+        raise NotImplementedError("contracts.OperatorAnnotation.render: not implemented")
+
+
+@dataclass(frozen=True, slots=True)
 class ActionReport:
     """What an agent gets back after every action.
 
@@ -265,6 +295,23 @@ class ActionReport:
     agent: riding out on the next tool response. This field is that path, and it is
     required rather than optional, because the alternative is smuggling it into
     ``summary`` where two implementations will do it two different ways.
+    """
+
+    operator_annotations: tuple[OperatorAnnotation, ...] = ()
+    """What the operator pointed at since the last report, with their words and measurements.
+
+    Travels the same route as :attr:`operator_notes` and for the same reason — MCP is
+    call/response — but typed, because an annotation has parts an agent needs separately.
+    Drained on delivery like a note: pointing at something is an event, not a state.
+    """
+
+    operator_focus: tuple[str, ...] = ()
+    """The parts the operator has marked as important, re-attached to **every** report.
+
+    Not drained (A-013). Q-10 chose "a standing instruction it re-reads every turn" and Q-11
+    chose "until you clear it", and both are the same requirement: a focus set delivered once
+    is forgotten by the third action, which is exactly where an operator would notice it had
+    stopped working. This is the one field on this dataclass that is deliberately repeated.
     """
 
     assumptions: tuple[str, ...] = ()
