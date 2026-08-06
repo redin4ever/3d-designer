@@ -1,0 +1,151 @@
+/* Pointing, priority and the edit tools (Q-05, Q-07, Q-13, Q-15, Q-20).
+   Every colour and size comes from tokens.css — tests/tokens.test.js fails on a hex
+   literal anywhere under src/ except that file. */
+
+/* The in-place annotation composer (Q-07). Absolute inside .viewport-panel, which is the
+   positioning context; anchored bottom-left rather than following the cursor, because a
+   panel that moves to wherever you clicked covers the thing you clicked about half the
+   time, and you cannot predict where to look for it. */
+.point-composer {
+  position: absolute;
+  left: var(--space-sm);
+  bottom: var(--space-sm);
+  z-index: 2;
+  max-width: min(28rem, calc(100% - var(--space-lg)));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--elevation-raised);
+}
+
+.point-composer[hidden] {
+  display: none;
+}
+
+.point-selection {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--marked);
+}
+
+.point-actions {
+  flex-wrap: wrap;
+}
+
+.point-note {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+
+.point-note:empty {
+  display: none;
+}
+
+/* A part the operator marked. Distinct from the agent's change-highlight in both colour
+   and behaviour: this stays lit until taken down, that one flashes and fades (Q-13). */
+.focus-list {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xxs);
+}
+
+.focus-list:empty {
+  display: none;
+}
+
+.focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--marked);
+  border-radius: var(--radius-sm);
+  background: var(--marked-soft);
+  color: var(--ink);
+  font-size: var(--text-caption);
+  line-height: 1.8;
+}
+
+.focus-chip button {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.control-hint {
+  margin: var(--space-xxs) 0 0;
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+
+.control-hint:empty {
+  display: none;
+}
+
+/* A number input carries an intrinsic width from its default `size`, which no amount of
+   `flex: 1` overrides — `min-width: 0` is what lets three of them share a narrow panel
+   instead of forcing the whole grid wider than the viewport. Wrapping is the backstop at
+   the narrowest sizes. */
+.edit-fields {
+  flex-wrap: wrap;
+}
+
+.edit-fields input {
+  min-width: 3.5rem;
+  width: 0;
+  flex: 1 1 3.5rem;
+}
+
+/* Same intrinsic-width problem, same fix: the composer's text input would otherwise hold
+   the viewport panel open at its own preferred width. */
+.point-composer input[type='text'] {
+  min-width: 0;
+  flex: 1 1 6rem;
+}
+
+/* Q-20: greyed out with the reason beside them, never hidden. A control you cannot see is
+   a feature you do not know exists; one you can see and cannot use teaches you the rule. */
+#edit-group[data-blocked='true'] .btn,
+#edit-group[data-blocked='true'] input {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Point mode changes what dragging means, so it changes the cursor — the only always-
+   visible signal of which mode you are in (Q-05). */
+.viewport-panel[data-point-mode='on'] canvas {
+  cursor: crosshair;
+}
+
+/* The lasso, drawn as an overlay rather than into the frame: the rasterizer's output is
+   what picking reads, and painting a loop into it would make the loop itself pickable. */
+.lasso {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

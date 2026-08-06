@@ -18,6 +18,7 @@ from typing import Callable
 
 from contracts import WIRE_VERSION, ServerMessage, ServerMessageType
 
+from .annotate import AnnotateMixin
 from .client import ClientMixin
 from .report import ReportMixin
 from .translate import TranslateMixin
@@ -29,7 +30,7 @@ transcript's own cap: replaying more than it will keep is work thrown away."""
 __all__ = ["ViewerBridge"]
 
 
-class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
+class ViewerBridge(TranslateMixin, ClientMixin, AnnotateMixin, ReportMixin):
     """Subscribes to one ``scene`` and optionally routes control messages through one
     ``orchestrator``. See ``README.md`` for the full contract.
 
@@ -47,6 +48,9 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         self._last_highlight: tuple[str, ...] = ()
         self._seen_conflicts: set[str] = set()
         self._transcript: list[ServerMessage] = []
+        # Annotation images, held out of the report and out of the transcript. See annotate.py.
+        self._images: dict[str, str] = {}
+        self._annotation_seq = 0
 
     def set_notifier(self, notifier: Callable[[], None] | None) -> None:
         """Register a zero-argument callback fired whenever a message is queued.
@@ -181,4 +185,16 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
             )
             for past in self._transcript
         )
+
+        # What the operator is watching, at the same seq as the rest of the greeting and for
+        # the same arithmetic. Focus lives on the orchestrator, so it outlives a page refresh
+        # — and a greeting that omitted it would show a reconnecting operator an unmarked
+        # scene while the agent went on being told those parts matter, with nothing anywhere
+        # saying the two disagreed. Sent only when there is something to say: a message per
+        # connection announcing that nothing is focused is noise on every reconnect, in the
+        # overwhelmingly common case of an autonomous run nobody has marked anything in.
+        focused = tuple(getattr(self._orchestrator, "focus", ()) or ())
+        if focused:
+            messages.append(self._focus_message(object_ids=focused, seq=seq))
+
         return tuple(messages)

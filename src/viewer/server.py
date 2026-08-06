@@ -70,6 +70,21 @@ BROADCAST_TO_OTHERS = frozenset(
 #: sender needs it too, as the confirmation that the backend actually has their words.
 
 
+MAX_FRAME_BYTES = 8 * 1024 * 1024
+"""The largest inbound frame this transport accepts.
+
+Raised above ``websockets``' 1 MB default because annotations carry a crop of the live view
+(Q-03), and the failure at the default is the worst kind: an over-length frame does not error,
+it **closes the connection**. The operator would watch the live view drop, with nothing
+anywhere saying why, at the exact moment they tried to tell the agent something.
+
+Deliberately larger than ``contracts.MAX_ANNOTATION_IMAGE_BYTES`` rather than equal to it. The
+payload limit is the one that should be hit, because it produces a message naming the size;
+this is only the backstop that stops the transport killing the socket first. ``server_test.py``
+pins the ordering so the two cannot drift.
+"""
+
+
 class ViewerSocketServer:
     """One listening socket, one :class:`~viewer.ViewerBridge`, any number of clients.
 
@@ -112,7 +127,9 @@ class ViewerSocketServer:
         self._wake = asyncio.Event()
         self.bridge.set_notifier(self._notify)
         self.bridge.attach()
-        self._server = await websockets.serve(self._handle, self.host, self.requested_port)
+        self._server = await websockets.serve(
+            self._handle, self.host, self.requested_port, max_size=MAX_FRAME_BYTES
+        )
         self._flusher = asyncio.create_task(self._flush_loop())
         return self
 

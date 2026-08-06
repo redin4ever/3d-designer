@@ -31,6 +31,8 @@ _HANDLER_NAMES: dict[ClientMessageType, str] = {
     ClientMessageType.SET_CADENCE: "_handle_set_cadence",
     ClientMessageType.REQUEST_FULL_SCENE: "_handle_request_full_scene",
     ClientMessageType.SELECT: "_handle_select",
+    ClientMessageType.ANNOTATE: "_handle_annotate",
+    ClientMessageType.SET_FOCUS: "_handle_set_focus",
 }
 
 

@@ -1,0 +1,177 @@
+/* The Connect button, its result line, and the client picker.
+ *
+ * Split from chat.css rather than added to it (Rule 2, responsibility seam): chat.css is
+ * the conversation — transcript rows and the composer — and this is one control that talks
+ * to the HTTP origin instead of the socket, plus a modal that is not part of the panel at
+ * all. Same rule as everywhere under frontend/src/: every colour, radius and space is a
+ * var(--token) from tokens.css.
+ */
+
+/* The heading row the button shares with "Conversation". The button sits at the right edge
+ * of the panel it belongs to, which is also the far right of the page. */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-right: var(--space-lg);
+  flex: 0 0 auto;
+}
+
+/* Dark, and close to the panel it sits on rather than contrasting with it: this is setup,
+ * not the thing the page is for, so it must be findable without competing with Send. The
+ * lift is DESIGN.md's elevation 2 — one step up the surface ladder, a stronger hairline,
+ * and the faint top edge highlight — not a shadow and not a colour. */
+.connect-button {
+  flex: 0 0 auto;
+  background: var(--surface-raised);
+  color: var(--ink-muted);
+  border: 1px solid var(--hairline-raised);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-raised);
+  padding: var(--space-xxs) var(--space-sm);
+  font-family: var(--font-display);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.connect-button:hover {
+  background: var(--surface-raised-hover);
+  color: var(--ink);
+}
+
+.connect-button[aria-busy='true'] {
+  color: var(--muted);
+  cursor: progress;
+}
+
+/* The dialog carries the whole flow — the picker, the empty-machine message and the result
+ * — because the conversation panel has no height to spare for any of them. A native
+ * <dialog>: Escape, focus-in and focus-restore come from the platform rather than from code
+ * that has to remember all three. */
+.connect-dialog {
+  background: var(--surface-overlay);
+  color: var(--ink);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-raised);
+  padding: var(--space-lg);
+  /* A layout measure, like .layout's sidebar width in app.css — not a design token. */
+  width: min(420px, calc(100vw - var(--space-xl)));
+  max-width: 100%;
+}
+
+.connect-dialog::backdrop {
+  background: var(--scrim);
+}
+
+.connect-dialog-title {
+  margin: 0 0 var(--space-xxs);
+  font-family: var(--font-display);
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+}
+
+.connect-dialog-note {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* A result runs to five lines including the restart warning, and a picker to three rows.
+ * Capped and scrollable so neither can grow past a short window and push the way out
+ * off-screen — a dialog whose Close button you cannot reach is a trap. */
+.connect-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin-bottom: var(--space-md);
+  max-height: 60vh;
+  overflow-y: auto;
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.connect-dialog-body:empty {
+  display: none;
+}
+
+.connect-result-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.connect-dialog-body[data-tone='error'] .connect-result-title {
+  color: var(--accent-hover);
+}
+
+.connect-result-line {
+  margin: 0;
+}
+
+/* The restart instruction. Every client here reads its MCP config once, at start-up, so a
+ * user who skims this line sees no tools at all and concludes the button did nothing. */
+.connect-result-critical {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* A Windows config path is one long unbreakable token; left alone it widens the dialog past
+ * the viewport and takes the page's horizontal scroll with it. */
+.connect-result-path,
+.connect-choice-path {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.connect-choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.connect-choice {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  text-align: left;
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: 1px solid var(--hairline-raised);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-raised);
+  padding: var(--space-xs) var(--space-sm);
+  cursor: pointer;
+}
+
+.connect-choice:hover {
+  background: var(--surface-raised-hover);
+  border-color: var(--hairline-tertiary);
+}
+
+.connect-choice-label {
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+}
+
+.connect-choice-path {
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+
+.connect-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+}

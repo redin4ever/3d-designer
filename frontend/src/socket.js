@@ -29,6 +29,7 @@ export const ServerMessageType = Object.freeze({
   EXPORT_REPORT: 'export_report',
   RESYNC_REQUIRED: 'resync_required',
   ERROR: 'error',
+  FOCUS: 'focus',
 });
 
 /** Mirrors contracts.wire.ClientMessageType. */
@@ -40,6 +41,8 @@ export const ClientMessageType = Object.freeze({
   REQUEST_FULL_SCENE: 'request_full_scene',
   SET_CADENCE: 'set_cadence',
   SELECT: 'select',
+  ANNOTATE: 'annotate',
+  SET_FOCUS: 'set_focus',
 });
 
 /** Mirrors contracts.wire.WIRE_VERSION. */

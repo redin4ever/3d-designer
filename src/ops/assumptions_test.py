@@ -25,6 +25,17 @@ from ops import OPS
 #: i.e. every optional parameter omitted, so the sweep below sees every default this
 #: library carries.
 _MINIMAL_PARAMS: dict[str, dict] = {
+    # The direct edits (Q-14). Each takes an object that already exists rather than making
+    # one, so they name `hero` from _seed. Included in the sweep for the same reason as
+    # everything else: an operation that reports an assumption about a parameter the caller
+    # supplied makes the whole ASSUMED block untrustworthy, and these are operations too.
+    "move_object": {"object_id": "hero", "translation": [1.0, 0.0, 0.0]},
+    "rotate_object": {"object_id": "hero", "axis": "z", "degrees": 90.0},
+    "scale_object": {"object_id": "hero", "scale": [2.0, 2.0, 2.0]},
+    "delete_object": {"object_id": "hero"},
+    "duplicate_object": {"object_id": "hero", "new_id": "hero_copy"},
+    "rename_object": {"object_id": "hero", "new_id": "hero_renamed"},
+    "set_object_material": {"object_id": "hero", "material_id": "seed_paint"},
     "add_primitive": {"object_id": "prim", "kind": "cube", "size": Vec3(1, 1, 1)},
     "add_wall": {
         "object_id": "wall2",
@@ -88,6 +99,9 @@ def _seed(engine) -> None:
                 params={"object_id": name, "kind": "cube", "size": Vec3(0.4, 0.4, 0.4)},
             ),
         )
+    # The direct edits added at Q-14 target existing things rather than creating them, so the
+    # sweep needs a material to exist as well as an object.
+    engine.create_material("seed_paint", (0.5, 0.5, 0.5))
 
 
 def _railing_op(op_id: str = "rail", **extra) -> Operation:

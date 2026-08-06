@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import functools
 import http.server
+import json
 import socket
 import sys
 import threading
@@ -67,15 +68,73 @@ def port_is_free(port: int, host: str = "127.0.0.1") -> bool:
 
 
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
-    """Static files, without logging every request over the banner.
+    """Static files, plus the two endpoints the Connect button needs.
 
     ``SimpleHTTPRequestHandler`` writes a line per request to stderr, which on this command
     is the same stream carrying the startup banner and the engine's own output. Twenty
-    module fetches would push the URLs a person needs off the top of their terminal.
+    module fetches would push the URLs a person needs off the top of their terminal, so it
+    is silenced.
+
+    The API lives here rather than on the wire protocol because connecting an AI client is
+    a one-off setup action, not a live-run event — ``contracts.wire`` is for what is
+    happening to the scene, and putting setup traffic through it would widen a frozen
+    surface for something that is not about geometry at all. Being served from the same
+    origin as the page is also what keeps this a plain ``fetch`` with no CORS.
     """
 
     def log_message(self, *_args: Any) -> None:
         return
+
+    def _json(self, status: int, payload: dict) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        # No caching: "which clients are installed" and "is forge3d configured" both change
+        # underneath the page, and a stale answer here means a button that lies.
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler's own naming
+        if self.path.split("?")[0] == "/api/clients":
+            from app.connect import detect_clients
+
+            self._json(200, {"clients": detect_clients()})
+            return
+        super().do_GET()
+
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path.split("?")[0] != "/api/connect":
+            self.send_error(404)
+            return
+
+        from app.connect import CLIENTS, write_config
+
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except (TypeError, ValueError):
+            self._json(400, {"error": "the request body was not JSON"})
+            return
+
+        client = body.get("client")
+        # Only the clients this build knows about, by name. Not a sandbox — ADR-009 already
+        # grants connected agents full disk access by explicit choice — but there is no
+        # reason for a setup endpoint to accept an arbitrary path, and building one that
+        # did would be inventing a capability nobody asked for.
+        if client not in CLIENTS:
+            self._json(400, {"error": f"unknown client {client!r}"})
+            return
+
+        try:
+            path = write_config(client)
+        except (KeyError, RuntimeError, OSError) as exc:
+            self._json(500, {"error": str(exc)})
+            return
+
+        self._json(200, {"ok": True, "client": client, "path": str(path),
+                         "note": CLIENTS[client]["note"]})
 
 
 def serve_frontend(port: int, directory: Path) -> http.server.ThreadingHTTPServer:

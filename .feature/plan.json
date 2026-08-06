@@ -1,0 +1,255 @@
+{
+  "feature": "point-and-edit",
+  "note": "Larger than a typical feature \u2014 three sub-features (point, prioritise, edit) and 25 decisions. Consolidated into 8 units rather than 12 so each is still one commit-sized piece of work. Built sequentially by the main agent: subagents are not available in this session.",
+  "buildOrder": "picking first, because Q-25 chose 'pointing feeling instant and exact' as what the effort goes into, and everything else stands on 'the part you got is the part you meant'. `integration` is last because a second agent is concurrently editing all four of its files.",
+  "units": [
+    {
+      "id": "picking",
+      "what": "pixel-exact picking \u2014 an id channel in the rasterizer, the part under a cursor, and the parts inside a drawn loop",
+      "paths": [
+        "frontend/src/picking.js",
+        "frontend/tests/picking.test.js"
+      ],
+      "alsoEdits": [
+        "frontend/src/raster.js"
+      ],
+      "publicInterface": "frontend/src/picking.js",
+      "dependsOn": [],
+      "seams": [
+        "frontend-picking"
+      ],
+      "decisions": [
+        "Q-04",
+        "Q-06",
+        "Q-25"
+      ],
+      "status": "green",
+      "note": "raster.js changes are strictly additive \u2014 createFrame keeps its signature and drawTriangle's id argument is optional \u2014 so every existing raster test keeps passing unedited."
+    },
+    {
+      "id": "annotate-wire",
+      "what": "the protocol: what a pointed-at part, an annotation and a focus set look like on the wire and in a report",
+      "paths": [
+        "src/contracts/wire.py",
+        "src/contracts/operations.py",
+        "src/contracts/contracts_test.py"
+      ],
+      "publicInterface": "src/contracts/__init__.py",
+      "dependsOn": [],
+      "seams": [
+        "wire-select",
+        "wire-redirect",
+        "report-operator-notes"
+      ],
+      "decisions": [
+        "Q-01",
+        "Q-03",
+        "Q-10",
+        "Q-12",
+        "Q-18"
+      ],
+      "status": "green",
+      "note": "contracts/ is main-agent-only (Rule 5). Additive and defaulted throughout, so all sixteen modules that compile against it keep working untouched."
+    },
+    {
+      "id": "annotate-viewer",
+      "what": "the browser's point, annotation and focus messages actually reaching the orchestrator instead of being discarded",
+      "paths": [
+        "src/viewer/client.py",
+        "src/viewer/client_test.py",
+        "src/viewer/server.py",
+        "src/viewer/server_test.py"
+      ],
+      "publicInterface": "src/viewer/__init__.py",
+      "dependsOn": [
+        "annotate-wire"
+      ],
+      "seams": [
+        "viewer-select-noop",
+        "viewer-handler-table",
+        "viewer-report-out"
+      ],
+      "decisions": [
+        "Q-01",
+        "Q-09",
+        "Q-18",
+        "Q-21"
+      ],
+      "status": "green",
+      "note": "A-011: images ride this socket, so serve() must raise max_size above the 1 MB default or a large crop closes the connection instead of erroring."
+    },
+    {
+      "id": "focus",
+      "what": "focus as standing orchestrator state \u2014 re-attached to every report until cleared, never drained like a note",
+      "paths": [
+        "src/orchestration/reporting.py",
+        "src/orchestration/reporting_test.py"
+      ],
+      "publicInterface": "src/orchestration/__init__.py",
+      "dependsOn": [
+        "annotate-wire"
+      ],
+      "seams": [
+        "orchestrator-notes"
+      ],
+      "decisions": [
+        "Q-10",
+        "Q-11",
+        "Q-12"
+      ],
+      "status": "green"
+    },
+    {
+      "id": "transform-ops",
+      "what": "move, rotate, scale, delete, duplicate, rename and set-material as real logged operations",
+      "paths": [
+        "src/ops/transform.py",
+        "src/ops/transform_test.py"
+      ],
+      "alsoEdits": [
+        "src/ops/registry.py"
+      ],
+      "publicInterface": "src/ops/__init__.py",
+      "dependsOn": [],
+      "seams": [
+        "ops-registry"
+      ],
+      "decisions": [
+        "Q-14",
+        "Q-16",
+        "Q-19"
+      ],
+      "status": "green",
+      "note": "Q-19 chose one shared history, which is why these are logged Operations rather than direct engine writes \u2014 replay, checkpoints and roll-back-N come for free."
+    },
+    {
+      "id": "operator-context",
+      "what": "the tool an agent calls to read what the operator pointed at, including the image \u2014 the one thing ActionReport cannot carry",
+      "paths": [
+        "src/mcp_server/operator_context.py",
+        "src/mcp_server/operator_context_test.py"
+      ],
+      "alsoEdits": [
+        "src/mcp_server/session_specs.py",
+        "src/mcp_server/registry.py"
+      ],
+      "dependsOn": [
+        "annotate-wire",
+        "focus"
+      ],
+      "seams": [
+        "mcp-describe-object",
+        "mcp-images",
+        "mcp-registry"
+      ],
+      "decisions": [
+        "Q-02",
+        "Q-03",
+        "Q-23"
+      ],
+      "status": "green",
+      "note": "ActionReport is a text dataclass; an image cannot ride it. So the report says an image is waiting and this tool returns it. Q-02 means the text half reuses describe_object's payload rather than inventing a second summary of the same object."
+    },
+    {
+      "id": "frontend-point",
+      "what": "the browser half \u2014 selection and focus state, the canvas crop, the annotation composer's logic, and the gizmo/snapping arithmetic",
+      "paths": [
+        "frontend/src/annotate.js",
+        "frontend/tests/annotate.test.js",
+        "frontend/src/capture.js",
+        "frontend/tests/capture.test.js",
+        "frontend/src/edit-tools.js",
+        "frontend/tests/edit-tools.test.js"
+      ],
+      "dependsOn": [
+        "picking",
+        "annotate-wire"
+      ],
+      "seams": [
+        "frontend-select-builder",
+        "frontend-viewport-state",
+        "frontend-pointer"
+      ],
+      "decisions": [
+        "Q-05",
+        "Q-07",
+        "Q-08",
+        "Q-13",
+        "Q-15",
+        "Q-16",
+        "Q-20",
+        "Q-22",
+        "Q-23"
+      ],
+      "status": "green",
+      "note": "Pure logic in its own files, the way camera.js was split out of scene-renderer.js \u2014 that split exists because a camera that could only turn left and right shipped from the one file with no unit tests."
+    },
+    {
+      "id": "integration",
+      "what": "the point-mode toggle, the annotation composer, the edit panel and the focus outline, wired into the real page",
+      "paths": [
+        "frontend/index.html",
+        "frontend/src/main.js",
+        "frontend/src/tokens.css",
+        "frontend/src/point.css",
+        "frontend/tests/index.js",
+        "frontend/src/scene-renderer.js"
+      ],
+      "dependsOn": [
+        "picking",
+        "frontend-point",
+        "annotate-viewer"
+      ],
+      "seams": [
+        "frontend-html",
+        "frontend-main-wiring",
+        "frontend-tokens",
+        "frontend-test-index",
+        "frontend-conventions",
+        "write-lock",
+        "live-http-api"
+      ],
+      "decisions": [
+        "Q-05",
+        "Q-07",
+        "Q-13",
+        "Q-15",
+        "Q-17",
+        "Q-20",
+        "Q-22",
+        "Q-24"
+      ],
+      "status": "green",
+      "contended": true,
+      "note": "CONTENDED. A second agent is concurrently editing index.html, main.js, tokens.css and tests/index.js for its Connect UI. Built last, and reconciled against whatever is on disk at that moment rather than against what was read at trace time (Rule 5: check for uncommitted local changes before a phase starts)."
+    },
+    {
+      "id": "operator-edit",
+      "what": "an operator's own edit applying while the run is paused",
+      "paths": [
+        "src/orchestration/reporting.py",
+        "src/orchestration/operator_edit_test.py"
+      ],
+      "dependsOn": [
+        "transform-ops"
+      ],
+      "seams": [
+        "write-lock"
+      ],
+      "decisions": [
+        "Q-17",
+        "Q-18",
+        "Q-19",
+        "Q-21"
+      ],
+      "status": "green",
+      "note": "Not in the original plan. Found while wiring the edit messages: perform() refuses while paused and Q-17 made pausing the precondition for editing, so without this the manual tools could never work at all."
+    }
+  ],
+  "removedUnits": [
+    {
+      "id": "edit-handlers",
+      "why": "Planned, then found to need no work at all: build_handlers registers every ops.OPS kind generically and build_registry collects SESSION_SPECS generically, so all seven operations and the new tool were picked up with no edit to either file. Verified at 40 kinds and inspect 9 -> 10, not assumed. Removed rather than marked green, because a unit with no test commit and no change is not a unit \u2014 its seams are declined with that evidence."
+    }
+  ]
+}

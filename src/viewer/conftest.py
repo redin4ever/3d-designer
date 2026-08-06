@@ -207,6 +207,44 @@ class RecordingOrchestrator:
         self.notes.append(text)
         self.calls.append(("add_operator_note", (text,)))
 
+    # The two operator channels this feature added. Real enough to observe through the same
+    # public `focus` property the real class exposes, rather than only recording calls —
+    # `viewer.greeting()` reads it back, and a double that only recorded would let a greeting
+    # that never asked still pass.
+    def set_focus(self, object_ids) -> None:
+        self._focus = tuple(object_ids)
+        self.calls.append(("set_focus", (self._focus,)))
+
+    @property
+    def focus(self) -> tuple[str, ...]:
+        return getattr(self, "_focus", ())
+
+    def add_annotation(self, annotation) -> None:
+        self.calls.append(("add_annotation", (annotation,)))
+
+    def apply_operator_edit(self, operation):
+        """Mirrors the real method's contract: never raises, always returns a report — the
+        guarantee the socket handler depends on. `next_edit_fails` lets a test drive the
+        refusal path, which is the branch an operator actually notices."""
+        from contracts import ActionReport
+
+        self.calls.append(("apply_operator_edit", (operation,)))
+        detail = getattr(self, "next_edit_fails", "")
+        return ActionReport(
+            op_id=operation.op_id,
+            ok=not detail,
+            summary=f"the operator {operation.kind} applied" if not detail else f"{operation.kind} failed",
+            error_detail=detail,
+        )
+
+    def hold_annotation_image(self, annotation_id: str, data_url: str) -> None:
+        self._images = getattr(self, "_images", {})
+        self._images[annotation_id] = data_url
+        self.calls.append(("hold_annotation_image", (annotation_id,)))
+
+    def annotation_image(self, annotation_id: str) -> str:
+        return getattr(self, "_images", {}).get(annotation_id, "")
+
 
 @pytest.fixture
 def recording_orchestrator() -> RecordingOrchestrator:

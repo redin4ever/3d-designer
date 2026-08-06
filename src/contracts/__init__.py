@@ -81,6 +81,7 @@ from .operations import (
     OperationHandler,
     OperationResult,
     OperationStatus,
+    OperatorAnnotation,
     Proposal,
     ReadHandler,
     ToolError,
@@ -113,10 +114,13 @@ from .scene_doc import (
     UndoBarrier,
 )
 from .wire import (
+    MAX_ANNOTATION_IMAGE_BYTES,
     WIRE_VERSION,
+    AnnotatePayload,
     CadencePayload,
     ClientMessage,
     ClientMessageType,
+    FocusPayload,
     MeshPayload,
     RedirectPayload,
     RollbackTarget,
@@ -146,6 +150,7 @@ __all__ = [
     "OperationHandler", "HandlerRegistry", "Proposal",
     "ActionReport", "ExportReport", "ToolRole", "ToolSpec",
     "MutatingHandler", "ReadHandler", "ToolError", "DETAIL_THRESHOLD",
+    "OperatorAnnotation",
     # scene document
     "SceneDocument", "ScenePort", "Checkpoint", "UndoBarrier", "ChangeKind",
     "SceneChangeEvent", "SCHEMA_VERSION", "MIN_READABLE_SCHEMA",
@@ -160,4 +165,5 @@ __all__ = [
     "WIRE_VERSION", "ServerMessageType", "ClientMessageType", "MeshPayload",
     "TransformPayload", "ServerMessage", "ClientMessage",
     "RollbackTarget", "RedirectPayload", "CadencePayload",
+    "AnnotatePayload", "FocusPayload", "MAX_ANNOTATION_IMAGE_BYTES",
 ]

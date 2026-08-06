@@ -27,6 +27,8 @@ import {
   renderTranscript,
 } from './transcript.js';
 import { attachControls, buildRequestFullSceneMessage } from './controls.js';
+import { attachPointing } from './point-ui.js';
+import { attachConnectButton } from './connect-ui.js';
 
 function resolveSocketUrl() {
   const override = new URLSearchParams(location.search).get('ws');
@@ -85,6 +87,7 @@ function main() {
               ? 'Waiting for a build to connect.'
               : undefined,
         );
+        pointing.setRun({ connected: status === 'open' });
         if (status === 'open') {
           pushLog('connected', 'status');
           pushTranscript({ text: 'connected', data: { role: 'system' } });
@@ -146,6 +149,16 @@ function main() {
         break;
       case ServerMessageType.RUN_STATE:
         pushLog(`run state → ${message.text}`, 'status');
+        // Editing is only reachable while paused (Q-17), so the edit panel has to learn
+        // about a pause the agent's own operator caused from another tab, not just one
+        // this browser asked for.
+        pointing.setRun({ runState: /paus/i.test(message.text) ? 'paused' : 'running' });
+        break;
+      case ServerMessageType.FOCUS:
+        // The server is the authority on what is marked. A browser that kept its own idea
+        // would drift from what the agent is actually told every turn.
+        pointing.applyFocus(message.object_ids ?? []);
+        pushLog(`focused: ${(message.object_ids ?? []).join(', ') || '(nothing)'}`, 'highlight');
         break;
       case ServerMessageType.PROBLEMS:
         pushLog(`problems: ${message.text || JSON.stringify(message.data ?? {})}`, 'log');
@@ -168,6 +181,21 @@ function main() {
         pushLog(`unhandled message: ${message.type}`, 'log');
     }
   }
+
+  // Pointing, priority and the edit tools. Given the renderer because picking reads the
+  // frame the renderer just drew — the id channel is written in the same inner loop as the
+  // depth, so this is the only object that can answer "what is under that pixel".
+  const pointing = attachPointing(controlsRoot, {
+    renderer,
+    send: (clientMessage) => {
+      const sent = socket.send(clientMessage);
+      if (!sent) pushLog(`not connected — "${clientMessage.type}" was not sent`, 'error');
+      return sent;
+    },
+    onError: (message) => {
+      controlError.textContent = message;
+    },
+  });
 
   attachControls(controlsRoot, {
     send: (clientMessage) => {
@@ -193,6 +221,12 @@ function main() {
       controlError.textContent = message;
     },
   });
+
+  // `document`, not `.layout`: the client picker is a <dialog> that renders in the top
+  // layer and lives outside <main>, so a root scoped to the layout cannot see it. Nothing
+  // here touches the socket — connecting an AI client is a one-off setup action against the
+  // page's own HTTP origin, and it is deliberately not on the wire protocol.
+  attachConnectButton(document);
 
   setStatus('connecting');
   socket.connect();

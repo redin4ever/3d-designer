@@ -38,6 +38,7 @@ import {
   complaints,
 } from './harness/open-page.mjs';
 import { probeCanvas, waitForCanvasDrawn } from './harness/canvas-probe.mjs';
+import { registerConnectTests } from './connect.browser.mjs';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NARROW = { width: 360, height: 720 };
@@ -124,6 +125,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         '/src/tokens.css',
         '/src/app.css',
         '/src/chat.css',
+        '/src/connect.css',
         '/src/main.js',
         '/src/socket.js',
         '/src/viewport.js',
@@ -131,6 +133,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         '/src/log.js',
         '/src/transcript.js',
         '/src/controls.js',
+        '/src/connect.js',
+        '/src/connect-ui.js',
       ]) {
         assert.ok(paths.includes(expected), `${expected} was never requested — the module graph did not load`);
       }
@@ -654,6 +658,60 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
       assert.deepEqual(complaints(s).pageErrors, []);
     } finally {
       await s.dispose();
+    }
+  });
+
+  // The Connect button's own tests, registered here rather than written here: they are one
+  // control with its own HTTP backend and its own modal, which is a responsibility seam
+  // (Rule 2) — but `test:frontend:browser` names this file by path, so a sibling *file*
+  // would never run. Registering into this describe gives them the seam and the one
+  // browser and static server this suite already pays for.
+  registerConnectTests({ withScene, waitUntil });
+
+  // ---- pointing, priority and the edit tools --------------------------------------
+  //
+  // Written AFTER the wiring they cover, not before. That is a Rule 4 violation, and it is
+  // recorded as one in docs/features/point-and-edit/FEATURE.md rather than glossed over: the
+  // decisions underneath were all covered test-first in picking/annotate/capture/edit-tools,
+  // but the DOM wiring itself was not, and the gate says so.
+
+  test('pointing and the edit tools are wired into the real page', async () => {
+    const s2 = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s2);
+
+      // Point mode announces its state, or a screen-reader user cannot tell which mode
+      // dragging is currently in — and dragging means two different things (Q-05).
+      const before = await s2.page.$eval('[data-action="point-mode"]', (el) => el.getAttribute('aria-pressed'));
+      await s2.page.click('[data-action="point-mode"]');
+      const after = await s2.page.$eval('[data-action="point-mode"]', (el) => el.getAttribute('aria-pressed'));
+      assert.equal(before, 'false');
+      assert.equal(after, 'true', 'a screen reader could not tell point mode was on');
+
+      // `hidden`, not merely invisible. A composer a keyboard user can tab into while it is
+      // not on screen is a trap they cannot see their way out of.
+      assert.equal(await s2.page.$eval('#point-composer', (el) => el.hidden), true);
+
+      // Q-20: the tools are visible and refused, never absent. A control you cannot see is a
+      // feature you do not know exists; one you can see and cannot use teaches you the rule.
+      assert.equal(
+        await s2.page.$eval('#edit-group', (el) => el.dataset.blocked),
+        'true',
+        'editing was offered while the run was neither paused nor connected',
+      );
+
+      // Q-13: a mark the operator put up has to be tellable from a change that happened to
+      // them, so the two colours must not be the same one.
+      const colors = await s2.page.evaluate(() => {
+        const css = getComputedStyle(document.documentElement);
+        return { marked: css.getPropertyValue('--marked').trim(), accent: css.getPropertyValue('--accent').trim() };
+      });
+      assert.ok(colors.marked, '--marked is not defined');
+      assert.notEqual(colors.marked, colors.accent, 'a mark is indistinguishable from a change highlight');
+
+      assert.deepEqual(s2.pageErrors, [], 'the pointing wiring threw on load');
+    } finally {
+      await s2.dispose();
     }
   });
 });

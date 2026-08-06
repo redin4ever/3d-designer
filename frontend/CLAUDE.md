@@ -5,8 +5,8 @@ implementation-facing.
 
 ## Status
 
-**GREEN.** `node --test frontend/tests/` passes 89/89 (also `npm run test:frontend`), plus
-`npm run test:frontend:browser` for 16 smoke tests in real Chromium via Puppeteer.
+**GREEN.** `node --test frontend/tests/` passes 164/164 (also `npm run test:frontend`), plus
+`npm run test:frontend:browser` for 22 smoke tests in real Chromium via Puppeteer.
 The module tests are pure logic — no browser, no WebGL, no real WebSocket. The browser
 suite exists because that purity is also a blind spot: it is how a camera that could only
 turn left and right shipped.
@@ -96,11 +96,66 @@ independently discovered) rather than harmful — leave it in place regardless.
   without a fake `WebSocket`. `SocketClient` itself is intentionally not unit-tested —
   faking a `WebSocket` well enough to test reconnect/backoff would test the fake, not the
   decision, which already lives in `classifySeq`.
+- **`connect.js` is pure and `connect-ui.js` is DOM, and the split is not cosmetic.** The
+  zero/one/many branch is the whole feature: an empty list rendered as a picker is a dead
+  end, a list of one rendered as a picker is a step that exists because the code did not
+  count, and writing the first of several unasked changes an application the user was not
+  thinking about. That decision is unit-tested without a browser; `connect-ui.js` gets no
+  unit test, for the same reason `attachControls` and `SocketClient` get none.
+- **Connect talks HTTP, not the wire protocol.** `GET /api/clients` / `POST /api/connect`
+  are served by `src/app/live.py` from the same origin as the page. Setting up an AI client
+  is a one-off action, not a scene event, and putting it through `contracts/wire.py` would
+  widen a frozen surface for something that is not about geometry. Same origin is also what
+  keeps it a plain `fetch` with no CORS.
+- **`fetch` is resolved at call time, never captured at import** (`(...args) =>
+  globalThis.fetch(...args)`). That is what lets the browser suite stub it after the page has
+  loaded, and calling it through a wrapper rather than passing the bare function is what
+  stops Chrome throwing `Illegal invocation` on an unbound `fetch`.
+- **The Connect flow renders in the `<dialog>`, never in the sidebar.** A written-config
+  result is five lines; inline in a 340px panel it drove the transcript to zero height. The
+  panel gains the button and nothing else — `tests-browser/connect.browser.mjs` asserts the
+  chat panel's children are exactly the header row, the transcript and the composer, so a
+  future "just one more status line" cannot quietly take the conversation back.
+- **The picker is a native `<dialog>`, and should stay one.** Focus in, Escape out, the page
+  behind inert, focus restored to the opener — four things a hand-rolled modal has to
+  remember and the platform already does. Only the last one is re-implemented here, because
+  it must survive the picker's own buttons being replaced by the result.
+- **Browser tests for Connect live in `tests-browser/connect.browser.mjs` but are not an
+  entry point.** `test:frontend:browser` names `smoke.test.js` by path and the root
+  package.json is main-agent-only, so a standalone sibling test file would never run.
+  `registerConnectTests({withScene, waitUntil})` is called from inside smoke.test.js's
+  `describe` body — which node:test runs synchronously, so the tests land in that suite and
+  share its one browser and one static server.
 - Nothing under `src/` may contain a raw hex color literal outside `tokens.css` —
   `tests/tokens.test.js` scans for it. `scene-renderer.js` reads colors as opaque CSS
   strings via `getComputedStyle` and blends translucency with `ctx.globalAlpha` rather
   than hand-parsing hex to `rgba()`, specifically to avoid ever needing a hex literal in
   source.
+
+- **Picking reads the rasterizer's id channel; it is never a ray cast.** `raster.js` writes
+  the object's id into `frame.ids` in the same inner loop, and behind the same depth test, as
+  the colour. A ray would be a second, independent answer to "what is visible", and two
+  answers disagree eventually — when they do, the operator clicks one thing and sees another
+  highlighted, intermittently, depending on camera angle. That is the same class of bug as
+  the painter's algorithm this renderer already threw out. `drawTriangle`'s `id` argument is
+  optional so every pre-existing caller stays untouched.
+- **`SceneRenderer.setFocused` is not `setHighlighted`.** `highlighted` means "the agent just
+  changed this" and `applyHighlight` clears every previous id on each HIGHLIGHT message,
+  deliberately. Focus is standing state the operator put up and expects to persist. Reusing
+  the one set would wipe their marks every time the agent touched anything.
+- **`--marked`, not `--focus`.** `--focus-ring` already means keyboard focus in `tokens.css`,
+  and two unrelated meanings under one word is how a later reader reaches for the wrong one.
+- **The two snaps must agree exactly.** `edit-tools.js`'s `snapTo` and `ops/transform.py`'s
+  `_snapped` round the same drag, and both round **half away from zero** — which is neither
+  language's default. Python's `round` is banker's rounding and `Math.round` rounds half
+  toward +Infinity, so the two disagreed on 0.25 and then, once Python was fixed, on -0.25.
+  Both suites pin the same table of cases; do not "simplify" either back to a built-in.
+- **`point-ui.js` is impure wiring and is not unit-tested**, for the same reason
+  `attachControls` and `SocketClient` are not: every decision worth checking is already in
+  `picking.js`, `annotate.js`, `capture.js` and `edit-tools.js`, which are pure and covered.
+- **A number input has an intrinsic width that `flex: 1` does not override.** The edit fields
+  need `min-width` plus `width: 0`, or three of them hold the whole grid wider than a 360px
+  viewport — which the browser suite's no-horizontal-scroll test catches, and did.
 
 ## Wire protocol assumptions
 
@@ -150,8 +205,18 @@ comments are for editor hover-help only. Every exported function in `viewport.js
 `socket.js`, `log.js`, and `controls.js` carries a docstring stating the product-level
 consequence of it being wrong, matching the house convention in
 `src/orchestration/CLAUDE.md`. Test files mirror source files one-to-one
-(`viewport.js` ↔ `viewport.test.js`, etc.) except `scene-renderer.js` and `main.js`,
-which are the two files with no pure logic to unit-test (see README).
+(`viewport.js` ↔ `viewport.test.js`, etc.) except `scene-renderer.js`, `main.js` and
+`connect-ui.js`, which are the three files with no pure logic to unit-test (see README).
+
+`tokens.css` also gained an elevation group for the Connect button and its dialog:
+`--surface-raised`, `--surface-raised-hover`, `--hairline-raised`, `--elevation-raised`
+(levels 2), and `--surface-overlay`, `--scrim` (level 3). These are an **extension** —
+DESIGN.md's "Elevation & Depth" describes the treatment in prose and its frontmatter has no
+token for it. They alias the existing surface ladder rather than introducing values, and
+`--elevation-raised` is a 1px inset top highlight built from `--ink` via `color-mix`, not a
+drop shadow: DESIGN.md is explicit that this brand "resists drop shadows on dark almost
+entirely", so on this page a lift is a surface step plus an edge, and there is no new colour
+in the system.
 
 `tokens.css` gained two `--text-*` type-scale rungs (`--text-body-sm`, `--text-caption`),
 transcribed verbatim from DESIGN.md's `typography` frontmatter. New CSS
