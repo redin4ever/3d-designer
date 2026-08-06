@@ -92,6 +92,7 @@ def run_live(
     include_raw: bool = True,
     ports: dict[str, int] | None = None,
     open_browser: bool = True,
+    seed: bool = True,
     ready: threading.Event | None = None,
 ) -> int:
     """Start everything, open the browser, and block until interrupted.
@@ -116,6 +117,16 @@ def run_live(
     app = build_app(prefer_blender=prefer_blender, include_raw=include_raw, attach_viewer=False)
     print(app.describe(), file=sys.stderr)
 
+    # Seeded by default, because the alternative is what this command used to do: open a
+    # working live view of an empty room, with no way for the person looking at it to put
+    # anything in. Geometry only ever arrives from a connected agent, so "there are no
+    # meshes" was an accurate description of the product rather than a misunderstanding of
+    # it. `--empty` opts out, for anyone attaching their own agent straight away.
+    if seed:
+        from app.demo_scene import seed_scene
+
+        print(seed_scene(app).describe(), file=sys.stderr)
+
     from forge3d_cli import start_viewer
 
     print(start_viewer(app, "127.0.0.1", ports["viewer"]), file=sys.stderr)
@@ -132,7 +143,8 @@ def run_live(
         f"\n  Watch it:   {url}\n"
         f"  Agents:     http://127.0.0.1:{ports['mcp']}/mcp  (streamable HTTP)\n"
         f"  Stdio MCP:  python -m mcp_server   (for Claude Desktop / Cursor)\n"
-        "\n  Ctrl-C to stop.\n",
+        "\n  Drag to orbit, scroll to zoom. Arrow keys and +/- work too.\n"
+        "  Ctrl-C to stop.\n",
         file=sys.stderr,
     )
 

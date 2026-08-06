@@ -20,6 +20,16 @@ export const MAX_ZOOM = 6;
 /** Radians per pixel dragged. Same feel on both axes so a diagonal drag goes diagonally. */
 export const DRAG_SENSITIVITY = 0.01;
 
+/**
+ * The opening view: slightly above the scene, looking down.
+ *
+ * Positive is above. The old fixed tilt was -0.5, which was chosen when the renderer was
+ * projecting a Z-up world as if it were Y-up — with that bug fixed, the same number puts the
+ * camera *under* the floor, so an opaque deck hides everything standing on it. The sign is
+ * the whole content of this constant, and `defaultViewLooksDownOnTheGround` pins it.
+ */
+export const DEFAULT_PITCH = 0.5;
+
 /** One wheel notch. Multiplicative, so zooming in and back out returns where it started. */
 export const WHEEL_STEP = 1.1;
 
@@ -28,9 +38,8 @@ export function clamp(value, low, high) {
 }
 
 export class OrbitCamera {
-  constructor({ pitch = -0.5 } = {}) {
+  constructor({ pitch = DEFAULT_PITCH } = {}) {
     this.yaw = 0;
-    /** Starts at the old fixed CAMERA_TILT, so the default view is unchanged. */
     this.pitch = clamp(pitch, -MAX_PITCH, MAX_PITCH);
     this.zoom = 1;
   }
@@ -61,7 +70,7 @@ export class OrbitCamera {
 
   reset() {
     this.yaw = 0;
-    this.pitch = -0.5;
+    this.pitch = DEFAULT_PITCH;
     this.zoom = 1;
   }
 
@@ -74,4 +83,82 @@ export class OrbitCamera {
   distanceFor(radius) {
     return (radius * 2.6 + 1) * this.zoom;
   }
+}
+
+/**
+ * Blender's world is **Z-up**; this renderer projects as if **Y** were up. Without this
+ * conversion the whole scene is drawn rotated 90° about X — an 8x8 m floor, which is wide
+ * in world X and Y and thin in world Z, comes out as a tall thin wall. That is exactly what
+ * `forge3d run` showed the first time it had geometry in it: a deck standing on its edge.
+ *
+ * Right-handed both sides: world +Z (up) becomes view +Y (up), and world +Y (away from the
+ * viewer in Blender's front view) becomes view -Z. Getting the sign of that third component
+ * wrong mirrors the scene front-to-back, which looks plausible and puts the far side of
+ * every object in front of the near side under the painter's sort.
+ */
+export function zUpToYUp([x, y, z]) {
+  return [x, z, -y];
+}
+
+/**
+ * Lambert shading from a face normal, as a 0..1 factor.
+ *
+ * Flat grey fills with no shading make a mesh unreadable — every face the same value, so a
+ * staircase is a grey blob and only its edges say anything. This is the cheapest thing that
+ * makes form legible, and it needs no light rig: a fixed headlight-ish direction, and the
+ * absolute value of the dot product so a triangle facing away is lit like one facing toward
+ * (this renderer has no back-face culling, and an unlit back face reads as a hole).
+ */
+export function shadeFactor(normal, { ambient = 0.35, light = [0.4, 0.75, 0.5] } = {}) {
+  const [nx, ny, nz] = normal;
+  const len = Math.hypot(nx, ny, nz);
+  if (!len) return ambient;
+  const [lx, ly, lz] = light;
+  const llen = Math.hypot(lx, ly, lz) || 1;
+  const dot = Math.abs((nx * lx + ny * ly + nz * lz) / (len * llen));
+  return clamp(ambient + (1 - ambient) * dot, 0, 1);
+}
+
+/** Face normal of a triangle, unnormalised length being fine for `shadeFactor`. */
+export function triangleNormal(a, b, c) {
+  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+}
+
+/**
+ * Split a triangle until no piece spans more depth than `maxExtent`, returning the pieces.
+ *
+ * The painter's algorithm sorts whole triangles by their average depth and draws far ones
+ * first. That is only sound when a triangle is small relative to the depth differences it
+ * has to resolve — and an 8x8 m floor is two triangles spanning the entire scene. Their
+ * average depth lands mid-scene, so the near half of the floor sorts *in front of* a
+ * staircase standing on it and paints straight over it. A user watching from an angle sees
+ * the deck slicing through the railing, which is exactly what was reported.
+ *
+ * Subdividing at the edge midpoints is the cheap correct-enough answer for a Canvas2D
+ * renderer with no depth buffer: it costs nothing on the small triangles that make up most
+ * of a mesh, and it turns the handful of huge ones into pieces whose depth ordering the
+ * sort can actually get right. It is not a general solution — genuinely interpenetrating
+ * triangles still need splitting along their intersection, which is a BSP, not this — but
+ * those are a defect the product reports rather than geometry it is asked to draw.
+ *
+ * `maxDepth` bounds the recursion so a triangle seen almost edge-on cannot subdivide
+ * forever: 4^5 = 1024 pieces is already far past the point of visible improvement.
+ */
+export function subdivideForDepth(a, b, c, maxExtent, maxDepth = 5) {
+  const extent = Math.max(a[2], b[2], c[2]) - Math.min(a[2], b[2], c[2]);
+  if (maxDepth <= 0 || extent <= maxExtent) return [[a, b, c]];
+
+  const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];
+  const ab = mid(a, b);
+  const bc = mid(b, c);
+  const ca = mid(c, a);
+
+  return [
+    ...subdivideForDepth(a, ab, ca, maxExtent, maxDepth - 1),
+    ...subdivideForDepth(ab, b, bc, maxExtent, maxDepth - 1),
+    ...subdivideForDepth(ca, bc, c, maxExtent, maxDepth - 1),
+    ...subdivideForDepth(ab, bc, ca, maxExtent, maxDepth - 1),
+  ];
 }

@@ -181,6 +181,7 @@ def run(args: argparse.Namespace) -> int:
         include_raw=not args.no_raw,
         ports={"mcp": args.port, "viewer": args.viewer_port, "web": args.web_port},
         open_browser=not args.no_browser,
+        seed=not args.empty,
     )
 
 
@@ -198,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--no-blender", action="store_true", help="force the in-memory engine")
     r.add_argument("--no-raw", action="store_true", help="omit the unrestricted-execution tool")
     r.add_argument("--no-browser", action="store_true", help="do not open a browser window")
+    r.add_argument("--empty", action="store_true",
+                   help="start with an empty scene instead of the demo geometry")
 
     s = sub.add_parser("serve", help="expose the tools over MCP")
     s.add_argument("--http", action="store_true", help="streamable HTTP instead of stdio")

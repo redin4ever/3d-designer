@@ -7,6 +7,11 @@ import {
   MIN_ZOOM,
   MAX_ZOOM,
   clamp,
+  zUpToYUp,
+  shadeFactor,
+  triangleNormal,
+  DEFAULT_PITCH,
+  subdivideForDepth,
 } from '../src/camera.js';
 
 // These describe a bug a user hit in a real browser and no test could have caught, because
@@ -136,4 +141,134 @@ test('clamp is inclusive of its bounds', () => {
   assert.equal(clamp(5, 0, 5), 5);
   assert.equal(clamp(0, 0, 5), 0);
   assert.equal(clamp(-1, 0, 5), 0);
+});
+
+// --- world orientation -------------------------------------------------------------
+// A user opened the live view and the 8x8 m deck was standing on its edge like a wall.
+
+test('world up becomes view up', () => {
+  const [, y] = zUpToYUp([0, 0, 1]); // straight up in Blender
+  assert.equal(y, 1, 'Blender is Z-up and this renderer draws Y-up');
+});
+
+test('a floor is wide and flat in view space, not tall and thin', () => {
+  // The deck: 8m in world X and Y, 0.2m thick in world Z.
+  const corners = [
+    [-4, -4, 0], [4, -4, 0], [4, 4, 0], [-4, 4, 0],
+    [-4, -4, 0.2], [4, 4, 0.2],
+  ].map(zUpToYUp);
+
+  const xs = corners.map((p) => p[0]);
+  const ys = corners.map((p) => p[1]);
+  const spreadX = Math.max(...xs) - Math.min(...xs);
+  const spreadY = Math.max(...ys) - Math.min(...ys);
+
+  assert.ok(spreadX > spreadY * 10, `a floor must be flat on screen, got ${spreadX} x ${spreadY}`);
+});
+
+test('the conversion does not mirror the scene front to back', () => {
+  // World +Y is away from the viewer in Blender's front view, so it must map to view -Z.
+  // The opposite sign looks plausible and puts every object's far side in front of its
+  // near side once the painter's sort runs.
+  const [, , z] = zUpToYUp([0, 1, 0]);
+  assert.ok(z < 0, 'front-to-back is mirrored');
+});
+
+test('the conversion leaves left and right alone', () => {
+  assert.deepEqual(zUpToYUp([3, 0, 0]), [3, 0, -0]);
+});
+
+// --- shading -----------------------------------------------------------------------
+
+test('shading gives different faces different values', () => {
+  const up = shadeFactor([0, 1, 0]);
+  const side = shadeFactor([1, 0, 0]);
+  assert.notEqual(up, side, 'every face the same value makes a mesh an unreadable blob');
+});
+
+test('shading never returns fully black', () => {
+  // A face perpendicular to the light must still be visible, or objects grow holes.
+  assert.ok(shadeFactor([0, 0, 0]) > 0.2);
+  for (const n of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, -1, -1]]) {
+    assert.ok(shadeFactor(n) > 0.2, `${n} shaded too dark`);
+    assert.ok(shadeFactor(n) <= 1);
+  }
+});
+
+test('a face turned away is lit like one turned toward', () => {
+  // No back-face culling here, so an unlit back face reads as a hole in the object.
+  assert.equal(shadeFactor([0, 1, 0]), shadeFactor([0, -1, 0]));
+});
+
+test('the triangle normal is perpendicular to the triangle', () => {
+  const n = triangleNormal([0, 0, 0], [1, 0, 0], [0, 1, 0]);
+  assert.equal(n[0], 0);
+  assert.equal(n[1], 0);
+  assert.notEqual(n[2], 0);
+});
+
+test('the default view looks down on the ground, not up at it from underneath', () => {
+  // With an opaque deck, a camera below the floor hides everything standing on it — which
+  // is exactly what the live view showed once surfaces stopped being 6%-alpha wireframe.
+  // The old -0.5 tilt was chosen while the renderer was drawing a Z-up world as Y-up; with
+  // that fixed, the same number points the camera at the underside.
+  const cam = new OrbitCamera();
+  assert.ok(cam.pitch > 0, 'the opening view is under the floor');
+});
+
+test('the ground plane recedes upward on screen from the default view', () => {
+  // The real check behind the sign: on a floor, the far edge must sit higher on screen than
+  // the near edge. Reproduces the renderer's own transform for two points on the ground.
+  const cam = new OrbitCamera();
+  const project = (world) => {
+    const [x, y, z] = zUpToYUp(world);
+    // rotateX by the camera pitch, as scene-renderer does
+    const c = Math.cos(cam.pitch);
+    const s = Math.sin(cam.pitch);
+    return { screenUp: y * c - z * s, depth: y * s + z * c };
+  };
+
+  const far = project([0, 4, 0]);   // +Y is away from the viewer in Blender's front view
+  const near = project([0, -4, 0]);
+
+  assert.ok(far.screenUp > near.screenUp, 'the ground is being viewed from below');
+});
+
+// --- depth sorting -----------------------------------------------------------------
+// Reported from a real browser: "when watching in an angle it doesnt render properly" —
+// the deck painted over the staircase standing on it.
+
+test('a small triangle is left alone', () => {
+  const out = subdivideForDepth([0, 0, 0], [1, 0, 0.1], [0, 1, 0.2], 1);
+  assert.equal(out.length, 1, 'subdividing small triangles would cost a lot for nothing');
+});
+
+test('a triangle spanning the whole scene is split until its pieces are shallow', () => {
+  const out = subdivideForDepth([0, 0, -10], [10, 0, 0], [0, 10, 10], 1);
+  assert.ok(out.length > 1, 'the floor is still two scene-spanning triangles');
+  for (const [p, q, r] of out) {
+    const extent = Math.max(p[2], q[2], r[2]) - Math.min(p[2], q[2], r[2]);
+    assert.ok(extent <= 1 + 1e-9, `a piece still spans ${extent}`);
+  }
+});
+
+test('subdivision preserves the triangle — no gaps, no overlap', () => {
+  const a = [0, 0, -8];
+  const b = [8, 0, 0];
+  const c = [0, 8, 8];
+  const out = subdivideForDepth(a, b, c, 1);
+
+  const area = ([p, q, r]) =>
+    Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (r[0] - p[0]) * (q[1] - p[1])) / 2;
+
+  const total = out.reduce((sum, tri) => sum + area(tri), 0);
+  assert.ok(
+    Math.abs(total - area([a, b, c])) < 1e-6,
+    'the pieces do not add up to the original — the floor would have holes in it',
+  );
+});
+
+test('recursion is bounded so an edge-on triangle cannot subdivide forever', () => {
+  const out = subdivideForDepth([0, 0, -1e6], [1, 0, 0], [0, 1, 1e6], 0.001);
+  assert.ok(out.length <= 4 ** 5, `runaway subdivision: ${out.length} pieces`);
 });

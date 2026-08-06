@@ -18,7 +18,13 @@
 // fallbacks below are CSS color keywords, not hex, for the same reason. That is what
 // lets frontend/tests/tokens.test.js scan this file for a raw hex literal and find none.
 
-import { OrbitCamera } from './camera.js';
+import {
+  OrbitCamera,
+  shadeFactor,
+  subdivideForDepth,
+  triangleNormal,
+  zUpToYUp,
+} from './camera.js';
 
 function readColor(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -202,6 +208,11 @@ export class SceneRenderer {
       let v = [positions[i] * scale[0], positions[i + 1] * scale[1], positions[i + 2] * scale[2]];
       v = rotateByQuaternion(v, quaternion);
       v = [v[0] + position[0], v[1] + position[1], v[2] + position[2]];
+      // World space is Blender's, which is Z-up. Everything below this line — the orbit,
+      // the projection, the painter's sort — assumes Y-up. Without the conversion an 8x8m
+      // deck rendered as a wall standing on its edge, which is what the live view showed
+      // the first time it had geometry in it.
+      v = zUpToYUp(v);
       v = rotateY(v, orbit);
       v = rotateX(v, this.camera.pitch);
       out[i / 3] = v;
@@ -236,6 +247,11 @@ export class SceneRenderer {
       return [width / 2 + x * f, height / 2 - y * f, z];
     };
 
+    // How much depth one triangle may span before the painter's sort stops being able to
+    // order it correctly against its neighbours. Scaled to the scene so it means the same
+    // thing for a doorknob and for a city block.
+    const maxDepthSpan = radius * 0.12;
+
     const triangles = [];
     for (const handle of this.nodes.values()) {
       const world = allWorld.get(handle.handleId);
@@ -245,8 +261,28 @@ export class SceneRenderer {
         const b = world[indices[i + 1]];
         const c = world[indices[i + 2]];
         if (!a || !b || !c) continue;
-        const avgZ = (a[2] + b[2] + c[2]) / 3;
-        triangles.push({ a: project(a), b: project(b), c: project(c), avgZ, highlighted: handle.highlighted });
+
+        // Shade from the original triangle, not the pieces: subdivision is a depth-sorting
+        // device and must not change how the surface is lit, or a floor would come out
+        // patchy exactly where it happened to be split.
+        const shade = shadeFactor(triangleNormal(a, b, c));
+
+        const pieces = subdivideForDepth(a, b, c, maxDepthSpan);
+        // Outline only a triangle that was NOT split. Stroking every piece would draw the
+        // subdivision grid across the floor — a wireframe of an implementation detail.
+        const outline = pieces.length === 1;
+
+        for (const [pa, pb, pc] of pieces) {
+          triangles.push({
+            a: project(pa),
+            b: project(pb),
+            c: project(pc),
+            avgZ: (pa[2] + pb[2] + pc[2]) / 3,
+            shade,
+            outline,
+            highlighted: handle.highlighted,
+          });
+        }
       }
     }
     triangles.sort((t1, t2) => t1.avgZ - t2.avgZ); // painter's algorithm: far first
@@ -262,18 +298,48 @@ export class SceneRenderer {
         ctx.fillStyle = this._colors.accent;
         ctx.strokeStyle = this._colors.accent;
         ctx.lineWidth = 1.5;
-        ctx.globalAlpha = 0.35;
+        ctx.globalAlpha = tri.shade;
         ctx.fill();
-        ctx.globalAlpha = 0.95;
+        ctx.globalAlpha = 1;
         ctx.stroke();
       } else {
-        ctx.fillStyle = this._colors.ink;
-        ctx.strokeStyle = this._colors.muted;
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.06;
+        // Solid, shaded surfaces — not a 6%-alpha wireframe.
+        //
+        // The old fill was `globalAlpha = 0.06`, which meant every object was effectively
+        // see-through: a staircase behind a deck showed straight through it, and the whole
+        // scene read as a tangle of lines with no sense of which surface was in front. The
+        // painter's sort was already doing the work; nothing was using it.
+        //
+        // Alpha rather than a computed colour because this file must not contain a colour
+        // literal — `tests/tokens.test.js` scans it, and every colour comes from a CSS
+        // custom property read through `getComputedStyle`. Compositing the token against
+        // the canvas background at the shade factor is how a flat token becomes a lit
+        // surface without ever naming a hex value here.
+        ctx.fillStyle = this._colors.muted;
+        ctx.globalAlpha = 1;
         ctx.fill();
-        ctx.globalAlpha = 0.55;
-        ctx.stroke();
+        ctx.fillStyle = this._colors.canvas;
+        ctx.globalAlpha = 1 - tri.shade;
+        ctx.fill();
+
+        if (tri.outline) {
+          ctx.strokeStyle = this._colors.ink;
+          ctx.lineWidth = 1;
+          ctx.globalAlpha = 0.25;
+          ctx.stroke();
+        } else {
+          // A subdivided piece gets no outline, but it does need its own edge painted in
+          // its own colour: canvas antialiases each fill independently, so two abutting
+          // triangles leave a hairline of background between them and a floor comes out
+          // visibly cracked along every split.
+          ctx.strokeStyle = this._colors.muted;
+          ctx.lineWidth = 1;
+          ctx.globalAlpha = 1;
+          ctx.stroke();
+          ctx.strokeStyle = this._colors.canvas;
+          ctx.globalAlpha = 1 - tri.shade;
+          ctx.stroke();
+        }
       }
     }
     ctx.globalAlpha = 1;
