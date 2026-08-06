@@ -116,3 +116,79 @@ frontend  29 tests                                                             e
 doctor    Blender 5.2.0 LTS, MCP SDK, websockets all present                    exit 0
 gate      17/17 modules green; tests-first check failing, see above
 ```
+
+---
+
+# Fix round 2 — everything above that could be fixed, was
+
+Fifteen of the seventeen findings are closed, each with a regression test named after the
+failure it prevents. The three that remain are P2 design questions, not defects I chose to
+leave.
+
+## Closed since the first pass
+
+**`find_clipping` reported the wrong number.** It conflated two quantities: the minimum
+translation that separates a pair (*how far to move*) and the depth along the axis a part is
+inserted (*what a socket declares*). Neither `min` nor `max` answers it — two flush cubes
+offset 30 mm insert along their *smallest* overlap, a driven post along its *largest*.
+`_geom.insertion_depth` picks the shallowest axis that is a genuine partial penetration,
+which is right for both, and `JoineryIntent` can now name the axis outright. The defect line
+carries all three overlaps and a suggestion that tells the agent exactly what to declare.
+
+**`distance` and `gap_width` measured bounding boxes.** Now measured against real triangles
+(vertex-to-face and edge-to-edge, AABB-pruned), with an honest flag when a pair is too large
+to sweep exactly. Two 45°-yawed beams 1.4 m apart no longer report as touching.
+
+**A dead writer wedged the lock forever.** Expiry was measured against `document.head`,
+which only advances when an operation is applied — which only the current holder can do. The
+clock now advances on acquire attempts, so a waiting agent advances it by waiting.
+
+**A failed operation left orphan geometry.** `scene.apply`'s own docstring promised the
+engine would be exactly as observable after a failure as before it, and did not deliver.
+The exception still propagates unchanged; what the failed attempt created is now removed
+first.
+
+**Raw execution recorded a barrier pointing at nothing.** `perform` now captures the scene
+before an opaque operation runs — the only moment the pre-execution state still exists.
+`SECURITY.md`'s claim is now true.
+
+**Loose vertices were invisible on real Blender.** `snapshot` walked only `mesh.polygons`,
+so `find_loose_or_duplicate`'s loose-vertex detection was dead code against Blender while
+working against the fake.
+
+**Object creation was O(n²).** A `view_layer.update()` per object re-evaluated the whole
+dependency graph. Composing `matrix_world` directly: **0.78 ms/op at 900 objects, down from
+54.52** — 70× faster, and near-flat instead of quadratic.
+
+**Accessibility.** Primary-button hover raised from 2.87:1 to 6.40:1 against a 4.5:1 floor;
+added a `<main>` landmark and an `<h1>`; the action log appends instead of rebuilding every
+row inside an `aria-live` region.
+
+**Ten module docs announced "RED by design"** for modules that are fully green.
+
+## Still open, and why
+
+**Q-017 — tests-first git evidence.** Ten modules have RED commits under combined scopes the
+gate's matcher cannot read; six have none; `app` committed tests after implementation. I am
+not fabricating retroactive commits. A green gate bought that way is worth less than a red
+one that tells the truth, and this check exists precisely to catch it.
+
+**B-00K — a railing declares no joinery for the parts it deliberately embeds.** A
+stair-plus-railing reports 94 clipping warnings, most of them balusters correctly socketing
+into treads. The measurement is right; the question is whether an operation should
+auto-declare its own joints, or whether that is the agent's call. That is a design decision,
+not a bug, and it belongs at a gate. The defect suggestion now names the exact
+`JoineryIntent` to declare, which makes it actionable in the meantime.
+
+**B-00L — real bevels produce poor topology.** Mean triangle aspect ratio ~116 and edge-length
+CoV ~1.6 on a simple tread. The tool measures and reports this correctly; the bevel
+parameters or a cleanup pass need work.
+
+## Suites after round 2
+
+```
+backend   620 tests + 57 conformance checks run twice (fake and real Blender)   exit 0
+frontend  31 tests                                                             exit 0
+doctor    Blender 5.2.0 LTS, MCP SDK, websockets                                exit 0
+gate      17/17 modules green; tests-first still failing, see Q-017
+```
