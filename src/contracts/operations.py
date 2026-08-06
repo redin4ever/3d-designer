@@ -242,7 +242,6 @@ class OperatorAnnotation:
     cannot carry a picture, so it says one is waiting and names the call that returns it.
     Dropping the half of Q-03 that the report cannot carry would be the quiet failure.
 
-    ``render`` is not implemented yet (Rule 4 — tests come first).
     """
 
     object_ids: tuple[str, ...] = ()
@@ -252,7 +251,24 @@ class OperatorAnnotation:
     annotation_id: str = ""
 
     def render(self) -> str:
-        raise NotImplementedError("contracts.OperatorAnnotation.render: not implemented")
+        """One compact block, in ``ActionReport.render``'s terse house style.
+
+        The image line is emitted only when there is an image. An agent that spent a turn
+        calling ``get_operator_context`` for a picture that did not exist would learn to stop
+        trusting the marker, and then miss the ones that are real.
+        """
+        parts: list[str] = []
+        if self.object_ids:
+            parts.append("pointing at " + ", ".join(self.object_ids))
+        if self.text:
+            parts.append(self.text)
+        lines = [" — ".join(parts)] if parts else []
+        lines.extend(f"  {fact}" for fact in self.facts)
+        if self.has_image:
+            lines.append(
+                f"  image attached ({self.annotation_id}) — call get_operator_context()"
+            )
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True, slots=True)
@@ -365,6 +381,13 @@ class ActionReport:
             lines.append("NOTE     verification skipped by cadence setting — not a clean result")
         for note in self.operator_notes:
             lines.append(f"OPERATOR {note}")
+        for annotation in self.operator_annotations:
+            lines.append(f"OPERATOR {annotation.render()}")
+        if self.operator_focus:
+            # Every report, not just the one after it was set. A standing instruction that
+            # appears once is one the agent has forgotten by its third action — which is
+            # exactly where the operator would notice it had stopped working (Q-10).
+            lines.append(f"FOCUS    the operator is watching: {', '.join(self.operator_focus)}")
         if not self.ok:
             lines.append(f"ERROR    {self.error_rule}: {self.error_detail}")
             if self.error_suggestion:

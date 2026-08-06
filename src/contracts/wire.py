@@ -116,28 +116,56 @@ class ClientMessageType(StrEnum):
 class AnnotatePayload:
     """The operator pointing at part of the scene, with optional words and an optional crop.
 
-    Nothing here is implemented yet (Rule 4 — tests come first).
+    Any one of the three is a complete annotation on its own: pointing with nothing to say is
+    a whole gesture (Q-04), and typing with nothing selected is the redirect composer that
+    already existed. What is refused is all three being empty.
     """
 
     object_ids: tuple[str, ...] = ()
     text: str = ""
     image: str = ""
+    """A ``data:`` URL, produced by ``canvas.toDataURL`` in the browser (A-012)."""
 
     def __post_init__(self) -> None:
-        raise NotImplementedError("contracts.AnnotatePayload: not implemented")
+        if not self.object_ids and not self.text.strip() and not self.image:
+            raise ValueError(
+                "an annotation with nothing in it — no object, no text, no image — would "
+                "travel the whole way to the agent and do nothing"
+            )
+        if self.image:
+            if not self.image.startswith("data:"):
+                # A remote URL here would have the server fetching an address the browser
+                # chose. That is not a capability this feature asked for, and ADR-009's
+                # trust boundary is this machine, not whatever the page decided to name.
+                raise ValueError(
+                    f"an annotation image must be a data: URL, not {self.image[:32]!r}"
+                )
+            if len(self.image) > MAX_ANNOTATION_IMAGE_BYTES:
+                raise ValueError(
+                    f"annotation image is {len(self.image)} bytes, over the "
+                    f"{MAX_ANNOTATION_IMAGE_BYTES} limit — send a smaller crop; a frame past "
+                    "the transport's limit closes the connection instead of erroring"
+                )
 
 
 @dataclass(frozen=True, slots=True)
 class FocusPayload:
     """The complete set of parts the operator has marked as important.
 
-    Nothing here is implemented yet (Rule 4 — tests come first).
+    Declarative, never a delta: the whole set arrives each time, so an empty one is how you
+    clear (Q-11). A delta protocol needs a separate clear message, and the two drift apart the
+    first time one is dropped — which for a standing instruction means the agent going on
+    being told something the operator has already taken back.
     """
 
     object_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        raise NotImplementedError("contracts.FocusPayload: not implemented")
+        if len(set(self.object_ids)) != len(self.object_ids):
+            # Focus is re-attached to every report (A-013), so a duplicate is not a one-off
+            # oddity — it tells the agent the same object matters twice, every turn, for the
+            # rest of the session.
+            raise ValueError("focus names the same object twice")
 
 
 @dataclass(frozen=True, slots=True)
