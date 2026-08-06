@@ -19,24 +19,57 @@ from typing import Callable
 
 import pytest
 
-from contracts import Operation, OperationResult, SceneDocument
+from contracts import Operation, OperationResult, SceneDocument, Vec3
+from testing import FakeEngine
 
 
 class FakeScene:
-    """A minimal, real, in-memory stand-in for ``src/scene``'s eventual public surface."""
+    """A minimal, real, in-memory stand-in for ``src/scene``'s public surface.
+
+    **This double must match the real `Scene`, method for method and property for
+    property.** It previously declared ``apply(self, op)`` with no lease and exposed no
+    ``engine`` — matching an incomplete ``ScenePort`` rather than the real thing — and that
+    agreement with the wrong side is exactly why a P0 (``perform`` never forwarding the
+    lease, so every mutating call failed) passed three test suites unnoticed.
+    """
 
     def __init__(self) -> None:
         self._doc = SceneDocument()
         self.subscribers: list[Callable[..., None]] = []
+        self._engine = FakeEngine()
+        self.applied_with_lease: list[object] = []
 
-    def apply(self, op: Operation) -> OperationResult:
+    def apply(self, op: Operation, *, lease: object | None = None) -> OperationResult:
+        # Record it so a test can assert the lease actually arrived — the real Scene
+        # rejects the call without it.
+        self.applied_with_lease.append(lease)
         self._doc.append(op, snapshot_path="fake-snapshot" if op.opaque else "")
+
+        # Actually create the geometry this operation claims to produce. The real Scene
+        # does, and `perform` now measures what an operation touched — so a double that
+        # reports objects it never created makes every measurement silently empty while
+        # the suite reads as green.
+        produced = tuple(op.produced_objects) or ((op.params.get("object_id"),) if op.params.get("object_id") else ())
+        created = []
+        for object_id in produced:
+            if object_id and not self._engine.exists(object_id):
+                created.append(self._engine.create_primitive(object_id, "cube", Vec3(1.0, 1.0, 1.0)))
+            elif object_id:
+                created.append(object_id)
+
         return OperationResult(
             op_id=op.op_id,
             ok=True,
-            produced_objects=op.produced_objects,
+            produced_objects=tuple(created),
             modified_objects=op.target_objects,
         )
+
+    @property
+    def engine(self) -> FakeEngine:
+        """Present because the real `Scene` exposes it, and because `perform` needs it to
+        run real measurements. A double missing it makes `perform` silently fall back to
+        no measurements while the suite stays green."""
+        return self._engine
 
     @property
     def document(self) -> SceneDocument:

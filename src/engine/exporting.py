@@ -59,7 +59,22 @@ class ExportingMixin:
                     Quat(t.rotation.w, -t.rotation.x, -t.rotation.y, -t.rotation.z)
                     if negate_rotation else t.rotation
                 )
-                temp_transform = Transform(translation=t.translation, rotation=new_rotation, scale=new_scale)
+                # The translation gets the same unit conversion and the same mirror as the
+                # mesh. It previously did not: each object was scaled in place while its
+                # position stayed in metres, so a single object exported correctly and a
+                # scene of two or more landed at the wrong distances apart — 3.57x for
+                # Roblox studs, 100x for Unreal centimetres. And mirror_x flipped each mesh
+                # without moving it to the other side, so a mirrored scene came back
+                # inside out. Both are invisible in a one-object smoke export, which is
+                # exactly what the tests did.
+                new_translation = Vec3(
+                    t.translation.x * scale * (-1.0 if mirror_x else 1.0),
+                    t.translation.y * scale,
+                    t.translation.z * scale,
+                )
+                temp_transform = Transform(
+                    translation=new_translation, rotation=new_rotation, scale=new_scale
+                )
                 temp_ids.append(self.duplicate(oid, f"__export__{oid}", temp_transform))
 
             for obj in bpy.data.objects:

@@ -258,3 +258,91 @@ def test_a_viewer_receives_events_from_a_real_operation() -> None:
         pytest.skip("viewer unavailable in this environment")
     _apply(app, "add_primitive", "op-1", object_id="one", kind="cube", size=[1.0, 1.0, 1.0])
     assert app.viewer.pending(), "the viewer saw nothing after an operation was applied"
+
+
+# ------------------------------------------------- the real agent path, end to end
+#
+# Five independent QA finders reported the same P0 here: `Orchestrator.perform` never
+# forwarded the caller's lease to `Scene.apply`, so every mutating call through the agent
+# path raised LockContention against the lease it had just verified. It survived every
+# module suite because both FakeScene doubles implemented `apply(self, op)` with no lock
+# check at all — a double agreeing with the wrong side of the contract.
+#
+# These tests use the REAL Orchestrator against the REAL Scene. That is the only
+# arrangement that could have caught it.
+
+def test_perform_reaches_the_engine_with_the_lease_it_just_verified() -> None:
+    """The whole agent-facing pipeline. If this fails, no tool call can change anything."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    lease = app.orchestrator.acquire("writer", app.orchestrator.phase)
+
+    report = app.orchestrator.perform(
+        Operation(op_id="op-1", kind="add_primitive",
+                  params={"object_id": "box", "kind": "cube", "size": [1.0, 1.0, 1.0]}),
+        lease,
+    )
+
+    assert report.ok, f"{report.error_rule}: {report.error_detail}"
+    assert app.engine.exists("box"), "the operation reported success but made no geometry"
+
+
+def test_perform_carries_real_measurements_not_placeholders() -> None:
+    """Gate A 3.1 and ADR-005: the tool computes the spatial facts so the model never
+    eyeballs them. This emitted a hardcoded triangle count of 0.0 for every operation
+    while reading as a working check-after-every-change loop."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    lease = app.orchestrator.acquire("writer", app.orchestrator.phase)
+
+    report = app.orchestrator.perform(
+        Operation(op_id="op-1", kind="add_primitive",
+                  params={"object_id": "box", "kind": "cube", "size": [2.0, 4.0, 1.0]}),
+        lease,
+    )
+
+    assert report.measurements, "no measurements — the check loop is not running"
+    assert not report.checks_skipped
+    dims = [m for m in report.measurements if m.kind.value == "dimensions"]
+    assert dims, "no dimensions measured"
+    assert dims[0].value[1] == pytest.approx(4.0, abs=1e-3), (
+        f"measured {dims[0].value} — a placeholder would report zeros regardless of the object"
+    )
+
+
+def test_a_mutating_tool_call_through_dispatch_changes_the_model() -> None:
+    """`dispatch` is the actual entry point an MCP client uses. Nothing tested it against
+    a real Scene, so the lock bug was invisible from every module's own suite."""
+    from mcp_server import dispatch
+
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    lease = app.orchestrator.acquire("writer", ToolRole.BLOCKOUT and app.orchestrator.phase)
+
+    dispatch(
+        "add_primitive",
+        {"object_id": "via_dispatch", "kind": "cube", "size": [1.0, 1.0, 1.0]},
+        role=ToolRole.BLOCKOUT,
+        orchestrator=app.orchestrator,
+        lease=lease,
+    )
+
+    assert app.engine.exists("via_dispatch"), "a dispatched tool call produced no geometry"
+
+
+def test_phase_promotion_can_actually_execute() -> None:
+    """`promote` writes a phase_promotion operation into the log so a forced promotion is
+    recorded rather than silent. Nothing registered a handler for that kind, so `scene`
+    raised KeyError and the phase machine — the backbone of the staged plan and of the
+    single-writer design — could not advance at all."""
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    lease = app.orchestrator.acquire("writer", app.orchestrator.phase)
+    app.orchestrator.perform(
+        Operation(op_id="op-1", kind="add_primitive",
+                  params={"object_id": "box", "kind": "cube", "size": [1.0, 1.0, 1.0]}),
+        lease,
+    )
+
+    new_phase = app.orchestrator.promote(force=True)
+
+    assert new_phase is Phase.REFINE
+    assert app.scene.document.phase is Phase.REFINE
+    forced = [o for o in app.scene.document.operations if o.kind == "phase_promotion"]
+    assert forced and forced[-1].params["forced"] is True, "the override was not recorded"

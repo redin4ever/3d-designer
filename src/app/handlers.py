@@ -271,6 +271,19 @@ def build_handlers(*, include_raw: bool = True) -> HandlerRegistry:
         "unwrap_and_bake": "unwrap_and_bake",
     })
 
+    def phase_promotion(engine: EngineProtocol, op: Operation) -> OperationResult:
+        """Record a phase transition. Changes no geometry.
+
+        It still has to be a registered handler: `orchestration.promote()` writes this
+        operation into the log so a forced promotion is recorded rather than silent, and
+        `scene.apply` looks every `Operation.kind` up in this registry. Without an entry
+        here, promoting raised `KeyError` and the phase machine — the backbone of both the
+        staged plan and the single-writer design — could not advance at all.
+        """
+        return OperationResult(op_id=op.op_id, ok=True)
+
+    registry["phase_promotion"] = phase_promotion
+
     if include_raw:
         try:
             from raw import execute as raw_execute

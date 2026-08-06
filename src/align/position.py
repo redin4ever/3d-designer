@@ -17,6 +17,7 @@ picking "the object's 3rd planar face" needs its own small resolver here.
 from __future__ import annotations
 
 from contracts import (
+    EPSILON,
     Anchor,
     AnchorKind,
     Constraint,
@@ -37,10 +38,13 @@ from .results import AlignResult
 __all__ = ["make_coplanar", "make_flush"]
 
 
-def _triangle_normal(vertices, triangle: tuple[int, int, int]) -> Vec3:
+def _triangle_normal(vertices, triangle: tuple[int, int, int]) -> Vec3 | None:
     a, b, c = (vertices[i] for i in triangle)
     n = (b - a).cross(c - a)
-    return n if n.length() < 1e-12 else n.normalized()
+    # EPSILON, not 1e-12, and None rather than an unnormalized near-zero vector: a
+    # sliver between the two thresholds trips normalized(), and returning the raw
+    # cross product silently hands callers a non-unit 'normal' they treat as unit.
+    return None if n.length() < EPSILON else n.normalized()
 
 
 def _nth_face(engine: EngineProtocol, object_id: str, face: int) -> tuple[Vec3, Vec3]:
@@ -56,8 +60,8 @@ def _nth_face(engine: EngineProtocol, object_id: str, face: int) -> tuple[Vec3, 
     groups: dict[tuple[float, float, float], dict] = {}
     for tri in snap.triangles:
         n = _triangle_normal(snap.vertices, tri)
-        if n.length() < 1e-9:
-            continue
+        if n is None:
+            continue  # degenerate sliver — no orientation to group by
         key = (round(n.x, 4), round(n.y, 4), round(n.z, 4))
         group = groups.setdefault(key, {"normal": n, "indices": set()})
         group["indices"].update(tri)

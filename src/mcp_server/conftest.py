@@ -16,6 +16,7 @@ from typing import Callable
 
 import pytest
 from contracts import Operation, OperationResult, Phase, SceneDocument
+from testing import FakeEngine
 from orchestration import Orchestrator
 
 
@@ -26,8 +27,14 @@ class FakeScene:
     def __init__(self) -> None:
         self._doc = SceneDocument()
         self.subscribers: list[Callable[..., None]] = []
+        self._engine = FakeEngine()
+        self.applied_with_lease: list[object] = []
 
-    def apply(self, op: Operation) -> OperationResult:
+    def apply(self, op: Operation, *, lease: object | None = None) -> OperationResult:
+        # The lease is recorded rather than ignored: the real `Scene` rejects the call
+        # without it, and a double that quietly accepts anything is how a lock bug reaches
+        # production with every suite green.
+        self.applied_with_lease.append(lease)
         self._doc.append(op, snapshot_path="fake-snapshot" if op.opaque else "")
         return OperationResult(
             op_id=op.op_id,
@@ -35,6 +42,10 @@ class FakeScene:
             produced_objects=op.produced_objects,
             modified_objects=op.target_objects,
         )
+
+    @property
+    def engine(self) -> FakeEngine:
+        return self._engine
 
     @property
     def document(self) -> SceneDocument:

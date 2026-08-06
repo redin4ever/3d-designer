@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import math
 
-from contracts import MeshSnapshot, Vec3
+from contracts import EPSILON, MeshSnapshot, Vec3
 
 __all__ = ["suggest_seams"]
 
@@ -71,7 +71,11 @@ def suggest_seams(snapshot: MeshSnapshot, *, min_dihedral_deg: float = 60.0) -> 
 def _triangle_normal(verts: list[Vec3], tri: tuple[int, int, int]) -> Vec3 | None:
     a, b, c = verts[tri[0]], verts[tri[1]], verts[tri[2]]
     cross = (b - a).cross(c - a)
-    if cross.length() < 1e-12:
+    # EPSILON, not 1e-12: Vec3.normalized() raises below EPSILON, so a sliver whose
+    # cross product falls between the two thresholds passes this guard and then trips
+    # the very call it guards. detail/edges.py hit exactly this and was fixed; this
+    # duplicated copy never received the fix.
+    if cross.length() < EPSILON:
         return None
     return cross.normalized()
 

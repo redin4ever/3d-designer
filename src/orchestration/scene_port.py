@@ -39,8 +39,16 @@ class ScenePort(Protocol):
         """
         ...
 
-    def apply(self, op: Operation) -> OperationResult:
-        """Append ``op`` to the operation log and evaluate it against the live engine."""
+    def apply(self, op: Operation, *, lease: object | None = None) -> OperationResult:
+        """Append ``op`` to the operation log and evaluate it against the live engine.
+
+        ``lease`` is the caller's proof it holds the single write lock. It is part of this
+        signature because the real ``Scene.apply`` requires it once a lock is held — and an
+        earlier version of this Protocol omitted it, so ``Orchestrator.perform`` called
+        ``apply(op)`` and got ``LockContention`` against the lease it had just verified.
+        Both test doubles matched the incomplete declaration, so three suites stayed green
+        while every mutating call through the real agent path failed.
+        """
         ...
 
     @property

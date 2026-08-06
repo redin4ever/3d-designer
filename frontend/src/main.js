@@ -87,6 +87,14 @@ function main() {
         break;
       case ServerMessageType.MESH_UPSERT:
         applyMeshUpsert(viewportState, message, renderer);
+        // The server sends `transforms` alongside `meshes` on every MESH_UPSERT
+        // (src/viewer/translate.py builds both from the same snapshot), and
+        // applyMeshUpsert creates each node at the identity transform. Without this
+        // second call every new object rendered at the world origin, and an object that
+        // had been positioned by an earlier TRANSFORM_UPDATE snapped back there the
+        // moment its topology changed — silently, with nothing logged. FULL_SCENE above
+        // always did both; this case did not.
+        applyTransformUpdate(viewportState, { transforms: message.transforms }, renderer);
         break;
       case ServerMessageType.TRANSFORM_UPDATE:
         applyTransformUpdate(viewportState, message, renderer);

@@ -67,6 +67,7 @@ from .conformance_boolean import (
     check_boolean_solver_choice_is_threaded_through,
 )
 from .conformance_exporting import (
+    check_export_scale_moves_objects_as_well_as_resizing_them,
     check_export_gltf_threads_the_full_conversion_through,
     check_export_gltf_writes_a_nonempty_file,
 )
@@ -188,6 +189,7 @@ UNIVERSAL_CHECKS = (
 #: docstring, and each check's own definition, for why ``FakeEngine`` is exempt. Only
 #: ``blender_test.py`` calls these.
 BLENDER_ONLY_CHECKS = (
+    check_export_scale_moves_objects_as_well_as_resizing_them,
     check_backend_name_identifies_bpy,
     check_export_gltf_writes_a_nonempty_file,
     check_reset_clears_the_live_bpy_scene,

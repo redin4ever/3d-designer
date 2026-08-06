@@ -147,3 +147,48 @@ test('clearViewportState drops every node and the highlight, for a full_scene re
   assert.equal(state.highlighted.size, 0);
   assert.equal(renderer.calls.removeNode.length, 2);
 });
+
+test('a mesh_upsert places the object where the server said, not at the origin', () => {
+  // The server sends `transforms` on every mesh_upsert. applyMeshUpsert creates nodes at
+  // the identity transform, so without applying them too, every new object renders at the
+  // world origin and an already-positioned object snaps back there on its next topology
+  // change — silently, with nothing logged. This is the "watch a build happen live"
+  // journey being visibly wrong while every other test passes.
+  const state = createViewportState();
+  const moved = [];
+  const renderer = {
+    createNode: (id) => ({ id }),
+    updateTransform: (handle, position) => moved.push([handle.id, position]),
+    removeNode() {},
+    setHighlighted() {},
+  };
+  const message = {
+    type: 'mesh_upsert',
+    seq: 3,
+    meshes: [{
+      object_id: 'wall-7',
+      positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
+      indices: [0, 1, 2],
+      materials: ['m'],
+      groups: [],
+      triangle_count: 1,
+    }],
+    transforms: [{
+      object_id: 'wall-7',
+      position: [42, 0, 17],
+      quaternion: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+    }],
+    object_ids: ['wall-7'],
+  };
+
+  applyMeshUpsert(state, message, renderer);
+  applyTransformUpdate(state, { transforms: message.transforms }, renderer);
+
+  assert.deepStrictEqual(
+    state.nodes.get('wall-7').transform.position,
+    [42, 0, 17],
+    'the server-sent position was discarded; the object is at the origin',
+  );
+  assert.ok(moved.length > 0, 'updateTransform was never called for an upserted mesh');
+});

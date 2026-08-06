@@ -336,3 +336,13 @@ def test_boolean_intersect_matches_the_geometric_overlap_bounds(engine) -> None:
     """If wrong: intersect does not actually shrink to the geometric overlap of the two
     inputs — the defining property of the operation."""
     conformance.check_boolean_intersect_matches_the_geometric_overlap_bounds(engine)
+
+
+@pytest.mark.needs_blender
+def test_export_scale_moves_objects_as_well_as_resizing_them(engine, tmp_path) -> None:
+    """A two-object scene must keep its proportions through a unit conversion.
+
+    Blender-only: the fake's export_gltf writes no real file, so the only way to prove the
+    translation was converted is to read the GLB that was actually written.
+    """
+    conformance.check_export_scale_moves_objects_as_well_as_resizing_them(engine, tmp_path)

@@ -115,7 +115,12 @@ class PhaseMixin:
                 "failing": tuple(r.query_id for r in results if not r.passed),
             },
         )
-        self._scene.apply(promotion_op)
+        # Promotion is bookkeeping, not geometry — it records the transition (and whether
+        # it was forced) in the operation log so the override is never silent. It goes
+        # through the same write path as anything else, which means it needs the live lease
+        # if one is held; without that the real Scene rejects it and promote() cannot
+        # complete at all.
+        self._scene.apply(promotion_op, lease=self._scene.document.active_lease)
         self._scene.document.phase = new_phase
         return new_phase
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from contracts import Anchor, AnchorKind, ConstraintError, EngineProtocol, Vec3, WORLD_UP
+from contracts import EPSILON, Anchor, AnchorKind, ConstraintError, EngineProtocol, Vec3, WORLD_UP
 
 __all__ = ["AnchorResolution", "resolve_anchor"]
 
@@ -78,7 +78,8 @@ def _unknown_object_error(engine: EngineProtocol, object_id: str) -> ConstraintE
 def _triangle_normal(vertices, triangle: tuple[int, int, int]) -> Vec3:
     a, b, c = (vertices[i] for i in triangle)
     n = (b - a).cross(c - a)
-    if n.length() < 1e-12:
+    # EPSILON, not 1e-12 — below EPSILON is exactly where normalized() raises.
+    if n.length() < EPSILON:
         return Vec3(0.0, 0.0, 0.0)
     return n.normalized()
 

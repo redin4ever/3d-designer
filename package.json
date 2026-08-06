@@ -5,7 +5,7 @@
   "description": "Test and tooling entry points. Node is not in the runtime path — see ADR-008.",
   "type": "module",
   "scripts": {
-    "test:backend": "python -m pytest",
+    "test:backend": "node tools/run-pytest.mjs -q",
     "test:frontend": "node --test frontend/tests/",
     "test": "npm run test:backend && npm run test:frontend",
     "lint:design": "node tools/lint-design-tokens.mjs",

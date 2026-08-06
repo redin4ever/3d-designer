@@ -1,7 +1,7 @@
 {
   "version": 1,
   "idea": "A tool/app that lets AI models create 3D models live: assists with blank/gap filling, raises design detail and realism beyond stitched-together cubes, handles angle adjustments and part clipping (e.g. railings), supports multi-agent/sub-agent task assignment, and is built to raise model accuracy, detail attention and spatial awareness. Blender/bpy acceptable as a base.",
-  "phase": 4,
+  "phase": 5,
   "pass": 1,
   "final": false,
   "startedAt": "2026-08-05",
@@ -15,10 +15,10 @@
     "A": "docs/decisions/gate-A.md"
   },
   "suites": {
-    "backend": "green-where-implemented",
-    "frontend": "none"
+    "backend": "green",
+    "frontend": "green"
   },
-  "next": "Phase 4 pass 1 / 4.3 — GREEN wave 2. GREEN+verified: spatial(18) measure(52) raw(13) constraints(37). RED awaiting implementers: engine(54 checks) detail(34) ops(47) scene(31) export(36) orchestration(25). PLANNED, need RED first: gaps uv align viewer mcp frontend. THEN: module reviewers (read-only, one per green module, must not have written it), then node .pipeline/check.mjs --phase 4, then Phase 5 QA.",
+  "next": "Phase 5 fix loop: 7 P0/P1 fixed and regression-tested. 10 confirmed findings open (Q-008..Q-017); Q-008 and Q-009 are the most consequential because ADR-005 gives measurement authority over the agent. Then re-run the gate, then Phase 6.",
   "status": "running",
   "blocked": null,
   "branch": "build/pass-1"
