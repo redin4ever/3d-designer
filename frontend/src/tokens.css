@@ -1,0 +1,76 @@
+/* GENERATED FROM DESIGN.md — DO NOT EDIT
+ *
+ * Source: DESIGN.md frontmatter (`colors`, `rounded`, `spacing`, `typography`), the
+ * `linear.app` design system chosen at Gate A wave 5.2. Values are transcribed verbatim
+ * from the frontmatter, mapped to semantic custom-property names so nothing outside this
+ * file ever needs to know a raw hex code (frontend/tests/tokens.test.js enforces that by
+ * scanning every other file in frontend/src/ for `#rrggbb`).
+ *
+ * To regenerate: re-read DESIGN.md's frontmatter and update the values below by hand —
+ * this workspace has no build step and no network, so there is no `tools/generate-tokens.mjs`
+ * wired up inside frontend/. See frontend/CLAUDE.md for the mapping table.
+ */
+
+:root {
+  /* Surfaces — canvas up through the four-step lift ladder (DESIGN.md "Surface") */
+  --canvas: #010102;
+  --surface-1: #0f1011;
+  --surface-2: #141516;
+  --surface-3: #18191a;
+  --surface-4: #191a1b;
+
+  /* Hairlines — 1px borders and dividers (DESIGN.md "Surface") */
+  --hairline: #23252a;
+  --hairline-strong: #34343a;
+  --hairline-tertiary: #3e3e44;
+
+  /* Text (DESIGN.md "Text") */
+  --ink: #f7f8f8;
+  --ink-muted: #d0d6e0;
+  --muted: #8a8f98;
+  /* ^ ink-subtle in DESIGN.md; named --muted to match the register given at Gate A 5.2 */
+  --ink-tertiary: #62666d;
+
+  /* Accent — the one chromatic color on screen (DESIGN.md "Brand & Accent") */
+  --accent: #5e6ad2;
+  --accent-hover: #828fff;
+  --accent-focus: #5e69d1;
+  /* EXTENSION, not from DESIGN.md: its primary-hover (#828fff) measures 2.87:1
+     against white ink, below the 4.5:1 WCAG AA floor for body text. A filled
+     primary button needs a hover that darkens rather than lightens. 6.40:1. */
+  --accent-pressed: #4a55b8;
+  --on-accent: #ffffff;
+  --brand-secure: #7a7fad;
+
+  /* Semantic (DESIGN.md "Semantic") */
+  --success: #27a644;
+  --overlay: #000000;
+
+  /* Radius scale (DESIGN.md "Shapes") */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-xxl: 24px;
+  --radius-pill: 9999px;
+
+  /* Spacing scale, 4px base unit (DESIGN.md "Layout") */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --space-section: 96px;
+
+  /* Type — cross-platform substitutes per DESIGN.md "Note on Font Substitutes"; no
+     network fetch, so no @font-face — system stacks only. */
+  --font-display: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --font-text: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /* Elevation 4 — focus ring (DESIGN.md "Elevation & Depth") */
+  --focus-ring: 2px solid var(--accent-focus);
+}

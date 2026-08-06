@@ -1,0 +1,188 @@
+"""The WebSocket wire protocol, shared by ``src/viewer/`` and ``frontend/``.
+
+Freezing it here is what lets the Puppeteer suite drive the browser against recorded
+fixtures with no Python and no Blender running (ADR-008), and it is why ``frontend`` can
+be built in parallel with everything else.
+
+There is no production-ready incremental glTF or USD streaming format, so this is a
+custom diff protocol with a full-reload fallback. The fallback is not a nicety: any
+topology change or opaque edit forces it, and it is the correctness path the fast path
+degrades to (ADR-011).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
+
+from .phases import CheckCadence
+
+__all__ = [
+    "WIRE_VERSION",
+    "ServerMessageType",
+    "ClientMessageType",
+    "MeshPayload",
+    "TransformPayload",
+    "RollbackTarget",
+    "RedirectPayload",
+    "CadencePayload",
+    "ServerMessage",
+    "ClientMessage",
+]
+
+WIRE_VERSION = 1
+
+
+class ServerMessageType(StrEnum):
+    HELLO = "hello"
+    """Sent once on connect: wire version, scene id, unit scale, current phase."""
+
+    FULL_SCENE = "full_scene"
+    """Every object. Sent on connect and on any resync."""
+
+    MESH_UPSERT = "mesh_upsert"
+    """New or topology-changed objects, with buffers."""
+
+    TRANSFORM_UPDATE = "transform_update"
+    """The cheap path — node transforms only, no buffers. The common case."""
+
+    OBJECTS_REMOVED = "objects_removed"
+    HIGHLIGHT = "highlight"
+    """What just changed, so the operator can find it without hunting (Gate A 5.3)."""
+
+    LOG = "log"
+    PHASE = "phase"
+    RUN_STATE = "run_state"
+    PROBLEMS = "problems"
+    CONFLICT = "conflict"
+    EXPORT_REPORT = "export_report"
+    """Carries the export warning banner (Gate A 6.3). Separate from ``PROBLEMS`` because
+    an export banner is about a file that was written, not about the live scene."""
+
+    RESYNC_REQUIRED = "resync_required"
+    ERROR = "error"
+
+
+class ClientMessageType(StrEnum):
+    """Operator controls (Gate A 5.4). The build runs fully autonomously; these exist so
+    a human watching can take the wheel without stopping it by default."""
+
+    PAUSE = "pause"
+    RESUME = "resume"
+    ROLLBACK = "rollback"
+    """Payload: :class:`RollbackTarget`."""
+
+    REDIRECT = "redirect"
+    """Payload: :class:`RedirectPayload`."""
+
+    REQUEST_FULL_SCENE = "request_full_scene"
+    SET_CADENCE = "set_cadence"
+    """Payload: :class:`CadencePayload`. The settings control asked for at Gate A 3.1."""
+
+    SELECT = "select"
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackTarget:
+    """Where to roll back to. Exactly one of the two.
+
+    Typed rather than a free dict because ``frontend`` and ``viewer`` are built in
+    parallel against this file alone. A disagreement about whether the key is ``steps``
+    or ``count`` surfaces only at live WebSocket runtime, which is the worst place to
+    find it.
+    """
+
+    steps: int | None = None
+    checkpoint: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.steps is None) == (self.checkpoint is None):
+            raise ValueError("rollback takes exactly one of steps or checkpoint")
+        if self.steps is not None and self.steps < 1:
+            raise ValueError(f"rollback steps must be >= 1, got {self.steps}")
+
+
+@dataclass(frozen=True, slots=True)
+class RedirectPayload:
+    """A free-text instruction typed by the operator mid-run.
+
+    It reaches the agent by riding out on the next tool response, in
+    ``ActionReport.operator_notes`` — MCP is call/response, so a server cannot push into
+    a connected agent's context uninvited.
+    """
+
+    text: str
+
+    def __post_init__(self) -> None:
+        if not self.text.strip():
+            raise ValueError("a redirect with no text would be silently dropped")
+
+
+@dataclass(frozen=True, slots=True)
+class CadencePayload:
+    cadence: CheckCadence
+
+
+@dataclass(frozen=True, slots=True)
+class MeshPayload:
+    """Flat typed-array-friendly buffers.
+
+    Deliberately flat lists of floats/ints rather than nested objects: these map straight
+    onto ``BufferGeometry`` attributes in the browser with no per-vertex object churn,
+    which is what keeps a thousands-of-objects scene responsive.
+    """
+
+    object_id: str
+    positions: list[float]
+    indices: list[int]
+    normals: list[float] | None = None
+    uvs: list[float] | None = None
+    materials: tuple[str, ...] = ()
+    """All material slots, not one. A mesh with several materials cannot be rendered
+    faithfully from a single name, and silently keeping the first is a rendering bug that
+    looks like a modelling bug."""
+
+    groups: tuple[tuple[int, int, int], ...] = ()
+    """``(start, count, material_index)`` draw ranges over ``indices``, one per material
+    run. Empty means the whole mesh uses ``materials[0]``."""
+
+    triangle_count: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class TransformPayload:
+    object_id: str
+    position: tuple[float, float, float]
+    quaternion: tuple[float, float, float, float]
+    """x, y, z, w — three.js order, not the w-first order used internally. Converted once,
+    here at the boundary."""
+
+    scale: tuple[float, float, float] = (1.0, 1.0, 1.0)
+
+
+@dataclass(frozen=True, slots=True)
+class ServerMessage:
+    type: ServerMessageType
+    seq: int = 0
+    """Monotonic, assigned by exactly one counter in ``viewer``. Never set by a caller.
+
+    Client rules, both required:
+
+    - **Gap** (``seq > last_applied + 1``) → request a full resync. A silently stale
+      viewport is worse than a slow one.
+    - **Duplicate or out-of-order** (``seq <= last_applied``) → ignore. Retries happen,
+      and a client that applies mesh updates additively would otherwise double-apply one.
+    """
+
+    meshes: tuple[MeshPayload, ...] = ()
+    transforms: tuple[TransformPayload, ...] = ()
+    object_ids: tuple[str, ...] = ()
+    text: str = ""
+    data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ClientMessage:
+    type: ClientMessageType
+    data: dict[str, Any] = field(default_factory=dict)

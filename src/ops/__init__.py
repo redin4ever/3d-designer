@@ -1,0 +1,38 @@
+"""``ops`` — the construction library: typed parametric operations, each carrying a
+re-runnable acceptance query (ADR-004).
+
+Not primitives (a railing takes ~140 of them and drift accumulates across every one) and
+not whole-object composites (measured at -12.6% Exec@1 because the model must get a dozen
+parameters right at once with no intermediate check). Every operation here is named,
+validated on entry, and re-measurable on exit — that is what makes ADR-005's programmatic
+definition-of-done possible.
+
+Everything importable from ``ops`` is declared below. Nothing else is public; do not import
+``ops.railing``, ``ops.stairs``, etc. directly from outside this package.
+"""
+
+from __future__ import annotations
+
+from .architecture import add_floor, add_opening, add_wall
+from .arrays import add_lod_chain, add_modular_kit, array_along
+from .primitives import add_primitive
+from .railing import add_railing
+from .registry import OP_SPECS, OPS
+from .stairs import add_staircase
+from .validation import acceptance_for, validate_params
+
+__all__ = [
+    "OPS",
+    "OP_SPECS",
+    "add_primitive",
+    "add_wall",
+    "add_floor",
+    "add_opening",
+    "add_staircase",
+    "add_railing",
+    "array_along",
+    "add_lod_chain",
+    "add_modular_kit",
+    "validate_params",
+    "acceptance_for",
+]

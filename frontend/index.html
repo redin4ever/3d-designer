@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gate A Console</title>
+  <meta name="description" content="Live 3D view, action log and operator controls for a running build." />
+  <!-- Without a declared icon the browser auto-requests /favicon.ico, which this static
+       origin does not serve, and every single page load logs a 404 to the console. An
+       empty data: URI satisfies the request without shipping an asset or a network fetch.
+       Not an image file, because an SVG icon would have to hardcode a hex colour and
+       every colour in this frontend comes from src/tokens.css. -->
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="src/tokens.css" />
+  <link rel="stylesheet" href="src/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="topbar-title">forge3d</h1>
+    <span id="connection-status" class="status-pill" data-status="connecting" role="status" aria-live="polite">
+      Connecting…
+    </span>
+  </header>
+
+  <main class="layout">
+    <section class="viewport-panel" aria-label="Live 3D view">
+      <canvas id="viewport-canvas" role="img" aria-label="Live 3D view of the current build"></canvas>
+      <div id="connection-banner" class="connection-banner">
+        <p class="connection-banner-title">Not connected</p>
+        <p class="connection-banner-detail" id="connection-banner-detail">
+          Waiting for a build to connect. Start the viewer server and this page will pick it up
+          automatically — no reload needed.
+        </p>
+      </div>
+    </section>
+
+    <aside class="sidebar" aria-label="Action log">
+      <h2 class="panel-heading">Action log</h2>
+      <ul id="action-log" class="action-log" aria-live="polite"></ul>
+    </aside>
+
+    <section class="controls-panel" aria-label="Operator controls">
+      <div class="control-group">
+        <span id="run-controls-label">Run</span>
+        <div class="control-row" role="group" aria-labelledby="run-controls-label">
+          <button type="button" class="btn" data-action="pause">Pause</button>
+          <button type="button" class="btn primary" data-action="resume">Resume</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <form data-action="rollback-form">
+          <label for="rollback-steps">Roll back N steps</label>
+          <div class="control-row">
+            <input
+              id="rollback-steps"
+              data-field="rollback-steps"
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              placeholder="1"
+              required
+            />
+            <button type="submit" class="btn">Roll back</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="control-group redirect-group">
+        <form data-action="redirect-form">
+          <label for="redirect-text">Redirect the build, in words</label>
+          <div class="control-row">
+            <input
+              id="redirect-text"
+              data-field="redirect-text"
+              type="text"
+              placeholder="e.g. add a garage door on the east wall"
+            />
+            <button type="submit" class="btn">Send</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="control-group">
+        <label for="cadence-select">Check cadence</label>
+        <select id="cadence-select" data-field="cadence">
+          <option value="every_geometry_change">Every geometry change</option>
+          <option value="phase_boundaries">Phase boundaries</option>
+          <option value="on_request">On request</option>
+        </select>
+      </div>
+
+      <p id="control-error" class="control-error" role="alert"></p>
+    </section>
+  </main>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
