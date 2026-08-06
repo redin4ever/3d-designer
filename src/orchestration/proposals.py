@@ -11,16 +11,14 @@ to it produces an invalid model, not just a surprise — ADR-007's "Consequences
 conflicted proposal can only be accepted after the conflict is gone — never overridden by
 ``accept`` itself.
 
-Nothing here computes anything yet — every method raises until an implementer replaces
-the body (Rule 4 — tests come first).
+Every method here can be called from any number of threads at once — that is what INSPECT
+agents *are* — so the pending list is guarded and read through one snapshot per call. See
+``find_conflicts`` for the ``KeyError`` that came out of getting this wrong.
 """
 
 from __future__ import annotations
 
 from contracts import ActionReport, Conflict, Proposal, WriteLease
-
-_NOT_IMPLEMENTED = "orchestration.{name}: not implemented"
-
 
 class ProposalConflict(RuntimeError):
     """Raised by ``accept`` when the named proposal is party to an unresolved conflict.
@@ -51,23 +49,24 @@ class ProposalsMixin:
 
         Deliberately takes no ``WriteLease`` and must never call ``self.verify`` — this
         is what lets any number of INSPECT-role agents call it while a writer holds the
-        lock (ADR-007). Once implemented, appends to an internal pending list keyed by
-        ``proposal_id``; a duplicate id is a caller bug and should raise rather than
-        silently overwrite (the same reasoning as
+        lock (ADR-007). Appends to an internal pending list keyed by ``proposal_id``; a
+        duplicate id is a caller bug and raises rather than silently overwriting (the same reasoning as
         ``contracts.SceneDocument.append``'s duplicate ``op_id`` check — ids key state
         that a duplicate would silently clobber).
         """
-        if any(existing.proposal_id == p.proposal_id for existing in self._pending):
-            raise ValueError(
-                f"proposal id {p.proposal_id!r} is already pending; ids key state a "
-                "duplicate would silently clobber"
-            )
-        self._pending.append(p)
+        with self._pending_mutex:
+            if any(existing.proposal_id == p.proposal_id for existing in self._pending):
+                raise ValueError(
+                    f"proposal id {p.proposal_id!r} is already pending; ids key state a "
+                    "duplicate would silently clobber"
+                )
+            self._pending.append(p)
         return p.proposal_id
 
     def pending(self) -> tuple[Proposal, ...]:
         """Every proposal not yet accepted or dropped, in submission order."""
-        return tuple(self._pending)
+        with self._pending_mutex:
+            return tuple(self._pending)
 
     def find_conflicts(self) -> tuple[Conflict, ...]:
         """Pair up pending proposals whose ``target_objects`` overlap and return one
@@ -79,8 +78,17 @@ class ProposalsMixin:
         proposals or with no overlapping objects, so an implementation that tries to
         build one for a lone proposal, or with no genuinely shared object, fails loudly
         at construction rather than shipping a phantom conflict.
+
+        Works from **one snapshot** of the pending list, taken under the lock. Every INSPECT
+        agent in the run calls ``propose`` concurrently by design (ADR-007), and re-reading
+        ``self._pending`` between the union-find build and the grouping pass meant an id that
+        arrived in between reached ``find()`` with no entry in ``parent`` — a bare
+        ``KeyError`` out of a read-only method, which is a reader being refused for doing
+        exactly what the design invites it to do. ``concurrency_test.py`` raised 168 of them
+        in one run.
         """
-        parent: dict[str, str] = {p.proposal_id: p.proposal_id for p in self._pending}
+        pending = self.pending()
+        parent: dict[str, str] = {p.proposal_id: p.proposal_id for p in pending}
 
         def find(x: str) -> str:
             while parent[x] != x:
@@ -94,7 +102,7 @@ class ProposalsMixin:
                 parent[ra] = rb
 
         owners_by_object: dict[str, list[str]] = {}
-        for p in self._pending:
+        for p in pending:
             for obj in p.target_objects:
                 owners_by_object.setdefault(obj, []).append(p.proposal_id)
 
@@ -103,7 +111,7 @@ class ProposalsMixin:
                 union(owners[0], other)
 
         groups: dict[str, list[Proposal]] = {}
-        for p in self._pending:
+        for p in pending:
             groups.setdefault(find(p.proposal_id), []).append(p)
 
         conflicts: list[Conflict] = []
@@ -139,8 +147,8 @@ class ProposalsMixin:
 
         The write lock (``self.verify(lease)``) is required here exactly as it is for
         any other mutation — accepting a proposal is the one moment it stops being a
-        read. Expected to convert the proposal via ``Proposal.to_operation`` and route
-        through the same path ``reporting.perform`` uses, so cadence and operator notes
+        read. Converts the proposal via ``Proposal.to_operation`` and routes through the
+        same ``reporting.perform`` path as everything else, so cadence and operator notes
         are decided in exactly one place.
 
         Must raise :class:`ProposalConflict` — never silently choose a winner — when
@@ -149,7 +157,7 @@ class ProposalsMixin:
         caller must resolve the conflict (drop one side, or submit a merged proposal)
         before either proposal can be accepted.
         """
-        proposal = next((p for p in self._pending if p.proposal_id == proposal_id), None)
+        proposal = next((p for p in self.pending() if p.proposal_id == proposal_id), None)
         if proposal is None:
             raise KeyError(f"no pending proposal named {proposal_id!r}")
 
@@ -166,5 +174,6 @@ class ProposalsMixin:
 
         op = proposal.to_operation(op_id=proposal_id, phase=self.phase.value)
         report = self.perform(op, lease)
-        self._pending = [p for p in self._pending if p.proposal_id != proposal_id]
+        with self._pending_mutex:
+            self._pending = [p for p in self._pending if p.proposal_id != proposal_id]
         return report

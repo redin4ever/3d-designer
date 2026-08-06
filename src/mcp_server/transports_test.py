@@ -1,20 +1,18 @@
 """Tests for ``SERVER_INFO`` and the two MCP transports (ADR-003, ADR-009).
 
-Neither transport can be driven end to end here — the ``mcp`` Python SDK is not installed
-in this environment (see ``CLAUDE.md``) — so these tests hold the two guarantees the
-module brief actually requires: the registry/``dispatch`` stay usable without it, and
-``serve_stdio``/``serve_http`` fail with one clear, named error instead of a bare
-``ModuleNotFoundError`` surfacing from inside someone else's package. The ADR-009
-loopback-by-default warning is fully testable without the SDK, since it runs before the
-SDK is ever imported.
+The ``mcp`` SDK **is** installed and importable here (2.0.0) — an earlier version of this
+docstring said it was not, and the package-name collision that shadowed it was fixed and is
+pinned below. What still cannot be driven end to end is a live client session, so these
+tests hold the guarantees that do not need one: the registry and ``dispatch`` stay usable
+whatever the SDK's state, ``serve_stdio``/``serve_http`` fail with one clear, named error
+rather than a bare ``ModuleNotFoundError`` or an ``AttributeError`` from inside someone
+else's package, and ``import mcp`` resolves to the real SDK rather than back to this
+package.
 
-``serve_stdio``/``serve_http`` are throwing stubs as of this file (Rule 4 — tests come
-first); the SDK-absence and warning tests below are expected to fail until the next pass
-implements them. Each explicitly rejects ``NotImplementedError`` rather than merely
-catching ``RuntimeError`` — ``NotImplementedError`` is itself a ``RuntimeError``
-subclass, so a bare ``pytest.raises(RuntimeError)`` would spuriously pass against the
-throwing stub and never actually verify anything (the stub's own message even contains
-the word "mcp"). ``SERVER_INFO`` is real, already-constructed data — its test passes now.
+Each SDK-absence test explicitly rejects ``NotImplementedError`` rather than merely catching
+``RuntimeError`` — ``NotImplementedError`` is itself a ``RuntimeError`` subclass, so a bare
+``pytest.raises(RuntimeError)`` would have spuriously passed against the original throwing
+stub and never verified anything. The check is kept: the same trap catches any future stub.
 """
 
 from __future__ import annotations
@@ -97,6 +95,23 @@ def test_serve_http_on_a_non_loopback_host_logs_a_warning_naming_adr_009(
         serve_http(orchestrator, host="0.0.0.0")
     _assert_real_runtime_error(excinfo)
     assert any("ADR-009" in record.message for record in caplog.records)
+
+
+def test_an_sdk_whose_api_this_is_not_written_against_is_refused_by_name(
+    orchestrator,
+) -> None:
+    """The SDK installed here is 2.0.0, whose ``mcp.server.Server`` no longer carries the
+    ``list_tools``/``call_tool`` decorators this module wires against (they were 1.x). An
+    operator who runs the server gets one sentence naming the installed version and what
+    it offers instead — not an ``AttributeError`` three frames inside someone else's
+    package, which tells them nothing about which side is wrong."""
+    with pytest.raises(RuntimeError) as excinfo:
+        serve_stdio(orchestrator)
+    _assert_real_runtime_error(excinfo)
+    assert not isinstance(excinfo.value, AttributeError)
+    message = str(excinfo.value)
+    assert "mcp" in message.lower()
+    assert "MCPServer" in message or "install" in message
 
 
 def test_the_sdk_resolves_to_the_real_package_not_this_one() -> None:

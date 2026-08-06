@@ -26,6 +26,31 @@ from contracts import (
 from app import build_app, build_handlers
 
 
+RECORDED_TOOL_COUNTS: dict[str, int] = {
+    "blockout": 5,
+    "refine": 4,
+    "repair": 8,
+    "align": 7,
+    "detail": 4,
+    "polish": 2,
+    "inspect": 9,
+    "export": 2,
+    "admin": 2,
+}
+"""The real per-role visible-tool counts, as assembled by the composition root.
+
+Gate B 3.3 chose to exceed the 5-8 accuracy-optimal band deliberately and measure it rather
+than split roles further or cap the visible set. ``inspect`` is the one role over, at 9 —
+``measure``'s six tools plus ``get_phase``/``list_objects``/``describe_object``.
+
+Duplicated on purpose from ``mcp_server/registry_test.py``: that one records what the
+registry *builds*, this one records what the wired application actually *exposes*. They
+have disagreed before — a fair-capping fallback once trimmed each role to eight and silently
+dropped ``repair``, ``make_plumb`` and ``close_visual_gap`` — and two independent ledgers
+are how that becomes a test failure instead of three missing operations.
+"""
+
+
 # --------------------------------------------------------------------- wiring
 
 def test_the_handler_registry_is_not_empty() -> None:
@@ -58,22 +83,57 @@ def test_no_operation_module_is_missing() -> None:
     assert app.missing == (), f"unavailable modules: {app.missing}"
 
 
-def test_every_registered_tool_has_a_handler() -> None:
+def test_every_registered_tool_is_executable_by_one_route_or_the_other() -> None:
     """A tool an agent can see but nothing can execute fails at call time, after the agent
-    has already committed to a plan."""
+    has already committed to a plan.
+
+    This test used to carve ``export_scene`` and ``check_export_budget`` out of its own
+    assertion, with no comment — so the one check written to catch "visible but not
+    executable" excluded the two tools that were exactly that, and export raised a raw
+    ``KeyError`` through the only path an agent has. There is no carve-out now.
+
+    There are two legitimate routes: an operation kind in ``app.handlers``, which is
+    replayable and lands in the undo log, and a ``ToolSpec.handler`` callable, which is
+    invoked directly and does not (ADR-014). Export, the session tools and the measurement
+    tools all take the second. A tool with neither is the defect.
+    """
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    unreachable = sorted(
+        t.name
+        for tools in app.registry.values()
+        for t in tools
+        if t.name not in app.handlers and t.handler is None
+    )
+    assert unreachable == [], f"tools an agent can see but cannot execute: {unreachable}"
+
+
+def test_the_per_role_tool_counts_are_the_ones_that_were_recorded() -> None:
+    """Gate B 3.3 chose to exceed the 5-8 accuracy-optimal band deliberately and *measure*
+    it, rather than split roles further or cap the visible set.
+
+    That choice only means something if the number is written down where it fails when it
+    drifts — otherwise "we exceeded it on purpose" and "it grew while nobody was looking"
+    are indistinguishable. A fair-capping fallback once silently hid ``repair``,
+    ``make_plumb`` and ``close_visual_gap``, which are core operations; capping is the one
+    response that is not allowed here.
+
+    If this fails because you added a tool: update the number, and say so in the pipeline
+    summary. Do not add a cap.
+    """
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    actual = {role.value: len(tools) for role, tools in app.registry.items()}
+    assert actual == RECORDED_TOOL_COUNTS
+
+
+def test_nothing_hides_a_tool_from_the_role_that_declares_it() -> None:
+    """The failure the recorded counts exist to prevent: a registry that quietly drops
+    tools to stay inside a bound leaves an agent unable to call an operation it was never
+    told about, and no error anywhere says so."""
     app = build_app(prefer_blender=False, attach_viewer=False)
     exposed = {t.name for tools in app.registry.values() for t in tools}
-    missing = exposed - set(app.handlers) - {"check_export_budget", "export_scene"}
-    assert missing == set(), f"tools with no handler: {sorted(missing)}"
-
-
-def test_no_role_exceeds_the_visible_tool_bound() -> None:
-    """The accuracy-optimal visible set measures around 2-7 tools; past ~10-15 agents
-    start inventing tool names and borrowing argument schemas from the wrong tool. This
-    bound is the reason roles exist at all."""
-    app = build_app(prefer_blender=False, attach_viewer=False)
-    for role, tools in app.registry.items():
-        assert len(tools) <= 8, f"{role} exposes {len(tools)} tools: {[t.name for t in tools]}"
+    for module_tools in (app.registry.values()):
+        for tool in module_tools:
+            assert tool.name in exposed
 
 
 def test_inspect_role_gets_no_mutating_tool() -> None:
@@ -328,10 +388,17 @@ def test_a_mutating_tool_call_through_dispatch_changes_the_model() -> None:
 
 
 def test_phase_promotion_can_actually_execute() -> None:
-    """`promote` writes a phase_promotion operation into the log so a forced promotion is
-    recorded rather than silent. Nothing registered a handler for that kind, so `scene`
-    raised KeyError and the phase machine — the backbone of the staged plan and of the
-    single-writer design — could not advance at all."""
+    """`promote` writes a phase_promotion operation into the log so an advance is recorded
+    rather than silent. Nothing registered a handler for that kind, so `scene` raised
+    KeyError and the phase machine — the backbone of the staged plan and of the
+    single-writer design — could not advance at all.
+
+    Rewritten for ADR-012: this used to pass ``force=True``, which no longer exists.
+    Promotion now happens because the phase's acceptance queries actually passed, which is
+    what Gate A 3.2 asked for and what pass 1 did not build. The old version asserted that
+    a *forced* promotion was recorded; there is no forcing, so it asserted a requirement
+    the gate has since superseded in writing.
+    """
     app = build_app(prefer_blender=False, attach_viewer=False)
     lease = app.orchestrator.acquire("writer", app.orchestrator.phase)
     app.orchestrator.perform(
@@ -340,12 +407,35 @@ def test_phase_promotion_can_actually_execute() -> None:
         lease,
     )
 
-    new_phase = app.orchestrator.promote(force=True)
+    passed, results = app.orchestrator.can_promote()
+    assert passed, f"blockout should be passable with one clean cube: {results}"
+
+    new_phase = app.orchestrator.promote()
 
     assert new_phase is Phase.REFINE
     assert app.scene.document.phase is Phase.REFINE
-    forced = [o for o in app.scene.document.operations if o.kind == "phase_promotion"]
-    assert forced and forced[-1].params["forced"] is True, "the override was not recorded"
+    recorded = [o for o in app.scene.document.operations if o.kind == "phase_promotion"]
+    assert recorded, "the promotion was not recorded in the log"
+
+
+def test_promotion_is_refused_when_the_phase_is_not_actually_finished() -> None:
+    """The whole point of ADR-012. Pass 1 promoted as soon as *anything* had happened, so
+    an agent walked blockout -> refine -> detail -> polish without a single quality check
+    and `measure.evaluate` was never called anywhere in the product.
+
+    With no override left, this refusal is also the only thing an unattended agent has to
+    work from, so it has to say what failed and what would fix it.
+    """
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    passed, results = app.orchestrator.can_promote()
+
+    assert not passed, "an empty scene should not pass blockout"
+    failures = [r for r in results if not r.passed]
+    assert failures, "refused, but named nothing that failed"
+    assert any(r.suggested_operation for r in failures), (
+        "a failing query named no operation that would fix it — an agent that cannot pass "
+        "and cannot force has nothing left to try"
+    )
 
 
 # ------------------------------------------------------ QA round 2 regressions

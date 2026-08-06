@@ -1,27 +1,33 @@
-"""Stub — turning the operation log into geometry: ``apply`` and ``replay`` (ADR-002).
+"""Turning the operation log into geometry: ``apply`` and ``replay`` (ADR-002).
 
 The log is the source of truth. ``apply`` is the only way an operation joins it;
 ``replay`` is the only way geometry is rebuilt from it. Every other file in this package
 calls one or both of these rather than touching ``SceneDocument`` or the engine directly.
 
-Nothing here is implemented yet. Every body raises until an implementer replaces it; the
-signatures and the contract described below do not move.
+Three collaborators keep this file at one responsibility (Rule 2): ``targets.py`` decides
+whether an operation could ever be re-run, ``barriers.py`` remembers which geometry
+snapshot describes which point in the log, and ``geometry_snapshot.py`` reads and writes
+those snapshots. What is left here is the loop itself.
 """
 
 from __future__ import annotations
+
+from dataclasses import replace
 
 from contracts import (
     ChangeKind,
     LockContention,
     Operation,
     OperationResult,
+    OperationStatus,
     SceneChangeEvent,
     WriteLease,
 )
 
-__all__ = ["DocumentMixin"]
+from .geometry_snapshot import capture, is_geometry_snapshot, restore, snapshot_directory
+from .replay_report import ReplayReport, SkippedOperation
 
-_NOT_IMPLEMENTED = "scene.{name}: not implemented"
+__all__ = ["DocumentMixin"]
 
 
 class DocumentMixin:
@@ -88,6 +94,14 @@ class DocumentMixin:
 
         ``lease=None`` is a valid, intentional default — see point 2. It is not an
         oversight that the signature allows it.
+
+        **Added by F-010 (Gate B 5.2), between points 3 and 4:** an operation naming a
+        target that no logged operation produced, and that was not in the engine when this
+        scene was constructed, is refused here with ``scene.unknown_target`` before it can
+        join the log. Such an operation cannot be re-run — geometry is rebuilt from
+        ``engine.reset()`` — so recording it made every later ``undo``/``redo``/
+        ``rollback_to`` in the session raise, three operations after the actual mistake.
+        See ``targets.py``.
         """
         if op.kind not in self._handlers:
             known = ", ".join(sorted(self._handlers)) or "(none)"
@@ -117,6 +131,20 @@ class DocumentMixin:
                 "opaque operation cannot be replayed, so rolling back across it needs a "
                 "snapshot — capture one before appending."
             )
+        self._targets.check(op)
+
+        # The pre-execution state, taken here because this is the last moment it exists.
+        # The caller's path is trusted only if it really is a geometry snapshot: the
+        # shipped caller passed the result of `scene.save()`, which serialises the
+        # operation log — and an opaque operation is by definition one the log does not
+        # describe, so restoring from it restored nothing at all (F-011).
+        before_state = ""
+        if op.opaque:
+            before_state = (
+                snapshot_path
+                if is_geometry_snapshot(snapshot_path)
+                else self._write_geometry_snapshot(f"{op.op_id}.before")
+            )
 
         # An operation is all-or-nothing. A handler that creates geometry and then fails
         # used to leave it live in the engine with no log entry: `add_railing` failing on
@@ -136,7 +164,28 @@ class DocumentMixin:
             self._discard_orphans(before)
             return result
 
-        self._document.append(op, snapshot_path=snapshot_path)
+        # What the operation made is recorded *on the log entry*, not only in the result:
+        # the result is gone after this call, and the log has to be able to answer "could
+        # this scene rebuild that object" on its own, including after a save and reload.
+        produced = tuple(dict.fromkeys((*op.produced_objects, *result.produced_objects)))
+        entry = replace(op, produced_objects=produced, status=OperationStatus.APPLIED)
+
+        # Appending after an undo truncates the undone tail, at which point a stored index
+        # would point into a log that no longer exists.
+        if self._document.head < len(self._document.operations):
+            self._snapshots.prune_beyond(self._document.head)
+
+        self._document.append(entry, snapshot_path=snapshot_path)
+        self._targets.record(produced)
+
+        if op.opaque:
+            # Both sides of the barrier. A pre-execution capture alone is enough to undo
+            # back across it and not enough to redo forward over it — which is how one
+            # redo of one raw script produced three differently-named objects (F-011).
+            index = self._document.head - 1
+            self._snapshots.register(
+                index, before_state, self._write_geometry_snapshot(f"{op.op_id}.after")
+            )
 
         touched = (*result.produced_objects, *result.modified_objects, *result.removed_objects)
         for object_id in touched:
@@ -160,31 +209,121 @@ class DocumentMixin:
         )
         return result
 
-    def replay(self) -> None:
-        """Rebuild every object in the scene from the operation log, from nothing.
+    def replay(self) -> ReplayReport:
+        """Rebuild every object in the scene from the log, and say what that cost.
 
-        Once implemented: ``self._engine.reset()``, clear the whole cache
-        (``self._cache.clear()``), then call ``self._handlers[op.kind](self._engine,
-        op)`` for every ``op`` in ``self._document.active_operations``, in order. Do not
-        catch what a handler raises during replay — ``contracts.OperationHandler``'s own
-        docstring requires a handler be deterministic (ADR-002), so a handler that raises
-        on a second run against the same params is a determinism violation, and hiding it
-        here would let a broken handler pass every test that only exercises ``apply``.
+        Two things changed here after the product was run against real Blender, and both
+        were session-fatal:
+
+        **It no longer aborts.** It used to call every handler and let anything they raised
+        propagate, on the reasoning that a handler which fails on a second run is violating
+        the determinism ``contracts.OperationHandler`` requires. True, and beside the point:
+        the log can also contain an operation that acts on geometry the log never made
+        (``build_app(reset_scene=False)`` — open an existing ``.blend``), and *that*
+        operation cannot re-run however deterministic its handler is. One of them in the
+        log and every ``undo``/``redo``/``rollback_to`` for the rest of the session raised
+        ``EngineError`` and never recovered. It now skips what it cannot run, records which
+        one and why, and finishes the rest (F-010, Gate B 5.2).
+
+        **It no longer starts from nothing when it does not have to.** Rebuilding from
+        ``engine.reset()`` re-executes every logged operation, including opaque ones —
+        arbitrary code that is not replayable by definition. A non-deterministic script
+        therefore produced *different geometry* on every undo while the system reported a
+        clean ``FULL_RESYNC`` (F-011, Gate B 5.3). It now restores the nearest geometry
+        snapshot at or before the head and replays only what follows it, so an opaque
+        operation is restored rather than re-run.
 
         Does **not** emit a ``SceneChangeEvent`` — ``replay`` is the low-level rebuild
         primitive; ``history.py``'s ``undo``/``redo``/``rollback_to`` are what call it and
         emit the one event that describes the result (``ChangeKind.ROLLBACK`` or
-        ``ChangeKind.FULL_RESYNC``) to listeners.
+        ``ChangeKind.FULL_RESYNC``), carrying this report's summary in ``log_line``.
 
-        This is the property the whole undo model depends on: the same log, replayed,
-        must produce byte-identical geometry every time. See
-        ``document_test.py::test_replay_reproduces_identical_geometry`` — if this is not
-        true, undo is not a pointer move and nothing else in this module is true.
+        The property the whole undo model depends on is unchanged: the same log, rebuilt,
+        produces identical geometry every time. See
+        ``document_test.py::test_replay_reproduces_identical_geometry``.
         """
-        self._engine.reset()
+        return self._rebuild_to(self._document.head)
+
+    def _rebuild_to(self, head: int) -> ReplayReport:
+        """Put the engine into the state the log describes at position ``head``."""
         self._cache.clear()
-        for op in self._document.active_operations:
-            self._handlers[op.kind](self._engine, op)
+        base, restored_from = self._restore_nearest_state(head)
+        applied, skipped = self._run_operations(self._document.operations[base:head])
+        self._targets.rebuild(self._document.operations, head)
+        report = ReplayReport(applied=applied, skipped=skipped, restored_from=restored_from)
+        self._last_replay = report
+        return report
+
+    def _restore_nearest_state(self, head: int) -> tuple[int, str]:
+        """Get as close to ``head`` as a captured snapshot allows; return where we landed.
+
+        Nearest usable first, then progressively earlier ones: a snapshot file can be gone
+        — these live in the system temp directory and sessions end — and an earlier base
+        still beats ``reset()``, which would re-run every opaque operation between them.
+        ``(0, "")`` means nothing was restorable and the engine was cleared.
+        """
+        for index, path in self._snapshots.candidates_for(head):
+            if restore(self._engine, path):
+                return index, path
+        self._engine.reset()
+        return 0, ""
+
+    def _run_operations(self, ops) -> tuple[int, tuple[SkippedOperation, ...]]:
+        """Re-run ``ops`` in order, skipping and recording whatever cannot run.
+
+        Four distinguishable ways an operation fails to come back, all reported with the
+        underlying message rather than a generic label — an agent told *"no object named
+        'bad_hole'"* can act, one told *"an operation was skipped"* cannot.
+        """
+        applied = 0
+        skipped: list[SkippedOperation] = []
+        for op in ops:
+            if op.opaque:
+                skipped.append(
+                    SkippedOperation(
+                        op.op_id,
+                        op.kind,
+                        "opaque operation: not replayable, and its geometry snapshot "
+                        "could not be restored",
+                    )
+                )
+                continue
+            handler = self._handlers.get(op.kind)
+            if handler is None:
+                skipped.append(
+                    SkippedOperation(
+                        op.op_id, op.kind, f"no handler is registered for kind {op.kind!r}"
+                    )
+                )
+                continue
+            try:
+                result = handler(self._engine, op)
+            except Exception as exc:  # noqa: BLE001 — one dead operation, not a dead session
+                skipped.append(SkippedOperation(op.op_id, op.kind, f"{type(exc).__name__}: {exc}"))
+                continue
+            if not result.ok:
+                skipped.append(
+                    SkippedOperation(
+                        op.op_id,
+                        op.kind,
+                        result.error_detail or result.error_rule or "the handler reported failure",
+                    )
+                )
+                continue
+            applied += 1
+        return applied, tuple(skipped)
+
+    def _write_geometry_snapshot(self, label: str) -> str:
+        """Capture the live geometry under a name unique within this session.
+
+        The counter matters: an opaque operation needs a *pair* of captures under the same
+        op id, and two files that collide are one restore silently reading the other side
+        of the barrier.
+        """
+        self._snapshot_seq += 1
+        scene_id = self._document.scene_id or "scene"
+        path = snapshot_directory() / f"{scene_id}-{self._snapshot_seq:04d}-{label}.json"
+        return capture(self._engine, str(path))
 
     def _discard_orphans(self, before: set[str]) -> None:
         """Remove anything the failed handler created, leaving the scene as it was found.

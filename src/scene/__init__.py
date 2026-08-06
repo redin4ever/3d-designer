@@ -33,13 +33,16 @@ from __future__ import annotations
 
 from contracts import EngineProtocol, HandlerRegistry, MeshSnapshot, SceneDocument
 
+from .barriers import SnapshotLedger
 from .cache import CacheMixin
 from .document import DocumentMixin
 from .events import EventsMixin, Listener
 from .history import HistoryMixin
 from .persistence import PersistenceMixin
+from .replay_report import ReplayReport, SkippedOperation
+from .targets import UNKNOWN_TARGET_RULE, TargetLedger
 
-__all__ = ["Scene"]
+__all__ = ["Scene", "ReplayReport", "SkippedOperation", "UNKNOWN_TARGET_RULE"]
 
 
 class Scene(DocumentMixin, HistoryMixin, CacheMixin, EventsMixin, PersistenceMixin):
@@ -57,6 +60,15 @@ class Scene(DocumentMixin, HistoryMixin, CacheMixin, EventsMixin, PersistenceMix
         self._document = SceneDocument(scene_id=scene_id, engine_backend=engine.backend_name)
         self._cache: dict[str, MeshSnapshot] = {}
         self._listeners: list[Listener] = []
+
+        # Whatever is already in the engine is on the record as a legitimate target.
+        # `build_app(reset_scene=False)` — "open an existing .blend and work on it" — is a
+        # supported workflow, and this is the one moment its geometry can be told apart
+        # from geometry that appeared later without a log entry behind it (F-010).
+        self._targets = TargetLedger(engine.list_objects())
+        self._snapshots = SnapshotLedger()
+        self._snapshot_seq = 0
+        self._last_replay = ReplayReport()
 
     @property
     def engine(self) -> EngineProtocol:

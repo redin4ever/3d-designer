@@ -2,19 +2,12 @@
 
 Pause is cooperative — checked between operations, never mid-operation, so the log is
 never left half-applied (``contracts.RunState.PAUSED``'s own docstring). This module owns
-only the state flag; ``reporting.perform`` is what actually consults it, once
-implemented.
-
-Nothing here computes anything yet — every method raises until an implementer replaces
-the body (Rule 4 — tests come first).
+only the state flag; ``reporting.perform`` is what consults it, before every operation.
 """
 
 from __future__ import annotations
 
 from contracts import RunState
-
-_NOT_IMPLEMENTED = "orchestration.{name}: not implemented"
-
 
 class RunPaused(RuntimeError):
     """Raised by ``reporting.perform`` while the run is paused.
@@ -44,9 +37,9 @@ class RunMixin:
     """Mixed into :class:`Orchestrator`. See ``src/orchestration/__init__.py``."""
 
     def pause(self) -> None:
-        """Set run state to :attr:`contracts.RunState.PAUSED`. Once implemented,
-        ``reporting.perform`` must consult this before starting a new operation — never
-        abort one already in flight, which is what "cooperative" means here."""
+        """Set run state to :attr:`contracts.RunState.PAUSED`. ``reporting.perform`` consults
+        this before starting a new operation and never aborts one already in flight, which is
+        what "cooperative" means here."""
         self._state = RunState.PAUSED
 
     def resume(self) -> None:

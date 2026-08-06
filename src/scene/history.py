@@ -1,32 +1,39 @@
-"""Stub — moving the undo pointer: ``undo``, ``redo``, ``rollback_to``, ``checkpoint``
-(ADR-006).
+"""Moving the undo pointer: ``undo``, ``redo``, ``rollback_to``, ``checkpoint`` (ADR-006).
 
-Undo is a pointer move, not a snapshot: every method here ends by calling
-``self.replay()`` (see ``document.py``) to rebuild geometry from wherever the pointer now
-sits, never by hand-patching engine state. The one thing every method must get right is
-telling ``ROLLBACK`` apart from ``FULL_RESYNC`` — the difference between an incremental
-viewer update and a full reload (see ``contracts.ChangeKind``'s own docstring).
+Undo is a pointer move, not a snapshot: every method here ends by calling ``self.replay()``
+(see ``document.py``) to rebuild geometry from wherever the pointer now sits, never by
+hand-patching engine state. The one thing every method must get right is telling
+``ROLLBACK`` apart from ``FULL_RESYNC`` — the difference between an incremental viewer
+update and a full reload (see ``contracts.ChangeKind``'s own docstring).
 
-Nothing here is implemented yet.
+Two additions after the product met real Blender, both visible here and implemented in
+``document.py``:
+
+- ``replay`` now returns a :class:`~scene.replay_report.ReplayReport`. Each method below
+  forwards its summary to listeners in ``SceneChangeEvent.log_line`` and keeps it on
+  ``Scene.last_replay``, because a rebuild that silently dropped operations leaves the
+  operator looking at a scene that appears whole (F-010).
+- Rebuilding restores from a captured geometry snapshot where one exists, so an opaque
+  operation is never re-executed. :meth:`capture_snapshot` is what produces those, and it
+  lives here rather than beside ``save``/``load`` because a barrier is an undo concept:
+  ADR-006's "undo across one is a snapshot restore, not a replay" is this file's sentence.
 """
 
 from __future__ import annotations
 
 from contracts import ChangeKind, Checkpoint, SceneChangeEvent
 
-__all__ = ["HistoryMixin"]
+from .replay_report import ReplayReport
 
-_NOT_IMPLEMENTED = "scene.{name}: not implemented"
+__all__ = ["HistoryMixin"]
 
 
 class HistoryMixin:
-    """``undo``/``redo``/``rollback_to``/``checkpoint``. See ``document.py``'s docstring
-    for what ``self`` is expected to carry."""
+    """``undo``/``redo``/``rollback_to``/``checkpoint``/``capture_snapshot``. See
+    ``document.py``'s docstring for what ``self`` is expected to carry."""
 
     def undo(self, steps: int = 1) -> ChangeKind:
         """Move the head back ``steps`` operations and rebuild geometry.
-
-        Once implemented:
 
         1. ``old_head = self._document.head``; ``new_head = old_head - steps``.
         2. ``self._document.set_head(new_head)`` — let whatever it raises propagate
@@ -49,8 +56,7 @@ class HistoryMixin:
         self._document.set_head(new_head)
         crossed = any(new_head <= b.index < old_head for b in self._document.barriers)
         kind = ChangeKind.FULL_RESYNC if crossed else ChangeKind.ROLLBACK
-        self.replay()
-        self._emit(SceneChangeEvent(kind=kind, head=self._document.head))
+        self._emit_rebuild(kind, self.replay())
         return kind
 
     def redo(self, steps: int = 1) -> ChangeKind:
@@ -68,16 +74,15 @@ class HistoryMixin:
         self._document.set_head(new_head)
         crossed = any(old_head <= b.index < new_head for b in self._document.barriers)
         kind = ChangeKind.FULL_RESYNC if crossed else ChangeKind.ROLLBACK
-        self.replay()
-        self._emit(SceneChangeEvent(kind=kind, head=self._document.head))
+        self._emit_rebuild(kind, self.replay())
         return kind
 
     def rollback_to(self, checkpoint: str) -> ChangeKind:
         """Move the head directly to a named checkpoint, in either direction.
 
-        Once implemented: ``cp = self._document.checkpoint(checkpoint)`` — propagate its
-        ``KeyError`` unchanged for an unknown name; it already names the checkpoints that
-        do exist. A barrier is crossed iff any ``b.index`` lies in
+        ``cp = self._document.checkpoint(checkpoint)`` — propagate its ``KeyError``
+        unchanged for an unknown name; it already names the checkpoints that do exist. A
+        barrier is crossed iff any ``b.index`` lies in
         ``[min(head, cp.index), max(head, cp.index))``. Then
         ``self._document.set_head(cp.index)``, ``self.replay()``, emit, return — the
         identical shape to :meth:`undo`/:meth:`redo`.
@@ -88,9 +93,31 @@ class HistoryMixin:
         crossed = any(lo <= b.index < hi for b in self._document.barriers)
         kind = ChangeKind.FULL_RESYNC if crossed else ChangeKind.ROLLBACK
         self._document.set_head(cp.index)
-        self.replay()
-        self._emit(SceneChangeEvent(kind=kind, head=self._document.head))
+        self._emit_rebuild(kind, self.replay())
         return kind
+
+    def capture_snapshot(self, op_id: str) -> str:
+        """Write the live **geometry** to a restorable file and return its path.
+
+        See ``contracts.ScenePort.capture_snapshot`` for why this exists and why it must
+        not be ``save()``. Called immediately before an opaque operation, because that is
+        the only moment the pre-execution state still exists — ``apply`` takes its own
+        capture at that same moment if the path it is handed turns out not to be one of
+        these, so a caller that gets it wrong degrades rather than silently loses the
+        barrier.
+        """
+        return self._write_geometry_snapshot(f"{op_id}.before")
+
+    @property
+    def last_replay(self) -> ReplayReport:
+        """What the most recent rebuild managed.
+
+        A property rather than a return value on :meth:`undo` because those three methods
+        return a ``ChangeKind`` that ``viewer`` switches on, and widening it would change
+        a contract sixteen modules read. The event's ``log_line`` carries the same summary
+        for anyone listening rather than asking.
+        """
+        return self._last_replay
 
     def checkpoint(self, name: str, note: str = "") -> Checkpoint:
         """Name the current head.
@@ -104,3 +131,18 @@ class HistoryMixin:
         cp = self._document.add_checkpoint(name, note)
         self._emit(SceneChangeEvent(kind=ChangeKind.CHECKPOINT, head=self._document.head))
         return cp
+
+    def _emit_rebuild(self, kind: ChangeKind, report: ReplayReport) -> None:
+        """One event per history move, carrying what the rebuild could not do.
+
+        ``log_line`` stays empty on the ordinary path so that a non-empty one means
+        something actually happened — a line on every event is a line nobody reads by the
+        time it matters.
+        """
+        self._emit(
+            SceneChangeEvent(
+                kind=kind,
+                head=self._document.head,
+                log_line="" if report.complete and not report.restored_from else report.describe(),
+            )
+        )

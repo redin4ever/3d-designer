@@ -230,3 +230,141 @@ def test_two_rotated_beams_that_never_touch_report_a_real_distance(engine) -> No
 
     assert distance(engine, "p", "q").value > 0.5, "a real gap still reads as touching"
     assert gap_width(engine, "p", "q").value > 0.5
+
+
+# ------------------------------------------------------- F-015: the quadratic blowup
+#
+# Measured against real Blender before this section existed: creating a 960-triangle
+# sphere takes 0.006s and the self-intersection check that then runs automatically on it
+# takes 6.5s and finds nothing — ~40% of a realistic 33-second session, on the default
+# cadence, on the first non-trivial object anyone builds. These tests hold the pruning
+# honest in both directions: much less work, and not one missed crossing.
+
+#: Wall-clock ceiling for one ~1000-triangle self-intersection check. Deliberately loose
+#: against the ~0.05s this actually costs after pruning, and still 6x under the 6.5s the
+#: unpruned version took — a machine slow enough to fail this is slow enough that the
+#: automatic check is unusable anyway.
+SELF_INTERSECTION_CEILING_SECONDS = 1.0
+
+
+def _uv_sphere(
+    radius: float = 1.0, segments: int = 32, rings: int = 16, centre: Vec3 | None = None
+) -> tuple[list[Vec3], list[tuple[int, int, int]]]:
+    """A closed, correctly-wound UV sphere as explicit triangles.
+
+    Built here rather than via ``engine.create_primitive``: ``FakeEngine`` approximates
+    every non-planar primitive by its bounding box (12 triangles), which is exactly the
+    kind of approximation that would make a density test pass while measuring nothing.
+    32x16 is Blender's own default and yields 960 triangles, matching the mesh the 6.5s
+    figure was measured on.
+    """
+    import math
+
+    origin = centre or Vec3(0.0, 0.0, 0.0)
+    verts: list[Vec3] = [Vec3(origin.x, origin.y, origin.z + radius)]
+    for r in range(1, rings):
+        phi = math.pi * r / rings
+        z, rad = math.cos(phi) * radius, math.sin(phi) * radius
+        for s in range(segments):
+            theta = 2.0 * math.pi * s / segments
+            verts.append(
+                Vec3(origin.x + rad * math.cos(theta), origin.y + rad * math.sin(theta), origin.z + z)
+            )
+    verts.append(Vec3(origin.x, origin.y, origin.z - radius))
+    south = len(verts) - 1
+
+    def ring_vertex(r: int, s: int) -> int:
+        return 1 + (r - 1) * segments + (s % segments)
+
+    tris: list[tuple[int, int, int]] = []
+    for s in range(segments):
+        tris.append((0, ring_vertex(1, s), ring_vertex(1, s + 1)))
+    for r in range(1, rings - 1):
+        for s in range(segments):
+            a, b = ring_vertex(r, s), ring_vertex(r, s + 1)
+            c, d = ring_vertex(r + 1, s + 1), ring_vertex(r + 1, s)
+            tris.append((a, b, c))
+            tris.append((a, c, d))
+    for s in range(segments):
+        tris.append((south, ring_vertex(rings - 1, s + 1), ring_vertex(rings - 1, s)))
+    return verts, tris
+
+
+def test_a_clean_dense_mesh_reports_no_self_intersections(engine) -> None:
+    """Correctness is not negotiable for speed. SELF_INTERSECTION is a BLOCKER by default,
+    so one false positive on an ordinary 960-triangle sphere would block export of the
+    first real object anybody builds — and it would do it on every automatic check."""
+    verts, tris = _uv_sphere()
+    engine.create_mesh("ball", verts, tris)
+    assert len(tris) == 960, "the fixture stopped matching the mesh the 6.5s was measured on"
+
+    assert find_self_intersections(engine, "ball") == ()
+
+
+def test_a_self_intersecting_dense_mesh_is_still_detected_after_pruning(engine) -> None:
+    """The failure a broad-phase introduces is a *missed* crossing, and a missed
+    self-intersection is a defect the agent then exports. Two overlapping shells inside one
+    mesh cross far from either shell's own neighbourhood, which is precisely the pair a
+    naive "only test triangles near each other in index order" prune would drop."""
+    verts_a, tris_a = _uv_sphere(radius=1.0, segments=16, rings=8)
+    verts_b, tris_b = _uv_sphere(radius=1.0, segments=16, rings=8, centre=Vec3(1.0, 0.0, 0.0))
+    offset = len(verts_a)
+    verts = verts_a + verts_b
+    tris = tris_a + [(a + offset, b + offset, c + offset) for a, b, c in tris_b]
+    engine.create_mesh("twin", verts, tris)
+
+    result = find_self_intersections(engine, "twin")
+
+    assert result, "two interpenetrating shells in one mesh went undetected"
+    assert all(d.defect_class is DefectClass.SELF_INTERSECTION for d in result)
+
+
+def test_self_intersection_examines_a_small_fraction_of_the_naive_triangle_pairs(
+    engine, monkeypatch
+) -> None:
+    """The performance fix, stated as the thing it actually changes: how many triangle
+    pairs reach the exact intersection test. Without a ratio assertion here a later edit
+    can quietly restore the full n^2 sweep and every other test still passes — the check
+    just costs 40% of the session again."""
+    import measure.intersections as intersections
+
+    verts, tris = _uv_sphere()
+    engine.create_mesh("ball", verts, tris)
+
+    examined = 0
+    real = intersections.triangles_intersect
+
+    def counting(tri_a, tri_b):
+        nonlocal examined
+        examined += 1
+        return real(tri_a, tri_b)
+
+    monkeypatch.setattr(intersections, "triangles_intersect", counting)
+    find_self_intersections(engine, "ball")
+
+    naive = len(tris) * (len(tris) - 1) // 2
+    assert examined < naive * 0.05, (
+        f"{examined} of {naive} triangle pairs reached the exact test "
+        f"({examined / naive:.1%}) — the broad-phase is not pruning"
+    )
+
+
+def test_self_intersection_on_a_thousand_triangle_mesh_stays_under_the_ceiling(engine) -> None:
+    """This check runs automatically after every geometry change, and another agent is
+    adding neighbour clipping to the same loop this round. At 6.5s per 960-triangle object
+    the automatic cadence is unusable and the first thing an operator does is turn
+    verification off — which is the product's whole premise, switched off."""
+    import time
+
+    verts, tris = _uv_sphere()
+    engine.create_mesh("ball", verts, tris)
+
+    started = time.perf_counter()
+    result = find_self_intersections(engine, "ball")
+    elapsed = time.perf_counter() - started
+
+    assert result == ()
+    assert elapsed < SELF_INTERSECTION_CEILING_SECONDS, (
+        f"{len(tris)} triangles took {elapsed:.2f}s, ceiling is "
+        f"{SELF_INTERSECTION_CEILING_SECONDS}s"
+    )

@@ -41,6 +41,13 @@ EXPORT_SPECS: tuple[ToolSpec, ...]      # roles=(ToolRole.EXPORT,)
 | Unreal | Z | **left** | cm | scale only, no axis remap |
 | Godot | Y | right | m | axis remap only, closest to glTF |
 
+All four unit figures are **verified against the engines' own documentation** (F-016) and
+pinned by `unit_scale_test.py`, which carries the URLs and the date each was checked. The
+Roblox stud is 28 cm per Roblox's unit table — a length unit, not the visual stud spacing on
+a part's surface — and Roblox's documented mass unit (1 RMU = 21.952 kg = 0.28³ × 1000)
+only agrees with the length row at 0.28. Do not change any of these four numbers without
+re-reading that file first.
+
 The actual numbers live in `src/contracts/export_profiles.py` (`PROFILES`) — this module
 never hardcodes one; every conversion reads them off the `ExportProfile` it is given.
 

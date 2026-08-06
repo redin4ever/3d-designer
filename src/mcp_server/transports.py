@@ -2,16 +2,17 @@
 HTTP for ChatGPT developer-mode connectors — plus ``SERVER_INFO``, the identity both
 advertise.
 
-The ``mcp`` Python SDK is an optional dependency. Importing it eagerly at module load
-would make the registry and ``dispatch()`` — the part every other test in this package
-exercises — unusable on a machine that has not installed it yet. Both ``serve_*``
-functions import it lazily, inside the function body, and turn its absence into one
-clear, named ``RuntimeError`` rather than a bare ``ModuleNotFoundError`` surfacing from
-several frames deep inside someone else's package.
+The ``mcp`` Python SDK is an optional dependency. It **is** installed and importable in
+this environment (2.0.0), and the ``mcp``/``mcp_server`` package-name collision that used
+to shadow it is fixed and pinned by a test — but importing it eagerly at module load would
+still make the registry and ``dispatch()`` unusable on a machine that has not installed it.
+Both ``serve_*`` functions import it lazily, inside the function body, and turn its absence
+— or an SDK whose API this is not written against — into one clear, named ``RuntimeError``
+rather than a bare ``ModuleNotFoundError`` or ``AttributeError`` surfacing from several
+frames deep inside someone else's package.
 
 ``SERVER_INFO`` is real, constructed data — not a stub — same reasoning as
 ``raw.RAW_TOOL_SPEC``: there is no implementation to defer, only a value to declare.
-``serve_stdio``/``serve_http`` raise until the next pass replaces their bodies (Rule 4).
 """
 
 from __future__ import annotations
@@ -41,10 +42,37 @@ SERVER_INFO: dict[str, Any] = {
 }
 
 _SDK_MISSING = (
-    "the `mcp` Python SDK is not installed (pip install mcp) — {transport} needs it to "
+    "the `mcp` Python SDK is not importable (pip install mcp) — {transport} needs it to "
     "actually speak the protocol. The tool registry and dispatch() work without it; only "
     "serving a live connection over {transport} does not."
 )
+
+_SDK_INCOMPATIBLE = (
+    "the installed `mcp` SDK does not expose the low-level decorator API this module wires "
+    "against (`Server.list_tools` / `Server.call_tool`, SDK 1.x). Installed here: {version}, "
+    "whose `mcp.server.Server` instead offers `MCPServer.add_tool`. Refusing to serve "
+    "{transport} rather than failing with an AttributeError from inside the SDK. Rewiring "
+    "`_build_server` onto `mcp.server.MCPServer` is a live-client task — see CLAUDE.md."
+)
+
+_LEASE_HOLDER = "mcp-session"
+"""One logical writer per server process.
+
+The MCP session model has no native "role" or "lease" concept, so a connected client is
+treated as a single writer that keeps renewing its own lease. Same-holder re-acquire
+renews rather than contends, and the lease expires on its own if this process dies (Rule 6
+— agents die, and a lock nobody can release wedges the run). A second server process still
+contends properly, which is ADR-007's actual guarantee.
+"""
+
+
+def _sdk_version() -> str:
+    try:
+        import importlib.metadata as metadata
+
+        return metadata.version("mcp")
+    except Exception:  # noqa: BLE001 — a missing version must not mask the real error
+        return "unknown"
 
 
 def _load_sdk(transport: str) -> Any:
@@ -56,7 +84,8 @@ def _load_sdk(transport: str) -> Any:
     inside this very package resolved back to *this* package regardless of install order,
     and the SDK was permanently unreachable — which would have meant no subscription client
     could ever connect, the one thing Gate A 7.4 asked for. Renaming the package to
-    ``mcp_server`` fixed it at the composition root; verified against a real install.
+    ``mcp_server`` fixed it, and ``transports_test.py`` pins the fix: ``import mcp`` now
+    resolves to the real SDK, which is installed and importable in this environment.
     """
     try:
         import mcp.server  # the third-party MCP SDK — see the collision note above
@@ -66,30 +95,45 @@ def _load_sdk(transport: str) -> Any:
 
 
 def _build_server(sdk_server_module: Any, orchestrator: Any) -> Any:
-    """Best-effort wiring onto the SDK's ``Server`` — unverified against a live install in
-    this environment (the SDK is not installed here; see ``CLAUDE.md``). Exposes the full
-    tool catalogue; every call still goes through ``dispatch()``, which enforces
-    role-visibility and the write lock per call regardless of what the transport layer
-    does. Per-role tool-set partitioning for one *live* session is a follow-up design
-    decision — the MCP session model has no native "role" concept, so it likely wants one
-    server process per role rather than something inferred here from a single
-    ``orchestrator``.
+    """Wire the full tool catalogue onto the SDK's low-level ``Server``.
+
+    Every call still goes through ``dispatch()``, which validates parameters, authorises
+    against the phase and the lease, and takes the write lock — regardless of what the
+    transport layer does. Per-role partitioning for one *live* session remains a follow-up:
+    the MCP session model has no native role concept, so it wants one server process per
+    role rather than something inferred here from a single ``orchestrator``.
+
+    Refuses by name when the installed SDK does not offer the decorator API this is written
+    against. That is not hypothetical — SDK 2.0 replaced it, and an ``AttributeError``
+    raised from three frames inside someone else's package is precisely the opaque failure
+    Gate A 4.2 asked about.
     """
-    server = sdk_server_module.Server(SERVER_INFO["name"])
+    server_class = getattr(sdk_server_module, "Server", None)
+    if server_class is None or not hasattr(server_class, "list_tools"):
+        raise RuntimeError(
+            _SDK_INCOMPATIBLE.format(version=_sdk_version(), transport="this transport")
+        )
+
+    server = server_class(SERVER_INFO["name"])
     registry = build_registry()
-    spec_by_name = {spec.name: (role, spec) for role, specs in registry.items() for spec in specs}
+    spec_by_name = {spec.name: spec for specs in registry.values() for spec in specs}
 
     @server.list_tools()
     async def _list_tools() -> list[dict[str, Any]]:
         return [
             {"name": spec.name, "description": spec.description, "inputSchema": spec.input_schema}
-            for _role, spec in spec_by_name.values()
+            for spec in spec_by_name.values()
         ]
 
     @server.call_tool()
     async def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
-        role, _spec = spec_by_name[name]
-        return dispatch(name, arguments, role=role, orchestrator=orchestrator)
+        spec = spec_by_name[name]
+        if not spec.mutating:
+            # Read-only tools take no lease at all, so many readers run beside the one
+            # writer (ADR-007). This is also why an INSPECT client works with no lock.
+            return dispatch(name, arguments, orchestrator=orchestrator)
+        lease = orchestrator.acquire(_LEASE_HOLDER, orchestrator.phase)
+        return dispatch(name, arguments, orchestrator=orchestrator, lease=lease)
 
     return server
 

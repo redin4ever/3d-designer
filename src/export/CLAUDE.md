@@ -20,9 +20,18 @@ pytest src/export/conversion_test.py -q
 pytest src -q
 ```
 
-No `needs_blender` marker is used anywhere in this module — everything here runs against
-`testing.FakeEngine` (or, for `conversion.py`, no engine at all) with no Blender installed,
-and must stay that way.
+`unit_scale_test.py` is the **only** file in this module that uses `needs_blender`, and the
+only one that may. Everything else runs against `testing.FakeEngine` (or, for
+`conversion.py`, no engine at all) with no Blender installed, and must stay that way — the
+whole point of the module is that the decision layer tests without Blender.
+
+The exception is load-bearing, not laziness: `unit_scale_test.py` pins the four profiles'
+`metres_per_unit` constants, and the only way to prove a unit constant is to read the size
+of the thing that actually landed on disk. `FakeEngine.export_gltf` records the call and
+writes no file, so against the fake that test could only re-divide by the constant it is
+trying to check, which proves nothing. Its two pure tests (`test_documented_*`,
+`test_roblox_mass_unit_*`) carry no marker and still fail on a wrong constant with no
+Blender present.
 
 ## Boundaries
 
@@ -82,3 +91,21 @@ Mirrors the four responsibility files: `conversion_test.py`, `budget_test.py`,
 `writer_test.py`, `registry_test.py`. A new profile or a new conversion edge case gets its
 test added to the matching file, not a new top-level test file, unless it grows enough to
 need its own responsibility split (at which point split the source file the same way first).
+
+`unit_scale_test.py` is the one file with no source counterpart, because what it tests is
+not code in this module — it is the four `metres_per_unit` numbers in
+`contracts/export_profiles.py` (frozen, main-agent-owned). It exists because every other
+test here reads that number from the same table the code under test reads it from, so all of
+them pass for **any** value, including a wrong one. Two rules follow, and breaking either
+returns the module to that state:
+
+- **Never import `PROFILES` for the expected side of an assertion in that file.** The
+  documented figures are literals in `DOCUMENTED_METRES_PER_UNIT` with the citation and the
+  date checked beside them. The contract table is only ever the *measured* side.
+- **Never assert on `convert_scalar`/`to_target_units` output there.** The measured side is
+  decoded from the vertex positions of a `.glb` the real Blender exporter wrote. The failure
+  this catches (an asset silently exported at the wrong physical size) exists on disk, so
+  that is where it has to be read from.
+
+A new export profile adds a row to `DOCUMENTED_METRES_PER_UNIT`, a citation in the module
+docstring, and nothing else — both tests are parametrized over that dict's keys.

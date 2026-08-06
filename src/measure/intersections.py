@@ -15,6 +15,7 @@ from typing import Sequence
 
 from contracts import Defect, DefectClass, EngineProtocol, JoineryIntent
 
+from ._broadphase import candidate_pairs, triangle_boxes
 from ._distance import mesh_distance
 from ._geom import aabb_axis_overlaps, insertion_depth
 from ._triangle_intersect import triangles_intersect
@@ -33,25 +34,31 @@ def find_self_intersections(engine: EngineProtocol, object_id: str) -> tuple[Def
     no natural single-number "depth", and ``None`` — never ``0.0`` — is how this
     module says "genuinely not measured" rather than "measured as zero" (see
     ``contracts.Defect.magnitude``). ``DefectClass.SELF_INTERSECTION``.
+
+    Only triangle pairs whose boxes can touch reach the exact test
+    (``_broadphase.candidate_pairs``). That is a pruning of the *work*, never of the
+    *answer*: two triangles that intersect necessarily have overlapping boxes, so the
+    pair set is a superset of the findings and this function returns exactly what the
+    all-pairs sweep returned — at ~1% of the triangle tests on a 960-triangle sphere,
+    which is the difference between a 6.5s automatic check and a negligible one.
     """
     snap = engine.snapshot(object_id)
     verts = snap.world_vertices()
     triangles = snap.triangles
 
     defects = []
-    for i in range(len(triangles)):
-        for j in range(i + 1, len(triangles)):
-            if set(triangles[i]) & set(triangles[j]):
-                continue  # shared vertex: adjacent, not a defect
-            tri_a = tuple(verts[v] for v in triangles[i])
-            tri_b = tuple(verts[v] for v in triangles[j])
-            if triangles_intersect(tri_a, tri_b):
-                defects.append(
-                    Defect.of(
-                        DefectClass.SELF_INTERSECTION, object_id,
-                        f"triangles {i} and {j} share points in 3D",
-                    )
+    for i, j in candidate_pairs(triangle_boxes(verts, triangles)):
+        if set(triangles[i]) & set(triangles[j]):
+            continue  # shared vertex: adjacent, not a defect
+        tri_a = tuple(verts[v] for v in triangles[i])
+        tri_b = tuple(verts[v] for v in triangles[j])
+        if triangles_intersect(tri_a, tri_b):
+            defects.append(
+                Defect.of(
+                    DefectClass.SELF_INTERSECTION, object_id,
+                    f"triangles {i} and {j} share points in 3D",
                 )
+            )
     return tuple(defects)
 
 

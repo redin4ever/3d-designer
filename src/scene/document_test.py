@@ -11,9 +11,32 @@ from __future__ import annotations
 
 import pytest
 
-from contracts import LockContention, Operation, Phase, WriteLease
-from scene import Scene
+from contracts import (
+    LockContention,
+    Operation,
+    Phase,
+    RuleError,
+    ScenePort,
+    Vec3,
+    WriteLease,
+)
+from scene import UNKNOWN_TARGET_RULE, Scene
 from testing import FakeEngine
+
+
+# ------------------------------------------------------------------- the port itself
+
+def test_the_real_scene_satisfies_the_declared_scene_port(engine, handlers):
+    """`ScenePort` was wrong twice while living in `orchestration`, each time producing a
+    P0 that three green suites could not see — because every double matched the
+    *declaration* and nothing ever checked the declaration against the real `Scene`.
+    Now that the Protocol is in the frozen surface, this is the check that was missing:
+    the thing consumers are handed is the thing they were promised."""
+    scene = Scene(engine, handlers)
+
+    assert isinstance(scene, ScenePort)
+    for member in ("engine", "document", "apply", "undo", "capture_snapshot", "subscribe"):
+        assert hasattr(scene, member), f"Scene is missing ScenePort's {member!r}"
 
 
 # --------------------------------------------------------------------- determinism
@@ -181,3 +204,137 @@ def test_apply_of_an_opaque_op_without_a_snapshot_path_fails_before_touching_the
 
     assert engine.calls == []
     assert scene.document.head == 0
+
+
+# ----------------------------------------------------- targets that cannot be replayed
+
+def test_apply_refuses_an_operation_targeting_an_object_nothing_produced(
+    engine, handlers, move_op
+):
+    """F-010, reject-early half. An operation whose target was never produced by a logged
+    operation and was not in the scene when it was constructed poisons the log: replay
+    starts from `engine.reset()`, so that target will not exist next time and every later
+    undo/redo/rollback in the session raises. Refusing it here turns a crash three
+    operations later into an error naming the actual mistake, at the moment it is made."""
+    scene = Scene(engine, handlers)
+
+    with pytest.raises(RuleError) as caught:
+        scene.apply(move_op("op1", "bad_hole"))
+
+    assert caught.value.rule == UNKNOWN_TARGET_RULE
+    assert "bad_hole" in caught.value.detail
+    assert scene.document.head == 0, "a refused operation must never reach the log"
+    assert engine.calls == [], "refusal must happen before the handler touches the engine"
+
+
+def test_an_object_present_when_the_scene_was_constructed_is_a_legitimate_target(
+    engine, handlers, move_op
+):
+    """`build_app(reset_scene=False)` — 'open an existing .blend and work on it' — is
+    documented and supported. Geometry that was already there is exactly what such a
+    session edits, so rejecting it would refuse the entire supported workflow rather than
+    the mistake the rule is aimed at."""
+    engine.create_primitive("existing_wall", "cube", Vec3(1.0, 1.0, 1.0))
+    scene = Scene(engine, handlers)
+
+    result = scene.apply(move_op("op1", "existing_wall"))
+
+    assert result.ok is True
+    assert scene.document.head == 1
+
+
+def test_an_object_an_earlier_operation_produced_is_a_legitimate_target(
+    engine, handlers, add_cube_op, move_op
+):
+    """The other half of the same rule: what the log itself made is always replayable, so
+    it must never be refused. A rule strict enough to reject this would block ordinary
+    build-then-adjust work, which is most of what the product does."""
+    scene = Scene(engine, handlers)
+    scene.apply(add_cube_op("op1", "a"))
+
+    result = scene.apply(move_op("op2", "a"))
+
+    assert result.ok is True
+    assert scene.document.head == 2
+
+
+def test_replay_skips_an_operation_it_cannot_re_run_and_carries_on(
+    engine, handlers, add_cube_op, move_op
+):
+    """F-010, survive-anyway half. `replay()` rebuilds from `engine.reset()`, so an
+    operation against pre-existing geometry cannot run a second time. Aborting the whole
+    replay there is what made undo session-fatal: one such operation and every later
+    history call raised for the rest of the session. Skipping it and continuing means the
+    rest of the scene still comes back."""
+    engine.create_primitive("existing_wall", "cube", Vec3(1.0, 1.0, 1.0))
+    scene = Scene(engine, handlers)
+    scene.apply(move_op("op1", "existing_wall"))
+    scene.apply(add_cube_op("op2", "a"))
+    scene.apply(add_cube_op("op3", "b"))
+
+    report = scene.replay()
+
+    assert engine.exists("a") and engine.exists("b"), "replay abandoned the rest of the log"
+    assert report.complete is False
+    assert [s.op_id for s in report.skipped] == ["op1"]
+
+
+def test_a_replay_report_names_the_operation_it_skipped_and_why(
+    engine, handlers, add_cube_op, delete_op
+):
+    """A replay that silently dropped operations is worse than one that failed — the
+    operator sees a scene that looks whole and is missing work nobody mentioned. The
+    report has to carry the operation id, its kind and the reason, because that is the
+    only thing an agent or a human can act on."""
+    engine.create_primitive("existing_wall", "cube", Vec3(1.0, 1.0, 1.0))
+    scene = Scene(engine, handlers)
+    scene.apply(delete_op("op1", "existing_wall"))
+    scene.apply(add_cube_op("op2", "a"))
+
+    report = scene.replay()
+
+    assert report.applied == 1
+    assert len(report.skipped) == 1
+    skipped = report.skipped[0]
+    assert skipped.op_id == "op1"
+    assert skipped.kind == "delete_object"
+    assert "existing_wall" in skipped.reason
+    assert "op1" in report.describe()
+
+
+def test_a_replay_that_could_not_re_run_something_does_not_break_the_next_one(
+    engine, handlers, add_cube_op, move_op
+):
+    """The reported failure was not one bad call, it was a dead session: after the first
+    `EngineError` out of `replay()`, `redo`, `rollback_to` and a second `undo` all failed
+    identically and never recovered. Replay must be re-enterable however many operations
+    it had to skip."""
+    engine.create_primitive("existing_wall", "cube", Vec3(1.0, 1.0, 1.0))
+    scene = Scene(engine, handlers)
+    scene.apply(move_op("op1", "existing_wall"))
+    scene.apply(add_cube_op("op2", "a"))
+
+    first = scene.replay()
+    second = scene.replay()
+
+    assert [s.op_id for s in first.skipped] == [s.op_id for s in second.skipped] == ["op1"]
+    assert engine.exists("a")
+
+
+def test_an_unregistered_kind_in_the_log_is_skipped_rather_than_raised_during_replay(
+    engine, handlers, add_cube_op
+):
+    """A scene saved by a build with one more operation module than this one has must
+    still open. Raising `KeyError` from inside replay makes the whole document
+    unopenable because of a single entry — the file is not corrupt, one operation is
+    simply unavailable, and those are very different outcomes."""
+    scene = Scene(engine, handlers)
+    scene.apply(add_cube_op("op1", "a"))
+    scene.document.operations.append(Operation(op_id="op2", kind="from_the_future"))
+    scene.document.head = 2
+
+    report = scene.replay()
+
+    assert [s.op_id for s in report.skipped] == ["op2"]
+    assert "from_the_future" in report.skipped[0].reason
+    assert engine.exists("a")

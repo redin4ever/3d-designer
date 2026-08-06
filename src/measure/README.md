@@ -37,12 +37,42 @@ find_unapplied_transforms(engine, object_id)
 find_clipping(engine, pairs, joinery=())       # pairs: Sequence[tuple[str, str]]
 find_visual_gaps(engine, pairs, max_gap)
 
+# neighbour-scoped pairwise checks — the caller supplies ids, not pairs
+neighbour_pairs(engine, object_ids, *, margin=0.0, index=None) -> tuple[tuple[str, str], ...]
+neighbour_defects(engine, object_ids, *, joinery=(), max_gap=0.005, margin=0.0, index=None)
+
 # composition
 inspect(engine, object_id) -> tuple[Defect, ...]                  # every single-object check
 report(engine, scope, pairs=(), joinery=(), full_scene=False) -> MeasurementReport
 evaluate(engine, query: AcceptanceQuery) -> AcceptanceResult
 is_watertight(engine, object_id) -> bool
+
+# the MCP tool surface
+MEASURE_SPECS: tuple[ToolSpec, ...]   # 6 tools, ToolRole.INSPECT, all mutating=False
+bind_engine(engine | None) -> None    # composition-root fallback; dispatch supplies its own
 ```
+
+### The six tools
+
+| Tool | Answers |
+|---|---|
+| `measure_distance(a, b)` | closest surface-to-surface distance, metres |
+| `measure_gap(a, b)` | shortest empty span, metres |
+| `measure_angle(a, b)` | degrees between the two long axes |
+| `measure_dimensions(object_ids)` | size, bounds, volume and triangle count per object |
+| `find_clipping(object_ids, joinery, margin)` | parts interpenetrating where they should not |
+| `defect_report(object_ids, include_neighbours, joinery, max_gap)` | every defect class, scoped |
+
+Six, not sixteen: ADR-003 puts the accuracy-optimal visible set at about 5-8 per role, and
+`ToolRole.INSPECT` also carries `mcp_server`'s three session tools. The seven single-object
+metrics are grouped into one tool and the ten defect classes into another, rather than
+published one apiece.
+
+Every handler returns a `contracts.MeasurementReport`, including the ones that answer with a
+single number — one return type is what lets `mcp_server.serialize` render any of them
+without duck-typing. Every parameter's schema carries its unit in its own description; an
+agent acts on the schema without reading source, and a review found an undescribed scalar
+being guessed as `[x, y, z]`.
 
 ## Layout
 
@@ -55,6 +85,11 @@ file:
 | `topology.py` | The 6 single-object defect finders (holes, non-manifold edge/vertex, loose/duplicate, flipped normal, unapplied transform) |
 | `intersections.py` | Self-intersection, clipping, visual gaps — everything that needs a BVH-pruned pair or a full triangle-triangle test |
 | `report.py` | `inspect`, `report`, `evaluate`, `is_watertight` — composes the above into what the rest of the system consumes |
+| `neighbours.py` | `neighbour_pairs`, `neighbour_defects` — the pairwise checks scoped through `spatial.SpatialIndex` |
+| `registry.py` | `MEASURE_SPECS` — the tool declarations and their schemas |
+| `_broadphase.py` | the uniform grid over one mesh's triangles that keeps `find_self_intersections` sub-quadratic |
+| `_handlers.py` | the callables behind `MEASURE_SPECS`, and how they reach the live engine |
+| `_errors.py` | `measure.unknown_object` and friends — a rule and a *usable* next step |
 
 ## Invariants
 
@@ -80,12 +115,29 @@ file:
   against live geometry every time; it is never told the answer by a caller and never trusts
   a prior result.
 
+- **The self-intersection check prunes work, never findings.** `_broadphase.candidate_pairs`
+  returns a *superset* of the pairs whose boxes overlap, and two triangles that intersect
+  necessarily have overlapping boxes — so the answer is identical to the all-pairs sweep it
+  replaced. Every fallback in that file falls back to *more* work. It matters because the
+  check is a `BLOCKER` and it runs automatically: on a real Blender 960-triangle sphere it
+  went from 6.5s finding nothing to 0.02s finding nothing, and the interpenetrating case
+  (two joined spheres, 1920 triangles) still reports all 126 crossings.
+- **A failure names a rule and a *usable* next step.** `measure.unknown_object` suggests up
+  to five near-miss ids, never the whole scene. At the thousands of objects ADR-011 targets,
+  listing every id is a next step no agent can act on.
+
 ## Dependencies
 
-`contracts` only. `find_clipping` and `find_visual_gaps` accept `pairs` as a plain
-`Sequence[tuple[str, str]]` — normally produced by `spatial.pairs_overlapping(engine)` — so
-this module has no import-time dependency on `spatial` even though `.pipeline/modules.json`
-lists it as a design-time one.
+`contracts` and `spatial` — the latter only for the neighbour-scoped queries in
+`neighbours.py`, which is what `spatial.SpatialIndex` was built for. `find_clipping` and
+`find_visual_gaps` still accept `pairs` as a plain `Sequence[tuple[str, str]]`, so the
+low-level checks carry no dependency on it.
+
+Nothing here imports `mcp_server`: `ARCHITECTURE.md`'s arrow runs `scene -> orchestration ->
+mcp`, and `mcp_server.registry` imports *this* module. The one thing `_handlers.py` needs
+from it — the attribute `context.needs("engine")` sets, so `dispatch` hands a handler the
+live engine — is written as a literal, with `bind_engine` as the fallback if it ever
+changes.
 
 ## Testing
 

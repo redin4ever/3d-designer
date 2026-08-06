@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from contracts import LockContention, Phase, ToolError, ToolRole, WriteLease
+from contracts import LockContention, Phase, PhaseViolation, ToolError, ToolRole, WriteLease
 from mcp_server import dispatch
 from raw import RAW_TOOL_SPEC
 
@@ -19,15 +19,21 @@ _ADD_PRIMITIVE_PARAMS = {"object_id": "box1", "kind": "cube", "size": [1, 1, 1]}
 
 # ------------------------------------------------------------------------- role gating
 
-def test_dispatch_on_a_tool_the_role_cannot_see_raises_tool_error_naming_the_role(
-    orchestrator,
+def test_dispatch_on_a_tool_this_phase_does_not_allow_names_the_phase(
+    orchestrator, write_lease,
 ) -> None:
-    """An EXPORT-role agent has no business reaching a BLOCKOUT construction tool. The
-    failure must name *which role* was denied, not surface as a generic lookup miss — an
-    agent told the boundary it hit can pick a tool that is actually available to it."""
-    with pytest.raises(ToolError) as excinfo:
-        dispatch("add_wall", {}, role=ToolRole.EXPORT, orchestrator=orchestrator)
-    assert "export" in str(excinfo.value).lower()
+    """Superseded premise, kept intent (ADR-013). This test used to dispatch as
+    ``role=EXPORT`` and assert the refusal named that role — but the role a caller passes
+    is no longer consulted at all, so asserting on it would have pinned the exact defect
+    Gate B 6.3 was raised to fix. The boundary an agent actually hits is the *phase*, and
+    the refusal must name it, or the agent has nothing to steer by. Role-and-phase gating
+    has its own file: ``authorize_test.py``."""
+    with pytest.raises(PhaseViolation) as excinfo:
+        dispatch(
+            "unwrap_uvs", {"object_id": "box1"},
+            role=ToolRole.POLISH, orchestrator=orchestrator, lease=write_lease,
+        )
+    assert "blockout" in str(excinfo.value).lower()
 
 
 def test_dispatch_on_an_unknown_tool_name_also_names_the_role(orchestrator) -> None:
@@ -128,14 +134,33 @@ def test_dispatching_raw_execute_records_an_opaque_operation(orchestrator, fake_
 
 
 def test_dispatch_on_a_read_only_tool_with_no_handler_wired_yet_fails_cleanly(
-    orchestrator,
+    orchestrator, monkeypatch,
 ) -> None:
-    """``check_export_budget`` is real, registered ``ToolSpec`` content with
-    ``handler=None`` (``export/registry.py``'s own docstring: a placeholder ``mcp`` skips
-    at registration, not an omission). Calling ``None(...)`` would be a bare
-    ``TypeError``; this must instead be a named, honest ``ToolError``."""
-    with pytest.raises(ToolError):
-        dispatch(
-            "check_export_budget", {"object_ids": ["a"]},
-            role=ToolRole.EXPORT, orchestrator=orchestrator,
-        )
+    """Calling ``None(...)`` would be a bare ``TypeError`` several frames from anything the
+    agent did. A tool that reaches ``dispatch`` with nothing behind it must fail as a named
+    rule instead.
+
+    ``check_export_budget`` used to be the live example of this and is not any more — it
+    carries a real handler as of ADR-014, and ``export_tools_test.py`` covers it. The
+    branch still has to hold for the next module that registers a tool before wiring it,
+    so it is exercised against a spec built for the purpose rather than deleted along with
+    its former subject."""
+    import mcp_server.registry as registry_module
+    from contracts import ToolSpec
+
+    handler_less = ToolSpec(
+        name="not_wired_yet",
+        description="a registered tool whose implementation has not landed",
+        roles=(ToolRole.INSPECT,),
+        input_schema={"type": "object", "properties": {}},
+        mutating=False,
+    )
+    monkeypatch.setitem(
+        registry_module._DEFAULT_REGISTRY,  # noqa: SLF001
+        ToolRole.INSPECT,
+        registry_module._DEFAULT_REGISTRY[ToolRole.INSPECT] + (handler_less,),  # noqa: SLF001
+    )
+
+    with pytest.raises(ToolError) as excinfo:
+        dispatch("not_wired_yet", {}, role=ToolRole.INSPECT, orchestrator=orchestrator)
+    assert excinfo.value.suggestion

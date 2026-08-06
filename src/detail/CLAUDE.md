@@ -5,7 +5,12 @@ implementation-facing: conventions for whoever works on this module next.
 
 ## Status
 
-**GREEN.** Every function here is implemented and its suite passes. This module was built test-first (Rule 4): the tests were written against the contract, run, and confirmed failing on `NotImplementedError` before any body existed.
+**GREEN.** Every function here is implemented and its suite passes (80 tests, 10 of them
+against real Blender). This module was built test-first (Rule 4): the tests were written
+against the contract, run, and confirmed failing on `NotImplementedError` before any body
+existed. The same applies to the F-008 (`DETAIL_SPECS`) and F-018 (bevel slivers) work — the
+sliver ceiling was reproduced as a failing measurement against real Blender before a line of
+the fix existed.
 
 The tests in this directory were written against the module brief and `docs/decisions/gate-A.md`
 waves 1.3 and 8.3/8.4 before any implementation existed (Rule 4) — they are the spec. Do not
@@ -27,16 +32,36 @@ pytest src/detail/edges_test.py -q
 pytest src -q
 ```
 
-No `needs_blender` marker anywhere in this module — everything here runs against
-`testing.FakeEngine` with no Blender installed, and must stay that way.
+```bash
+# the one file that needs a real Blender
+pytest src/detail/bevel_quality_test.py -q
+```
+
+**`bevel_quality_test.py` is the only `needs_blender` file here, and it must stay the only
+one.** Everything else runs against `testing.FakeEngine` with no Blender installed. The
+exception exists because `FakeEngine.bevel_edges` never moves a vertex — it duplicates a face
+to model polygon growth — so a bevel-quality assertion written against the fake proves
+nothing, and F-018 (bevel slivers) is a defect that only exists in real geometry. Everything
+*decidable* about that fix lives in `topology.py`/`_polygon.py` and is tested without Blender;
+only the "does a real bevel actually come out under the ceiling" claim needs bpy.
+
+If you add a `needs_blender` test, mark it with `pytest.mark.needs_blender` (registered in
+`pyproject.toml`; `conftest.py` skips it and reports the skip loudly when bpy is missing) and
+take the engine from `engine.create_engine()`, never by constructing `BlenderEngine`.
 
 ## Boundaries
 
 - Write only inside `src/detail/**`. `src/contracts/`, `src/testing/`, and `conftest.py` are
   frozen surfaces owned elsewhere (Rule 5) — read them, never edit them.
-- If the contract in `src/contracts/` is missing something this module needs (see the
-  `MetricKind` gap noted in `README.md` and `report.py`), do not edit it. File the need and
-  adapt locally against the current contract.
+- If the contract in `src/contracts/` is missing something this module needs, do not edit it.
+  File the need and adapt locally against the current contract. (The `MetricKind` gap this
+  file used to name is closed: `SHARP_EDGE_RATIO`, `TRIANGLE_ASPECT_RATIO` and
+  `EDGE_LENGTH_UNIFORMITY` exist and `report.py`/`quality.py` use them directly.)
+- `DETAIL_SPECS` names must match the handler names `src/app/handlers.py` registers under
+  `"detail"`. A tool whose name does not match its handler is visible to an agent and
+  executable by nothing — and it fails at call time, after the agent has committed to a plan.
+  `cleanup_bevel_topology` is currently published here with no handler wired there yet; that
+  entry belongs to the composition root, which is main-agent only.
 - `detail/__init__.py` is a barrel: re-exports only. If it grows logic, that logic belongs in
   one of the five responsibility files instead.
 - Nothing outside `detail/` may import `detail.edges`, `detail.apply`, etc. directly — only
@@ -70,17 +95,37 @@ No `needs_blender` marker anywhere in this module — everything here runs again
 - **`add_greebles` and `add_panel_lines` add geometry; they do not remove it.**
   `triangles_after >= triangles_before` always, and strictly greater whenever `changed` is
   `True`.
+- **`Vec3.normalized()` raises below `EPSILON` (1e-4), which is bigger than real geometry.**
+  A legitimate 2.4 mm x 3 mm bevel-corner triangle has a cross-product length around 7e-6.
+  `edges.py::_triangle_normal` treats those as degenerate and skips them; `topology.py`
+  cannot, because it has to triangulate the region they belong to — so it normalises by hand
+  against a 1e-15 floor. Do not "simplify" either one into a `normalized()` call.
+- **The cleanup's floor is the triangulation it was given.** `_polygon.best_triangulation`
+  returns `None` unless a candidate strictly beats what was already there. On real bevel
+  output the engine's own triangulation wins on roughly two thirds of regions, and a pass
+  that "improved" those would make the mesh worse under the name of a quality step. This is
+  also what makes `changed=False` honest and the pass idempotent under replay.
+- **Three triangulation strategies, not one, and this is not over-engineering.** Measured on
+  the F-018 tread: greedy ear clipping alone reaches 83.5, the dynamic program alone 90.8,
+  the best-of-all-candidates 64.2 — they fail on different shapes. Deleting one costs real
+  quality; check `bevel_quality_test.py` before you do.
 - Keep the one-file-per-responsibility split from `README.md`. A function that grows past the
   300-line soft cap (`.claude/rules/modularity.md`) wants a private helper module under
   `detail/`, not a bigger source file.
 
 ## Test layout
 
-Mirrors the five responsibility files, plus one for the shared result type:
-`results_test.py`, `edges_test.py`, `apply_test.py`, `surface_test.py`, `materials_test.py`,
-`report_test.py`. A new pass or parameter gets its test added to the matching file, not a new
-top-level test file, unless it grows enough to need its own responsibility split (split the
-source file the same way first).
+One test file per responsibility file: `results_test.py`, `edges_test.py`, `apply_test.py`,
+`topology_test.py`, `cleanup_test.py`, `quality_test.py`, `surface_test.py`,
+`materials_test.py`, `report_test.py`, `specs_test.py`, plus `bevel_quality_test.py` for the
+real-Blender claims (see *Commands*). `_polygon.py` has no test file of its own on purpose —
+it is private, and it is covered through `retriangulate_planar_regions` on hand-built shapes
+(Rule 4: test the public interface; a private file that needs its own test wants to be a
+module).
+
+A new pass or parameter gets its test added to the matching file, not a new top-level test
+file, unless it grows enough to need its own responsibility split (split the source file the
+same way first).
 
 ## Style
 

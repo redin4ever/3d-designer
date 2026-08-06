@@ -14,15 +14,63 @@ from mcp_server import build_registry, tools_for
 
 # ------------------------------------------------------------------- visible-set bounds
 
-def test_every_role_tool_set_has_at_most_eight_tools() -> None:
-    """The accuracy-optimal visible tool set measures roughly 2-7, with real degradation
-    reported past ~10-15 and agents inventing tool names entirely past ~30
-    (``contracts.ToolRole``'s own docstring, ADR-003). This bound is load-bearing: a
-    registry that ever grows one role past 8 has silently broken the guarantee every
-    sub-agent role's accuracy depends on, for every role at once, not just the one that
-    grew."""
-    for role in ToolRole:
-        assert len(tools_for(role)) <= 8, role
+#: The visible-set size of every role, recorded rather than assumed (Gate B 3.3).
+#:
+#: The accuracy-optimal visible tool set measures roughly 5-8, with degradation reported
+#: past ~10-15 (``contracts.ToolRole``'s own docstring, ADR-003). Asked at Gate B 3.3
+#: whether to split roles further, hide tools, or exceed the band and measure it, the user
+#: chose **exceed it and measure**: ship what is needed, record the real numbers, and treat
+#: the band as guidance derived from other systems rather than as law here.
+#:
+#: So this is a ledger, not a limit. A number that changes because a module shipped a tool
+#: is a number to *update deliberately* — that act is the measurement the decision asked
+#: for. Silently capping the registry to keep a number under 8 is the one response that is
+#: ruled out: a fair-capping fallback once did exactly that and hid ``repair``,
+#: ``make_plumb`` and ``close_visual_gap``, three core operations, from every agent.
+TOOL_COUNTS_BY_ROLE: dict[str, int] = {
+    "blockout": 5,
+    "refine": 4,
+    "repair": 8,
+    "align": 7,
+    "detail": 4,
+    "polish": 2,
+    "inspect": 9,
+    "export": 2,
+    "admin": 2,
+}
+
+
+def test_the_visible_tool_count_of_every_role_is_the_recorded_one() -> None:
+    """Gate B 3.3 chose to exceed the 5-8 accuracy band and measure it. That choice is only
+    honoured if the number is written down somewhere that fails when it drifts — otherwise
+    "we exceeded it deliberately" and "it grew while nobody was looking" are the same
+    state, and the next person has a rule instead of evidence.
+
+    If this fails because you added a tool: update the number here and in ``README.md``,
+    and do not add a cap to make it go away."""
+    actual = {role.value: len(tools_for(role)) for role in ToolRole}
+    assert actual == TOOL_COUNTS_BY_ROLE
+
+
+def test_no_tool_is_hidden_from_the_role_that_declares_it() -> None:
+    """The failure this replaces: a fair-capping fallback trimmed each role to eight and
+    silently dropped ``repair``, ``make_plumb`` and ``close_visual_gap``. An agent cannot
+    call a tool it cannot see, and nothing in the response said anything was missing — the
+    operations simply appeared not to exist. Whatever a role's count reaches, every
+    declared tool must reach every role that declares it."""
+    import mcp_server.registry as registry_module
+
+    registry = build_registry()
+    for _source, specs in registry_module._sources(include_raw=True):  # noqa: SLF001
+        for spec in specs:
+            for role in spec.roles:
+                assert spec.name in {s.name for s in registry[role]}, (
+                    f"{spec.name} declares role {role.value} but is not visible to it"
+                )
+
+    visible = {spec.name for specs in registry.values() for spec in specs}
+    for name in ("repair", "make_plumb", "close_visual_gap"):
+        assert name in visible, f"{name} is declared but invisible to every role"
 
 
 def test_catalogue_is_larger_than_any_single_roles_slice() -> None:
@@ -40,12 +88,15 @@ def test_roles_with_real_registered_content_have_at_least_one_tool() -> None:
     (``export.EXPORT_SPECS``), ADMIN (``raw.RAW_TOOL_SPEC``) and POLISH (``uv``'s specs)
     already have real ``ToolSpec`` content declared beside their operations — an empty
     slice for any of these would mean this module dropped already-built tools on the
-    floor. DETAIL and INSPECT are legitimately empty today: ``measure``/``detail`` exist
-    but publish no ``*_SPECS`` constant yet. Asserting >=1 there would mean this module
-    fabricating tool content that ``ARCHITECTURE.md`` assigns to those modules, not to
-    ``mcp`` — see this task's ``assumptions`` output."""
+    floor. INSPECT joined them at Gate B 3.1: session orientation is registry *policy*,
+    declared in ``session_specs.py`` here, because the phase and the registry are what it
+    reports on and neither belongs to an operation module. DETAIL is still legitimately
+    empty — ``detail`` exists but publishes no ``*_SPECS`` constant yet, and asserting >=1
+    there would mean this module fabricating tool content ``ARCHITECTURE.md`` assigns
+    elsewhere."""
     for role in (
-        ToolRole.BLOCKOUT, ToolRole.REFINE, ToolRole.EXPORT, ToolRole.ADMIN, ToolRole.POLISH,
+        ToolRole.BLOCKOUT, ToolRole.REFINE, ToolRole.EXPORT, ToolRole.ADMIN,
+        ToolRole.POLISH, ToolRole.INSPECT,
     ):
         assert len(tools_for(role)) >= 1, role
 

@@ -264,6 +264,11 @@ def build_handlers(*, include_raw: bool = True) -> HandlerRegistry:
         "apply_edge_treatment": "apply_edge_treatment",
         "add_panel_lines": "add_panel_lines",
         "add_greebles": "add_greebles",
+        # Gate B 3.4. Runs by default inside apply_edge_treatment; registered separately
+        # so it can be re-run on a mesh bevelled elsewhere, or after a deliberate
+        # cleanup=False pass. Real bevels measured mean triangle aspect ratio 109 before
+        # this and 64 after.
+        "cleanup_bevel_topology": "cleanup_bevel_topology",
     })
     _add("uv", {
         "unwrap_uvs": "unwrap",

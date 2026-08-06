@@ -64,6 +64,10 @@ class FakeScene:
             ok=True,
             produced_objects=tuple(created),
             modified_objects=op.target_objects,
+            # Real handlers report what they supplied on the caller's behalf (Gate B 1.4).
+            # A double that always returns `()` here would let `perform` drop the field
+            # entirely and still look correct.
+            assumptions=tuple(op.params.get("assumptions", ())),
         )
 
     @property

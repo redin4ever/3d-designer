@@ -8,9 +8,12 @@ geometry and ``ChangeKind`` that result, never through any special-cased interna
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
-from contracts import ChangeKind
+from contracts import ChangeKind, Vec3
 from scene import Scene
 
 
@@ -155,3 +158,139 @@ def test_checkpoint_emits_a_checkpoint_change_event(engine, handlers, add_cube_o
 
     assert len(events) == 1
     assert events[0].kind == ChangeKind.CHECKPOINT
+
+
+# ------------------------------------------------ surviving a log it cannot fully replay
+
+def test_a_scene_mixing_pre_existing_and_logged_geometry_survives_a_whole_history_cycle(
+    engine, handlers, add_cube_op, move_op
+):
+    """F-010, both halves together, in the shape the live failure took. Opening an
+    existing `.blend` (`build_app(reset_scene=False)`) means the log legitimately contains
+    operations against geometry no logged operation produced. Before this, the first
+    `undo` raised `EngineError` from inside `replay()` and `redo`, `rollback_to` and every
+    later `undo` failed identically for the rest of the session — the operator's only
+    remaining option was to restart and lose the run."""
+    engine.create_primitive("existing_wall", "cube", Vec3(1.0, 1.0, 1.0))
+    scene = Scene(engine, handlers)
+    scene.apply(move_op("op1", "existing_wall"))
+    scene.apply(add_cube_op("op2", "a"))
+    scene.checkpoint("after-a")
+    scene.apply(add_cube_op("op3", "b"))
+    scene.apply(add_cube_op("op4", "c"))
+
+    assert scene.undo(2) == ChangeKind.ROLLBACK
+    assert scene.redo(1) == ChangeKind.ROLLBACK
+    assert scene.rollback_to("after-a") == ChangeKind.ROLLBACK
+    assert scene.undo(1) == ChangeKind.ROLLBACK
+
+    assert scene.document.head == 1
+    assert engine.exists("existing_wall") is False, (
+        "the pre-existing wall cannot be rebuilt from a log that never made it — the "
+        "scene must say so rather than pretend"
+    )
+    assert not engine.exists("a")
+
+
+def test_an_unreplayable_operation_is_reported_on_the_event_the_undo_emits(
+    engine, handlers, add_cube_op, move_op
+):
+    """Gate B 5.2 — 'reject where we can, survive where we can't'. Surviving silently is
+    not surviving: the live view would show a scene missing an operation the operator
+    still believes is applied. The skip has to reach whoever asked for the undo."""
+    engine.create_primitive("existing_wall", "cube", Vec3(1.0, 1.0, 1.0))
+    scene = Scene(engine, handlers)
+    scene.apply(move_op("op1", "existing_wall"))
+    scene.apply(add_cube_op("op2", "a"))
+    scene.apply(add_cube_op("op3", "b"))
+    events = []
+    scene.subscribe(events.append)
+
+    scene.undo(1)
+
+    assert len(events) == 1
+    assert "op1" in events[0].log_line
+    assert [s.op_id for s in scene.last_replay.skipped] == ["op1"]
+
+
+# ------------------------------------------------------- barriers restore, never re-run
+
+def test_undo_across_a_raw_barrier_restores_geometry_instead_of_re_running_the_script(
+    engine, handlers, add_cube_op, random_object_op
+):
+    """F-011. A non-deterministic `raw_execute` made `randobj_f9dd53`; undoing past it and
+    redoing forward produced three differently-named objects while the system reported a
+    clean `FULL_RESYNC`. Every rebuild went through `replay()`, which re-executes the
+    script — the captured snapshot was never read back. Arbitrary code must be restored
+    from, never re-run, or undo quietly rewrites the scene it claimed to restore."""
+    scene = Scene(engine, handlers)
+    scene.apply(add_cube_op("op1", "a"))
+    op = random_object_op("op2")
+    scene.apply(op, snapshot_path=scene.capture_snapshot("op2"))
+    scene.apply(add_cube_op("op3", "c"))
+    before = set(engine.list_objects())
+
+    assert scene.undo(2) == ChangeKind.FULL_RESYNC
+    assert set(engine.list_objects()) == {"a"}, "the barrier's own object survived an undo past it"
+
+    assert scene.redo(2) == ChangeKind.FULL_RESYNC
+
+    assert set(engine.list_objects()) == before, (
+        "redo re-ran the opaque script instead of restoring it — the scene came back with "
+        "differently-named geometry"
+    )
+
+
+def test_an_undo_stopping_short_of_a_barrier_still_never_re_runs_the_script(
+    engine, handlers, add_cube_op, random_object_op
+):
+    """The deepest form of the same defect: *any* rebuild started from `engine.reset()`
+    and re-ran every logged operation, so even an undo that reported a plain `ROLLBACK`
+    silently replaced the raw script's output. Nothing may re-execute an opaque operation,
+    whatever ChangeKind the move reports."""
+    scene = Scene(engine, handlers)
+    op = random_object_op("op1")
+    scene.apply(op, snapshot_path=scene.capture_snapshot("op1"))
+    produced = [o for o in engine.list_objects() if o.startswith("randobj_")]
+    scene.apply(add_cube_op("op2", "b"))
+
+    assert scene.undo(1) == ChangeKind.ROLLBACK
+
+    assert [o for o in engine.list_objects() if o.startswith("randobj_")] == produced
+    assert not engine.exists("b")
+
+
+def test_rollback_to_a_checkpoint_across_a_barrier_restores_rather_than_re_runs(
+    engine, handlers, add_cube_op, random_object_op
+):
+    """`rollback_to` is the operator-facing control Gate A 5.4 asked for by name — pause,
+    roll back, redirect. It shares undo's rebuild path and must share its guarantee, or
+    the one control a human reaches for under pressure is the one that silently changes
+    the scene."""
+    scene = Scene(engine, handlers)
+    scene.apply(add_cube_op("op1", "a"))
+    scene.checkpoint("before-raw")
+    scene.apply(random_object_op("op2"), snapshot_path=scene.capture_snapshot("op2"))
+    scene.apply(add_cube_op("op3", "c"))
+
+    assert scene.rollback_to("before-raw") == ChangeKind.FULL_RESYNC
+
+    assert set(engine.list_objects()) == {"a"}
+
+
+def test_capture_snapshot_records_geometry_not_the_operation_log(
+    engine, handlers, add_cube_op
+):
+    """The capture half shipped in QA round 2 called `scene.save()`, which serialises the
+    *operation log* — and an opaque operation is by definition one the log does not
+    describe, so restoring from it restored nothing at all. A barrier's snapshot has to be
+    geometry or the barrier is decorative."""
+    scene = Scene(engine, handlers)
+    scene.apply(add_cube_op("op1", "a", size=3.0))
+
+    path = scene.capture_snapshot("op-next")
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+
+    assert "operations" not in data, "this is the operation log again, not geometry"
+    assert [o["object_id"] for o in data["objects"]] == ["a"]
+    assert data["objects"][0]["vertices"], "an object recorded with no vertices restores nothing"

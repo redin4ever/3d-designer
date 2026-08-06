@@ -1,15 +1,15 @@
 """The action loop: apply one operation, check it, and hand back one report (Gate A 4.1).
 
 ``perform`` is the single path every mutation takes — direct agent calls and
-``proposals.accept`` alike are expected to route through it (or through the same
-machinery), so cadence, operator notes and lock verification are decided in exactly one
-place. ADR-005: geometry checks run after every geometry-changing operation at a
-user-configurable cadence, and report rather than block by default. Gate A 4.1: the
-report is "what changed + key measurements + new problems", never full scene state and
-never a bare pass/fail.
+``proposals.accept`` alike route through it — so cadence, operator notes, lock verification
+and report size are decided in exactly one place. ADR-005: geometry checks run after every
+geometry-changing operation at a user-configurable cadence, and report rather than block.
+Gate A 4.1: the report is "what changed + key measurements + new problems", never full scene
+state and never a bare pass/fail.
 
-Nothing here computes anything yet — every method raises until an implementer replaces
-the body (Rule 4 — tests come first).
+Two things live in sibling files because they are separate decisions (Rule 2):
+``_neighbours.py`` owns *which pairs* the check compares, and ``_summary.py`` owns *how much*
+of the result is worth sending.
 """
 
 from __future__ import annotations
@@ -17,20 +17,20 @@ from __future__ import annotations
 from contracts import (
     ActionReport,
     CheckCadence,
-    Measurement,
-    MetricKind,
+    Defect,
     Operation,
     OperationResult,
     RunState,
     WriteLease,
 )
 
+from ._neighbours import NeighbourIndex
+from ._phase_acceptance import VISUAL_GAP_MAX
+from ._summary import Detail, summarise
 from .run import RunPaused
 
-_NOT_IMPLEMENTED = "orchestration.{name}: not implemented"
 
-
-def _touched(result: OperationResult) -> list[str]:
+def _touched(result: OperationResult) -> tuple[str, ...]:
     """Objects an operation produced or modified, in order, without duplicates."""
     seen: set[str] = set()
     out: list[str] = []
@@ -38,167 +38,166 @@ def _touched(result: OperationResult) -> list[str]:
         if obj not in seen:
             seen.add(obj)
             out.append(obj)
-    return out
+    return tuple(out)
 
 
 class ReportingMixin:
     """Mixed into :class:`Orchestrator`. See ``src/orchestration/__init__.py``."""
 
     def _capture_snapshot(self, op: Operation) -> str:
-        """Write the scene as it stands, and return the path.
+        """The restorable pre-execution state for an opaque operation.
 
-        Called before an opaque operation runs, because that is the only moment the
-        pre-execution state still exists. Without it `UndoBarrier.snapshot_path` pointed at
-        nothing and undoing across a raw call re-executed the arbitrary script instead of
-        restoring — a non-deterministic script then produced different geometry while the
-        system reported a clean `FULL_RESYNC`.
+        Delegates to ``ScenePort.capture_snapshot``, which writes the live **geometry**. This
+        module used to implement it by calling ``scene.save()``, which serialises the
+        operation *log* — and an opaque operation is by definition one whose effect the log
+        does not describe. Restoring from it restored nothing: undo across a raw-execution
+        barrier re-ran the script, so a non-deterministic script produced one object, then
+        three differently-named ones after undo-then-redo, while the system reported a clean
+        ``FULL_RESYNC`` (Gate B 5.3).
+
+        A scene that cannot capture one gets an honest marker rather than a path to a file
+        nobody wrote. The barrier still records that this point cannot be replayed across,
+        which is the half of the guarantee that survives.
         """
-        import tempfile
-        from pathlib import Path
+        capture = getattr(self._scene, "capture_snapshot", None)
+        if capture is not None:
+            try:
+                path = capture(op.op_id)
+            except Exception:  # noqa: BLE001 — an honest marker beats a bogus path
+                path = ""
+            if path:
+                return path
+        return f"{op.op_id}#unavailable-no-capture-snapshot"
 
-        directory = Path(tempfile.gettempdir()) / "forge3d-snapshots"
-        directory.mkdir(parents=True, exist_ok=True)
-        path = str(directory / f"{op.op_id}.json")
-        save = getattr(self._scene, "save", None)
-        if save is None:
-            # Better an honest marker than a path to a file that was never written: the
-            # barrier still records that this point cannot be replayed across.
-            return f"{path}#unavailable-no-save"
-        save(path)
-        return path
+    def _engine(self):
+        return getattr(self._scene, "engine", None)
 
-    def _measure(self, op: Operation, result: OperationResult) -> tuple[Measurement, ...]:
-        """Real measurements against live geometry for what this operation touched.
+    def _neighbour_index(self, engine) -> NeighbourIndex:
+        """One index per engine, kept alive across operations (ADR-011).
 
-        This is the product's core promise (Gate A 3.1, ADR-005): the tool computes the
-        spatial facts so the model never eyeballs them. It emitted hardcoded zeroes for a
-        while because `ScenePort` exposed no engine — B-000. The port now does, so this
-        calls `measure` for real.
-
-        Scoped to the changed objects (ADR-011): at thousands of objects a whole-scene
-        sweep per call is not viable, and `MeasurementReport` records the scope so a clean
-        result can never be mistaken for a whole-scene clean bill of health.
-
-        Never raises. A measurement failure must not fail the operation that already
-        succeeded — the report says less, the model still gets its result.
+        Rebuilt only if the engine underneath changes, which in practice never happens — but
+        an index silently answering for a different engine is a wrong answer that looks
+        exactly like a right one.
         """
-        touched = _touched(result)
-        if not touched:
-            return ()
-        engine = getattr(self._scene, "engine", None)
-        if engine is None:
-            return ()
+        if getattr(self, "_index_engine", None) is not engine:
+            self._index_engine = engine
+            self._index = NeighbourIndex(engine)
+        return self._index
 
+    def _detail(self, changed: tuple[str, ...]) -> Detail:
+        """Measurements for what changed, summarised if there is too much of it."""
+        engine = self._engine()
+        if engine is None or not changed:
+            return Detail()
+        return summarise(engine, changed)
+
+    def _new_problems(self, op: Operation, result: OperationResult) -> tuple[Defect, ...]:
+        """Defects on what this operation touched **and between it and its neighbours**.
+
+        The single-object checks (``measure.inspect``) cannot see a part interpenetrating a
+        *different* part — that is a pairwise question, and ``inspect``'s own docstring says
+        it excludes them. Running only those while stamping every report
+        ``checks_scope="changed+neighbours"`` is how a 4 m room produced 39 real clipping
+        defects and reported none.
+
+        ``op.joinery`` is passed through because no library can tell a post socketed into a
+        deck from two posts overlapping — both are identical BVH overlaps, and the difference
+        is declared intent, never inferred. Without it every intentional joint in a model
+        comes back as a defect and the agent learns to ignore the channel.
+
+        Never raises. A check that fails must not fail the operation that already succeeded.
+        """
         import measure
 
-        out: list[Measurement] = []
-        for obj in touched:
-            try:
-                out.append(measure.dimensions(engine, obj))
-                out.append(measure.triangle_count(engine, obj))
-            except Exception:  # noqa: BLE001 — a stale id must not sink the report
-                continue
-        return tuple(out)
-
-    def _new_problems(self, result: OperationResult) -> tuple:
-        """Defects that exist on the objects this operation just touched.
-
-        Gate A 4.1 chose "what changed + key measurements + new problems". Without this the
-        third of those three is always empty and the agent never learns that the railing it
-        just placed now clips the tread — which is the whole reason the field exists.
-        """
         touched = _touched(result)
-        engine = getattr(self._scene, "engine", None)
+        engine = self._engine()
         if engine is None or not touched:
             return ()
 
-        import measure
-
-        problems: list = []
-        for obj in touched:
+        problems: list[Defect] = []
+        for object_id in touched:
             try:
-                problems.extend(measure.inspect(engine, obj))
+                problems.extend(measure.inspect(engine, object_id))
             except Exception:  # noqa: BLE001
                 continue
+
+        try:
+            pairs = self._neighbour_index(engine).pairs_touching(touched, VISUAL_GAP_MAX)
+        except Exception:  # noqa: BLE001
+            return tuple(problems)
+
+        if pairs:
+            try:
+                problems.extend(measure.find_clipping(engine, pairs, op.joinery))
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                problems.extend(measure.find_visual_gaps(engine, pairs, VISUAL_GAP_MAX))
+            except Exception:  # noqa: BLE001
+                pass
         return tuple(problems)
+
+    def _checks_skipped(self, op: Operation) -> bool:
+        if self._cadence is CheckCadence.EVERY_GEOMETRY_CHANGE:
+            return False
+        if self._cadence is CheckCadence.PHASE_BOUNDARIES:
+            return op.kind != "phase_promotion"
+        return True  # CheckCadence.ON_REQUEST
 
     def perform(self, op: Operation, lease: WriteLease) -> ActionReport:
         """Apply ``op`` and return the standard report.
 
-        Once implemented, in this order:
+        In this order, and the order is the contract:
 
-        1. ``self.verify(lease)`` — raise :class:`contracts.LockContention` and change
-           nothing if ``lease`` is not the live one. A caller that cannot present a live
-           lease must never reach ``self._scene.apply``; the lock is what makes that
-           true.
-        2. Check ``self.state``: if :attr:`contracts.RunState.PAUSED`, raise
-           ``orchestration.RunPaused`` (see ``run.py``) without touching ``self._scene``
-           at all. This module's chosen answer to "raise or defer": raise, and check
-           *before* ``self._scene.apply`` runs — pause is cooperative, checked between
-           operations and never mid-operation, so the log is never left half-applied
-           (``contracts.RunState.PAUSED``'s own docstring).
-        3. ``self._scene.apply(op)``.
-        4. Decide, from the current cadence (``self._cadence``), whether to run
-           measurement now: ``EVERY_GEOMETRY_CHANGE`` always does; ``PHASE_BOUNDARIES``
-           only at a phase promotion; ``ON_REQUEST`` only when asked explicitly (a
-           separate call, not modelled by ``perform`` itself). When skipped,
-           ``ActionReport.checks_skipped`` must be ``True`` — its own ``render()``
-           already refuses to let that read as a clean result; this method's only job is
-           to set the flag honestly.
-        5. Drain ``self._operator_notes`` into the report's ``operator_notes`` and clear
-           the internal list — MCP is call/response, so a redirect typed mid-run has
-           exactly one path out (``ActionReport.operator_notes``'s own docstring), and it
-           must be delivered exactly once, never replayed on a later, unrelated call.
+        1. ``self.verify(lease)`` — nothing reaches ``self._scene.apply`` without the live
+           write lease. The lock is what makes that true.
+        2. Refuse if the run is paused, *before* applying. Pause is cooperative — checked
+           between operations, never mid-operation — so a paused run never has a half-applied
+           operation to resume into.
+        3. Capture a snapshot if ``op`` is opaque; that is the only moment the pre-execution
+           state still exists.
+        4. Apply, then check at the configured cadence, honestly marking ``checks_skipped``.
+        5. Drain the operator-note queue exactly once.
+
+        The whole write path holds ``self._write_mutex``. ``SceneDocument.append`` truncates
+        anything past ``head``, and two threads inside it at once can have one truncate the
+        other's just-appended operation away while its ``perform`` still reports success —
+        a lost operation nobody is told about, in a log that is the source of truth for the
+        geometry.
         """
         self.verify(lease)
-
         if self.state is RunState.PAUSED:
             raise RunPaused()
 
-        # An opaque operation cannot be replayed, so rolling back across it needs a real
-        # snapshot to restore from. Nothing in the wired product computed one, so raw
-        # execution either raised outright or recorded a barrier that pointed at nothing —
-        # while SECURITY.md claimed the barrier as a defence. Capturing it here, before the
-        # code runs, is the only moment the pre-execution state still exists.
-        snapshot_path = self._capture_snapshot(op) if op.opaque else ""
+        with self._write_mutex:
+            self.verify(lease)  # re-checked under the mutex: step 1 was outside it
+            snapshot_path = self._capture_snapshot(op) if op.opaque else ""
+            result = self._scene.apply(op, lease=lease, snapshot_path=snapshot_path)
 
-        # Forward the lease we just verified. Without it the real Scene sees no lock proof
-        # and raises LockContention against the caller's own live lease, so every mutating
-        # call through the agent path failed 100% of the time. Invisible in every suite
-        # because both FakeScene doubles implement `apply(self, op)` with no lock check —
-        # a double agreeing with the wrong side of the contract.
-        result = self._scene.apply(op, lease=lease, snapshot_path=snapshot_path)
+            checks_skipped = self._checks_skipped(op)
+            changed = _touched(result)
+            detail = Detail() if checks_skipped else self._detail(changed)
+            new_problems = () if checks_skipped else self._new_problems(op, result)
 
-        if self._cadence is CheckCadence.EVERY_GEOMETRY_CHANGE:
-            checks_skipped = False
-        elif self._cadence is CheckCadence.PHASE_BOUNDARIES:
-            checks_skipped = op.kind != "phase_promotion"
-        else:  # CheckCadence.ON_REQUEST
-            checks_skipped = True
-
-        measurements = () if checks_skipped else self._measure(op, result)
-        new_problems = () if checks_skipped else self._new_problems(result)
-
-        notes = tuple(self._operator_notes)
-        self._operator_notes.clear()
-
-        changed: list[str] = []
-        seen: set[str] = set()
-        for obj in (*result.produced_objects, *result.modified_objects):
-            if obj not in seen:
-                seen.add(obj)
-                changed.append(obj)
+        with self._notes_mutex:
+            notes = tuple(self._operator_notes)
+            self._operator_notes.clear()
 
         return ActionReport(
             op_id=op.op_id,
             ok=result.ok,
             summary=f"{op.kind} applied" if result.ok else f"{op.kind} failed",
-            changed=tuple(changed),
+            changed=changed,
             removed=result.removed_objects,
-            measurements=measurements,
+            measurements=detail.measurements,
             new_problems=new_problems,
             checks_skipped=checks_skipped,
             operator_notes=notes,
+            assumptions=result.assumptions,
+            breakdown=detail.breakdown,
+            detail_omitted=detail.detail_omitted,
+            detail_hint=detail.detail_hint,
+            total_triangles=detail.total_triangles,
             error_rule=result.error_rule,
             error_detail=result.error_detail,
             error_suggestion=result.error_suggestion,
@@ -211,8 +210,8 @@ class ReportingMixin:
         self._cadence = c
 
     def add_operator_note(self, text: str) -> None:
-        """Queue free text typed mid-run for delivery on the next ``ActionReport`` (see
-        ``perform``, step 5). Queued rather than sent immediately because MCP is
-        call/response — there is no channel into a connected agent's context except the
-        next tool response."""
-        self._operator_notes.append(text)
+        """Queue free text typed mid-run for delivery on the next ``ActionReport``. Queued
+        rather than sent immediately because MCP is call/response — there is no channel into
+        a connected agent's context except the next tool response."""
+        with self._notes_mutex:
+            self._operator_notes.append(text)

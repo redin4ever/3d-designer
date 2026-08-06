@@ -1,12 +1,10 @@
-"""Stub — the per-object geometry cache: ``snapshot_of``, ``invalidate_cache``.
+"""The per-object geometry cache: ``snapshot_of``, ``invalidate_cache``.
 
 Reading geometry through the engine is not free at thousands of objects (ADR-011), so
 ``scene`` caches one ``MeshSnapshot`` per object id and only re-reads on an explicit
 invalidation — which ``document.py``'s ``apply`` calls for every object an operation
 touches, and ``document.py``'s ``replay`` calls in bulk (``self._cache.clear()``) before
 rebuilding everything from nothing.
-
-Nothing here is implemented yet.
 """
 
 from __future__ import annotations
@@ -14,8 +12,6 @@ from __future__ import annotations
 from contracts import MeshSnapshot
 
 __all__ = ["CacheMixin"]
-
-_NOT_IMPLEMENTED = "scene.{name}: not implemented"
 
 
 class CacheMixin:

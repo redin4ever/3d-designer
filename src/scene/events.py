@@ -1,4 +1,4 @@
-"""Stub — what the live view subscribes to: ``subscribe`` (and the private ``_emit`` that
+"""What the live view subscribes to: ``subscribe`` (and the private ``_emit`` that
 ``document.py`` and ``history.py`` call).
 
 ``scene`` never imports ``src/viewer/``. The event this module carries
@@ -7,8 +7,6 @@ arrow points one way: the viewer subscribes to scene; scene knows nothing about 
 viewer. See ``events_test.py::test_scene_source_never_imports_the_viewer``, which parses
 every source file in this package and fails if any of them import anything named
 ``viewer``.
-
-Nothing here is implemented yet.
 """
 
 from __future__ import annotations
@@ -18,8 +16,6 @@ from typing import Callable
 from contracts import SceneChangeEvent
 
 __all__ = ["EventsMixin", "Listener"]
-
-_NOT_IMPLEMENTED = "scene.{name}: not implemented"
 
 Listener = Callable[[SceneChangeEvent], None]
 
