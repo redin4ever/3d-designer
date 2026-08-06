@@ -18,7 +18,7 @@
     "backend": "green",
     "frontend": "green"
   },
-  "next": "Phase 5 fix loop: 7 P0/P1 fixed and regression-tested. 10 confirmed findings open (Q-008..Q-017); Q-008 and Q-009 are the most consequential because ADR-005 gives measurement authority over the agent. Then re-run the gate, then Phase 6.",
+  "next": "Phase 5 fix loop complete: 15 of 17 QA findings fixed and regression-tested. Open: Q-017 (tests-first git evidence, will not fabricate) and B-00K/B-00L (railing joinery declaration, bevel topology quality) - both design questions for Gate B. Next: docs/qa/report-1.md update, then Phase 6 review research.",
   "status": "running",
   "blocked": null,
   "branch": "build/pass-1"

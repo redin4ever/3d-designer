@@ -31,7 +31,7 @@
     "type": "defect",
     "module": "engine",
     "priority": "P1",
-    "status": "open",
+    "status": "fixed",
     "title": "Object creation degrades 17x from 3.16ms to 54.52ms per op between 100 and 900 objects (a view_layer.update() per object). The stated target is thousands.",
     "source": "phase 5 QA, 2026-08-06"
   },

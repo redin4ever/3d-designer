@@ -351,3 +351,41 @@ def test_export_scale_moves_objects_as_well_as_resizing_them(engine, tmp_path) -
 @pytest.mark.needs_blender
 def test_snapshot_carries_vertices_no_face_references(engine) -> None:
     conformance.check_snapshot_carries_vertices_no_face_references(engine)
+
+
+@pytest.mark.needs_blender
+def test_object_creation_does_not_degrade_quadratically(engine) -> None:
+    """Creating an object must not cost more as the scene grows.
+
+    `apply_transform_fields` called `view_layer.update()` — a full dependency-graph
+    re-evaluation — once per object, making creation O(scene) each time and O(n^2) overall:
+    3.16 ms/op at ~100 objects rising to 54.52 ms/op at ~900, against a stated target of
+    thousands. Composing matrix_world directly removed it.
+
+    The bound is deliberately loose (4x over a 6x scene growth). This is a guard against an
+    algorithmic regression, not a benchmark — a tight timing assertion on a shared machine
+    is a flaky test, and a flaky test gets deleted.
+    """
+    import time
+
+    from contracts import Transform, Vec3
+
+    def cost_of_100(offset: int) -> float:
+        start = time.perf_counter()
+        for i in range(100):
+            n = offset + i
+            engine.create_primitive(
+                f"perf{n}", "cube", Vec3(0.1, 0.1, 0.1),
+                Transform(translation=Vec3(n * 0.5, 0.0, 0.0)),
+            )
+        return time.perf_counter() - start
+
+    early = cost_of_100(0)
+    for block in range(1, 5):  # grow the scene to ~500 objects
+        cost_of_100(block * 100)
+    late = cost_of_100(500)
+
+    assert late < early * 4 + 0.05, (
+        f"creating 100 objects cost {early:.3f}s early and {late:.3f}s at ~500 objects — "
+        "the per-object cost is growing with scene size again"
+    )
