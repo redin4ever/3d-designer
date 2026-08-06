@@ -54,10 +54,15 @@ see "Contract gaps" in `README.md`, item 4).
   inside this package (its own `*_test.py` files) import fixtures from `conftest.py` the
   normal pytest way (as fixture parameters, never `from .conftest import ...`) — see
   "Style" below.
-- `websockets`/`starlette` are declared project dependencies (`pyproject.toml`) but are
-  **not installed in this environment**. `serve()` must stay behind a lazy `import
-  websockets` inside the function body so importing `viewer` — and running every other
-  test in this package — never requires them. Do not hoist that import to module level.
+- `websockets`/`starlette` are declared project dependencies (`pyproject.toml`) **and are
+  installed here** — `doctor` reports the version, and `live_socket_test.py` opens a real
+  socket against a real client. This note used to say they were missing, which was the
+  stated reason for the lazy import and was wrong for a whole pass.
+  The practice is still right, for a better reason: `serve()` must stay behind a lazy
+  `import websockets` inside the function body so that importing `viewer` — and running
+  every other test in this package — works on a machine that does *not* have them. The
+  live view is optional; the geometry core is not. Do not hoist that import to module
+  level.
 
 ## Implementation notes for whoever picks this up next
 

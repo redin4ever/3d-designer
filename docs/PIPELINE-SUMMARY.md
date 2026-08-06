@@ -37,8 +37,10 @@ Verified by running it against real Blender 5.2.0 LTS, not by reading the code.
   role-partitioned tools, checkpoints, undo, and a phase gate that will not let an agent
   advance until the phase's acceptance queries actually pass.
 
-All of it reachable over MCP, on both transports — **except that a live client cannot connect
-today**; see Known issues.
+All of it reachable over MCP, on both transports, by a real client: the live-client suite
+completes a handshake, lists the catalogue with roles, builds geometry that is really there
+afterwards, is refused by the phase gate with a named rule, follows that refusal's own
+suggestion to get through, and exports a file a person can open.
 
 ## The two gates
 
@@ -83,30 +85,34 @@ That is what Gate B 6.2 asked to be excellent, and it is why it was worth asking
 ## Suites
 
 ```
-backend   901 tests, run against both the in-memory engine and real Blender 5.2   exit 0
-frontend  31 module tests                                                          exit 0
-doctor    Blender 5.2.0 LTS, MCP SDK, websockets — 43 tools across 9 roles          exit 0
+backend   1036 tests, against both the in-memory engine and real Blender 5.2   exit 0
+frontend    31 module tests                                                    exit 0
+browser     10 tests in real Chromium                                          exit 0
+doctor    Blender 5.2.0 LTS, MCP SDK 2.0, websockets — 43 tools, 9 roles       exit 0
 ```
 
 ## Known issues
 
-Full detail, with repros, in **[HANDOVER.md](HANDOVER.md)**. The four that matter:
+Full detail, with repros, in **[HANDOVER.md](HANDOVER.md)**. **27 of the 28 scoped final-pass
+items are done.** What is left:
 
-1. **No live MCP client can connect.** The installed SDK is 2.0.0; `transports._build_server`
-   is written against the 1.x decorator API. It refuses by name rather than failing obscurely.
-   Everything behind the transport is verified working. This is wiring, and it is the first
-   thing to fix.
-2. **`forge3d serve` does not start the viewer socket**, and the socket has never carried a
-   frame. The browser page is real and fully implemented; nothing connects it.
-3. **The live view emits 5 of 13 message types.** `HIGHLIGHT`, `LOG` and `PROBLEMS` are handled
-   in the frontend and never sent, so "the latest change is highlighted" shows nothing.
-4. **`_triangle_normal` exists four times and the copies disagree** on the degenerate case —
-   and one of them, in `detail/edges.py`, uses a threshold that silently drops legitimate
-   sub-millimetre bevel triangles.
+1. **F-019 is partial.** `src/engine/scale_test.py` follows the object-creation curve past the
+   ~900 objects either earlier pass had measured, against a stated target of thousands. The
+   figures in it were not independently re-run at the close — treat the ceiling it asserts as a
+   regression guard, not a published benchmark. Re-run it before quoting numbers.
+2. **No operation declares joinery for the joints it creates** (B-00K). An agent *can* now
+   declare one — `find_clipping` takes a `joinery` parameter — but a staircase plus railing
+   still reports its deliberate sockets as defects unless the agent knows to say so.
+3. **A render tool, collision meshes and texture atlasing** were chosen by the user at Gate B
+   and then cut by the user for budget. They are wanted, not declined.
+4. **Rigging and organic sculpting have zero code**, deliberately and for stated reasons.
 
-Round 2 of the final pass was stopped partway through at the user's request. Two of its units
-were half-applied: `engine` was finished by hand, `viewer` was reverted to the last green
-commit rather than shipped broken. `ops` and `frontend` had completed and were kept.
+The final pass ran in three rounds and survived two interruptions. Round 2 was stopped at the
+user's request; `ops` and `frontend` had completed and were kept, `engine` was finished by
+hand, and `viewer` was reverted rather than shipped with eleven failing tests. Round 3
+recovered the units that never ran, and was itself interrupted by a machine restart that
+killed one unit **between an atomic write and its rename** — the crashed temp file was
+recovered and the unit finished by hand from the tests it had already written.
 
 ## Assumptions still open
 
@@ -119,14 +125,17 @@ is the first thing to do after this run.
 
 ## What the next person should do first
 
-1. **Rewire the MCP transport for SDK 2.0 and connect a real client.** Read the installed SDK
-   rather than the docs — the API changed and most of what is written about it is 1.x. Until
-   this is done, the product's whole reason for existing is unreachable from outside.
-2. **Then run one real session end to end** — an agent connecting over MCP, building a small
-   scene, promoting through all four phases, exporting for Roblox. That single run will settle
-   A-006 and will find more than any test written in advance.
-3. **Then start the viewer socket and emit `HIGHLIGHT`.** It is cheap and it is the difference
-   between a live view and a blank canvas.
+1. **Run one real session end to end** — a real agent, connected over MCP, building a small
+   scene, promoting through all four phases, exporting for Roblox, with the browser open. Every
+   piece of that now works and is tested; what has never happened is all of it at once, driven
+   by a model rather than a test. It will settle A-006 and it will find more than any test
+   written in advance — that has been true of every layer in this project that got its first
+   real exercise.
+2. **Then re-run `src/engine/scale_test.py` and read the curve**, before quoting any number
+   about scale.
+3. **Then decide about joinery** (B-00K): an agent can declare it now, but no operation
+   declares its own. That is the last thing standing between a staircase-plus-railing and a
+   clean defect report.
 
 Everything else is in [HANDOVER.md](HANDOVER.md), priority-ordered.
 

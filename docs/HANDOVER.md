@@ -41,9 +41,11 @@ produced by `src/uv/` into a single sheet and rewrites the UVs before `export_gl
 
 ### The full browser suite — medium-large
 
-Reduced to a load-and-render smoke test (`F-020`). Real keyboard interaction, CSS layout
-against `DESIGN.md`, focus order, and the orbit/pan controls in an actual browser remain
-unverified. `A-009` is amended accordingly.
+Reduced to a load-and-render smoke test (`F-020`), which is real and now runs: 10 tests in
+Chromium, including a pixel-level check that the canvas actually draws, a discriminating
+negative case (an empty scene leaves it flat), both colour schemes, and a keyboard-only pass
+with visible focus. What remains unverified is CSS layout against `DESIGN.md` and the
+orbit/pan controls under a real pointer. `A-009` is amended accordingly.
 
 **Why this matters more than it looks:** every layer in this project that got its first real
 exercise found defects nothing else could — the contract review found 15 blockers, the test
@@ -59,8 +61,12 @@ layer, and the base rate here is not encouraging.
 
 A staircase plus railing reports 94 clipping defects, most of them balusters correctly
 socketing into treads. The measurement is right. Nothing produces a `JoineryIntent` for a
-joint an operation deliberately made, **and no tool schema exposes a `joinery` parameter**, so
-an agent cannot declare one either.
+joint an operation deliberately made.
+
+**Half of this closed in the final pass**: `find_clipping` now exposes a `joinery` parameter
+and accepts plain JSON, so an agent *can* declare "this post is meant to be 500 mm into the
+deck" and have the defect correctly silenced. What remains is that no operation declares
+joinery for the joints it creates itself, so an agent still has to know to do it.
 
 Offered at Gate B 3.1 as one of four wire-ups and not among the three selected.
 
@@ -84,7 +90,10 @@ Gate B, and that evidence does not exist because nothing has run.
 Offered at Gate B 2.4 against measuring scale to a few thousand objects; scale won.
 
 **This is the one assumption this pipeline could not resolve.** It needs a real session with a
-real agent, which is the first thing to do after the run ends.
+real agent — which the final pass made possible for the first time: a real MCP client now
+connects over stdio, lists the catalogue, builds geometry, is refused by the phase gate,
+follows the refusal's own suggestion, and exports a file. Running one such session and
+recording which constraints get reached for is the first thing to do next.
 
 ### Routing `ops/` through the constraint solver
 
@@ -182,78 +191,49 @@ Recorded because none of these has a single real run behind it, by any test or a
 
 ## Anything the final pass did not reach
 
-The final pass ran in two rounds. **Round 1 landed in full** (F-001 to F-018, all committed
-and green). **Round 2 was stopped by the user partway through**, so four of its six units
-never ran and two were half-applied and reconciled per Rule 6.
+The final pass ran in three rounds. **Round 1 landed in full.** **Round 2 was stopped by the
+user partway through** — `ops` and `frontend` had completed and were kept, `engine` was
+finished by hand, `viewer` was reverted rather than shipped broken, and two units never ran.
+**Round 3 recovered those**, and was itself interrupted by a machine restart that killed one
+unit between an atomic write and its rename; the crashed temp file was recovered and the
+unit finished by hand from the tests it had already written.
 
-### Reconciled at the stop
+**27 of the 28 scoped items are done.** What follows is what is not.
 
-| Unit | State | What was done |
-|---|---|---|
-| `ops` | **complete, kept** | F-021 and F-013's ops half landed before the stop and are green |
-| `frontend` | **complete, kept** | Puppeteer installed, `frontend/tests-browser/` written |
-| `engine` | **half-applied, finished by hand** | F-023 done (`prefer_subprocess` deleted, `ARCHITECTURE.md` and `engine/README.md` corrected). F-019 and F-025 were not started |
-| `viewer` | **half-applied, reverted** | The agent had written a real socket test suite (RED) and partially changed `bridge.py`/`translate.py`, leaving 11 failures. Reverted to the last green commit rather than shipping a broken module. `git show 30954de` is the baseline it returned to |
-| `mcp-live` | **never ran** | — |
-| `geometry-consistency` | **never ran** | — |
+### F-019 — the scale curve, partially
 
-### Not done, in priority order
+`src/engine/scale_test.py` exists and follows object creation past the ~900 objects that was
+all either pass had measured, against Gate A 11.4's stated target of thousands. The figures
+in it are the implementing agent's; they were not independently re-run at the close of the
+run, so treat the ceiling it asserts as a regression guard rather than as a published
+benchmark. **Re-run it and read the numbers before quoting them.**
 
-1. **F-002/live — the MCP SDK is 2.0 and the transport is written against 1.x.**
-   Found and honestly filed by the round-1 `mcp_server` agent rather than hidden.
-   `transports._build_server` uses `Server.list_tools()` / `Server.call_tool()` decorators,
-   which 2.0.0 dropped for `mcp.server.MCPServer.add_tool`. It refuses by name rather than
-   raising from inside the SDK, so **no live client can connect over stdio or HTTP today.**
-   Everything behind the transport works — `dispatch` is verified end to end against real
-   Blender — so this is wiring, not design. `src/mcp_server/CLAUDE.md` has the detail under
-   "Known gap". **This is the highest-value single item left**: Gate A 7.4 (drive it from a
-   consumer subscription) and Gate B 6.2 (the multi-agent guarantee) both run through it.
+### The contract request that was resolved, and the one consequence left
 
-2. **F-009 — `forge3d serve` still does not start the viewer socket.** Gate B 1.3 chose
-   auto-start. `viewer.serve()` is real and exported and nothing calls it, so no browser can
-   reach a running session. The CLI change is small; the viewer work under it is not (see 3).
+`MeshOps.replace_mesh` was added this pass, so `detail.cleanup_bevel_topology` no longer has
+to decline on a UV-unwrapped or multi-material object. One honest limit remains and is
+documented at the implementation: **a replaced mesh loses its UV layer**, because UVs are
+stored per split vertex and a new vertex set has no correspondence to the old coordinates.
+A caller that needs UVs afterwards re-unwraps. That is a real cost and it is better than a
+silently mismatched unwrap.
 
-3. **The viewer socket has never carried a frame, and emits 5 of 13 message types.**
-   `frontend/src/main.js` fully handles `HIGHLIGHT`, `LOG`, `PROBLEMS`, `CONFLICT`,
-   `EXPORT_REPORT` and `RUN_STATE`; the backend constructs none of them, because
-   `translate.py` only ever sees a raw `SceneChangeEvent` and never `perform`'s
-   `ActionReport`. So Gate A 5.3's "latest change highlighted" shows nothing during a real
-   run. The reverted round-2 work had started exactly here — a `serve(bridge=...)` seam plus
-   a `report.py` translation path — and that is the shape of the fix.
+### Deliberately not attempted
 
-4. **F-019 — the scale curve past ~900 objects.** Gate B 2.4 chose to measure to a real few
-   thousand. Object creation is 0.78 ms/op at 900 and near-flat there; the stated target is
-   thousands and the curve was never followed further, in either pass.
+- **A render/screenshot tool** and **collision meshes + texture atlasing** — chosen by the
+  user at Gate B 3.2 and cut by the user at Gate B 6.1 for budget. Both are described above
+  under "Chosen by the user, then cut for budget"; they are wanted, not declined.
+- **The full browser interaction and layout suite** — reduced to a smoke test at Gate B 6.1.
+  The smoke test is real and runs 10 tests in Chromium, including a pixel-level check that
+  the canvas actually draws and a keyboard-only pass over the controls. What it does not do
+  is exercise the orbit/pan controls or assert layout against `DESIGN.md`.
+- **Rigging and organic sculpting** — zero code, for the reasons set out above. Unchanged.
+- **Teaching the gate to parse combined-scope commits** — offered at Gate B 6.4 and not
+  chosen. See "Process evidence that cannot be recovered".
 
-5. **F-025 — `_triangle_normal` exists four times and the copies disagree.**
-   `align/position.py:41`, `constraints/anchors.py:78`, `detail/edges.py:162`,
-   `uv/seams.py:71`. All four use `EPSILON` correctly since QA round 2, but three return
-   `None` on a degenerate triangle and `constraints/anchors.py:82` returns `Vec3(0,0,0)` and
-   then layers a second, undocumented `1e-9` threshold at `:95`. Nothing breaks today
-   because each caller matches its own copy — the danger is that "make anchors consistent
-   with the others" is exactly the drive-by edit that reintroduces the bug at `:95`.
-   **There is a live half to this**, found by the round-1 `detail` agent: `detail/edges.py`
-   treats anything under `EPSILON` (1e-4) as degenerate, which on real post-bevel geometry
-   silently drops legitimate sub-millimetre corner triangles from the sharp-edge proxy. A
-   4 mm bevel strip on a 1 m edge produces triangles well under that. `detail/topology.py`
-   already normalises by hand against `1e-15` for this reason.
+### A-006, still the one assumption nothing could settle
 
-6. **F-013's remaining half — bare `ValueError`s in the geometry helpers.** `ops` got its
-   share. `align/_geom.py`, `constraints/_orientation.py`, `constraints/_position.py` and
-   `uv/unwrap.py` still raise unnamed errors that reach an agent as a raw traceback, against
-   Gate A 4.2's "what rule it broke". `contracts.errors.RuleError` is the base to hang them
-   on, and it exists.
+Which of the 12 constraint types agents actually reach for. The vocabulary is built, solved,
+and now reachable — but no agent has driven a real session end to end. That is the first
+thing to do next, and it is now genuinely possible: a real MCP client connects, builds,
+promotes and exports.
 
-7. **F-026/F-027/F-028 — documentation and bookkeeping.** `mcp_server`'s docs were corrected
-   in round 1 and `engine`'s in the reconciliation; `viewer/CLAUDE.md` still claims
-   `websockets`/`starlette` are not installed (they are). Seven files sit marginally over the
-   300-line soft cap without the one required justification line — five of them in
-   `contracts/`, where splitting is explicitly disfavoured, so the honest fix is the line and
-   not a restructure. 24 entries in `.pipeline/backlog-pass-1.json` are built and green with
-   no `status` field.
-
-8. **A contract request the `detail` agent filed and worked around:** `MeshOps` has no
-   `replace_mesh(object_id, vertices, faces)`, so `cleanup_bevel_topology` has to
-   delete-then-recreate under the same id and therefore declines on any object that has been
-   UV unwrapped or carries more than one material slot. Harmless today because detail runs
-   before UV; it becomes a real limit the moment anyone re-details a finished asset.

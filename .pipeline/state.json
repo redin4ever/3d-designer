@@ -16,12 +16,23 @@
     "B": "docs/decisions/gate-B.md"
   },
   "suites": {
-    "backend": "green (901)",
-    "frontend": "green (31)"
+    "backend": "green (1036)",
+    "frontend": "green (31 module + 10 browser)"
   },
-  "next": "Run complete. See docs/PIPELINE-SUMMARY.md and docs/HANDOVER.md.",
+  "next": "Run complete. Read docs/PIPELINE-SUMMARY.md, then run one real agent session end to end.",
   "status": "finished",
   "blocked": null,
   "branch": "build/pass-1",
-  "stoppedEarly": "Phase 8 round 2 stopped by the user; 4 units never ran, 2 reconciled (engine finished, viewer reverted). See docs/HANDOVER.md."
+  "finalPass": {
+    "scoped": 28,
+    "done": 27,
+    "partial": [
+      "F-019"
+    ],
+    "rounds": 3,
+    "interruptions": [
+      "user stop in round 2",
+      "machine restart in round 3"
+    ]
+  }
 }

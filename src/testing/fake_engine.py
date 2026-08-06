@@ -12,6 +12,14 @@ that a railing post ended up plumb instead of asserting that ``set_transform`` w
 
 Owned by the main agent (Rule 5): every module's tests depend on it, so no module agent
 may change it. A module needing different behaviour files a contract request.
+
+
+**Over the 300-line soft cap, deliberately** (Rule 2): this is one class implementing one
+frozen Protocol, and every method is there because ``contracts.EngineProtocol`` declares it.
+Splitting on any seam other than the Protocol's own mixin boundaries would scatter that
+correspondence, and splitting on those would produce five files whose contents are dictated
+by a file in another package — the "first half" cut the rule names as a bad seam. It sits at
+a third of the hard cap.
 """
 
 from __future__ import annotations

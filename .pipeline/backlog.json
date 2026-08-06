@@ -7,9 +7,10 @@
     "title": "Bind ToolRole to the WriteLease. dispatch must read the role from the lease, never from the role string the caller passes. A tool the granted role does not hold is refused with a named rule stating the role that would allow it.",
     "decision": "Gate B 6.3",
     "adr": "ADR-013",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-002",
@@ -19,9 +20,10 @@
     "title": "Enforce phase on dispatch. A tool not legal in the session current phase is refused with a named rule stating the current phase, what is available in it, and how to promote. Verified today: unwrap_uvs (POLISH) and add_railing (REFINE) both succeeded while phase was blockout.",
     "decision": "Gate B 6.3",
     "adr": "ADR-013",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-003",
@@ -30,9 +32,10 @@
     "priority": "P0",
     "title": "Real OS-concurrency tests on the write lock: genuine threads contending for acquire, a second writer refused while a lease is live, INSPECT readers running concurrently with a writer, lease expiry under contention, dead-writer recovery. Zero threading.Thread exists anywhere in the lock test surface today. This is the property the whole design assumes and the thing the pass is judged on.",
     "decision": "Gate B 6.2",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-004",
@@ -42,9 +45,10 @@
     "title": "can_promote evaluates real per-phase AcceptanceQuery objects against live geometry via measure.evaluate. Remove the force=True override. Every failing query names the object, the measured value, the threshold missed, and the operation that would fix it — that message is load-bearing, not cosmetic, because there is no override behind it.",
     "decision": "Gate B 1.1",
     "adr": "ADR-012",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-005",
@@ -54,9 +58,10 @@
     "title": "export_scene and check_export_budget get real ToolSpec.handler callables invoked directly by dispatch, outside the operation log. Remove the carve-out at app/app_test.py:66 so the every-registered-tool-is-executable assertion becomes total.",
     "decision": "Gate B 4.1",
     "adr": "ADR-014",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-006",
@@ -65,9 +70,10 @@
     "priority": "P0",
     "title": "Publish MEASURE_SPECS: distance, gap_width, angle, find_clipping, full defect report. Assigned to the INSPECT role, which has zero tools today. This is the product central claim and the largest gap against blender-ai-mcp.",
     "decision": "Gate B 3.1",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-007",
@@ -76,9 +82,10 @@
     "priority": "P0",
     "title": "Add inspect and promote tools: get_phase, list_objects, describe_object, promote_phase. Without these an agent cannot see what it built, learn what phase it is in, advance, or finish.",
     "decision": "Gate B 3.1",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-008",
@@ -87,9 +94,10 @@
     "priority": "P0",
     "title": "Publish DETAIL_SPECS for the three detail passes named first-class at Gate A 8.4 and currently holding zero tools.",
     "decision": "Gate B 3.1",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-009",
@@ -98,9 +106,10 @@
     "priority": "P0",
     "title": "forge3d serve starts viewer.serve() automatically alongside the MCP transport. Today the socket is never opened, so no browser can reach a running session and the entire built control surface is unreachable.",
     "decision": "Gate B 1.3",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-010",
@@ -109,9 +118,10 @@
     "priority": "P1",
     "title": "Undo: reject at apply() an operation targeting an object no logged operation produced, with a named rule; AND make replay() tolerant of a single operation that cannot re-run, skipping and reporting rather than aborting. Today one such operation makes undo/redo/rollback raise for the rest of the session.",
     "decision": "Gate B 5.2",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-011",
@@ -120,9 +130,10 @@
     "priority": "P1",
     "title": "undo/redo/rollback_to restore from barrier.snapshot_path when an undo barrier is crossed, instead of replaying the opaque operation. Verified today: a non-deterministic raw script produced 1 object, then 3 differently-named objects after undo+redo, while reporting FULL_RESYNC. The capture half already exists.",
     "decision": "Gate B 5.3",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-012",
@@ -132,9 +143,10 @@
     "title": "Scene document v2: serialise placements, joinery, acceptance, asset_class and proposal_id. SCHEMA_VERSION to 2. A v1 file loads with an explicit named warning that its constraints were never stored. Round-trip test per nested type.",
     "decision": "Gate B 1.2",
     "adr": "ADR-015",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-013",
@@ -143,9 +155,10 @@
     "priority": "P1",
     "title": "Every failure names a rule. Broad catch at the app/handlers.py boundary mapping any unhandled exception to a real rule carrying the original detail, PLUS degeneracy checks (zero-length path, zero quaternion, empty point set) moved into validate_params so good cases never reach the floor.",
     "decision": "Gate B 5.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-014",
@@ -154,9 +167,10 @@
     "priority": "P1",
     "title": "The automatic post-operation check runs pairwise find_clipping and find_visual_gaps against spatial neighbours, matching the checks_scope: \"changed+neighbours\" it already reports. One small room produced 39 unreported clipping defects; sweeping 480 pairs by hand took 14ms.",
     "decision": "Gate B 4.2",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-015",
@@ -165,9 +179,10 @@
     "priority": "P1",
     "title": "find_self_intersections uses the spatial index for broadphase pruning. Today it is an O(triangles^2) pure-Python sweep: 0.006s to create a 960-triangle sphere, 6.5s to check it and find nothing — about 40% of a realistic session. F-014 adds load to the same loop.",
     "decision": "Gate B 5.1",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-016",
@@ -176,9 +191,10 @@
     "priority": "P1",
     "title": "Verify 1 Roblox stud = 0.28 m against Roblox own documentation, cite the source in export_profiles.py, and pin it with a regression test. Currently an uncited guess in the primary export profile.",
     "decision": "Gate B 2.1",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-017",
@@ -187,9 +203,10 @@
     "priority": "P2",
     "title": "Summarise the post-operation report above a threshold: per-object detail while it is a handful, aggregate plus breakdown plus defects beyond that. add_railing currently returns ~3,398 tokens for 40 objects; a small room costs ~5,400.",
     "decision": "Gate B 4.3",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-018",
@@ -198,9 +215,10 @@
     "priority": "P2",
     "title": "Tune bevel parameters and add a topology cleanup pass. Real Blender bevels currently give mean triangle aspect ratio ~116 and edge-length CoV ~1.6 on a simple tread. Closes B-00L.",
     "decision": "Gate B 3.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-019",
@@ -209,9 +227,10 @@
     "priority": "P2",
     "title": "Measure the object-creation and check-loop curve to a real few thousand objects, not ~900. Record where it bends, and what the viewer and the check loop cost at that size. Gate A 11.4 named thousands as the target.",
     "decision": "Gate B 2.4",
-    "status": "open",
+    "status": "partial",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "note": "scale_test.py exists and follows the curve past 900; the measured figures are the agent's and were not independently re-run at the close"
   },
   {
     "id": "F-020",
@@ -220,9 +239,10 @@
     "priority": "P2",
     "title": "Install Puppeteer and add a smoke test: the page loads against a live backend, the canvas draws, the action log updates. Not the full interaction and layout suite (cut at Gate B 6.1). Nothing has ever run this frontend in a browser.",
     "decision": "Gate B 2.2 as reduced by 6.1",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-021",
@@ -231,9 +251,10 @@
     "priority": "P2",
     "title": "add_railing reports the cross-sections it supplied when the agent omitted post_size/baluster_size/rail_size, so the 5cm/5cm/3cm defaults stop being invisible. Gate A 6.4 chose no built-in dimension table.",
     "decision": "Gate B 1.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-022",
@@ -242,9 +263,10 @@
     "priority": "P2",
     "title": "Delete _tool_registry.py and its tests; Orchestrator.tools_for delegates to the real mcp_server registry. Its 16 tool names match none of the 29 real ones and nothing in src/app calls it.",
     "decision": "Gate B 4.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-023",
@@ -253,9 +275,10 @@
     "priority": "P2",
     "title": "Delete create_engine(prefer_subprocess=True) and correct docs/ARCHITECTURE.md:34,43, which still describes the subprocess fallback as a working part of the engine surface.",
     "decision": "Gate B 2.3",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-024",
@@ -264,9 +287,10 @@
     "priority": "P2",
     "title": "Record actual per-role tool counts after F-005..F-008 land, and state plainly where a role exceeds the 5-8 accuracy-optimal band. Gate B 3.3 chose to exceed it deliberately and measure rather than split roles.",
     "decision": "Gate B 3.3",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-025",
@@ -275,9 +299,10 @@
     "priority": "P2",
     "title": "Add the missing spacing <= 0 guard to engine/_curve.py sample_polyline, which loops forever if called directly; its twin in testing/mesh_helpers.py:51 already has it. Reconcile the four _triangle_normal copies on their degenerate-case return value (three return None, constraints/anchors.py returns Vec3 zero and re-checks 1e-9 rather than EPSILON at :95).",
     "decision": "Gate B 6.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-026",
@@ -286,9 +311,10 @@
     "priority": "P2",
     "title": "Correct the four stale module docs: mcp_server/CLAUDE.md and README.md describe the package collision as live and blocking when it is fixed and claim the SDK is not installed when it is; viewer/CLAUDE.md says the same of websockets/starlette; orchestration/README.md still frames src/scene as unbuilt.",
     "decision": "Gate B 6.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-027",
@@ -297,9 +323,10 @@
     "priority": "P3",
     "title": "Add the one required justification line to the seven files marginally over the 300-line soft cap (contracts_test.py 530, operations.py 408, fake_engine.py 392, geometry.py 345, measurement.py 325, engine.py 319, app/handlers.py 310). Five are in contracts/ where splitting is explicitly disfavoured.",
     "decision": "Gate B 6.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   },
   {
     "id": "F-028",
@@ -308,8 +335,9 @@
     "priority": "P3",
     "title": "Set status \"done\" on the 24 backlog entries (B-001..B-021, B-023..B-025, B-027) that are built and green but carry no status field, in the archived .pipeline/backlog-pass-1.json.",
     "decision": "Gate B 6.4",
-    "status": "open",
+    "status": "done",
     "source": "phase 7 Gate B, 2026-08-06",
-    "pass": 2
+    "pass": 2,
+    "closedBy": "phase 8, pass 2"
   }
 ]
