@@ -23,7 +23,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from contracts import MeshSnapshot, Vec3
+from contracts import EPSILON, MeshSnapshot, Vec3
 
 __all__ = ["EdgeSelection", "select_bevel_edges", "bevel_width_for"]
 
@@ -122,6 +122,11 @@ def select_bevel_edges(
 
         (t1, _opp1), (t2, opp2) = occurrences
         n1, n2 = normals[t1], normals[t2]
+        if n1 is None or n2 is None:
+            # One side is a degenerate sliver, so there is no dihedral angle to read.
+            # Not a rejection — nothing was assessed — so it must not inflate `rejected`,
+            # for the same reason a boundary edge does not.
+            continue
         cosine = max(-1.0, min(1.0, n1.dot(n2)))
         dihedral_deg = math.degrees(math.acos(cosine))
 
@@ -154,9 +159,26 @@ def select_bevel_edges(
     return EdgeSelection(edge_indices=tuple(selected), reasons=tuple(reasons), rejected=rejected)
 
 
-def _triangle_normal(verts: list[Vec3], tri: tuple[int, int, int]) -> Vec3:
+def _triangle_normal(verts: list[Vec3], tri: tuple[int, int, int]) -> Vec3 | None:
+    """The triangle's unit normal, or ``None`` if it is degenerate.
+
+    Real geometry contains zero-area triangles — a bevel on real Blender produces them, and
+    so does any imported mesh with slivers. An earlier version called ``normalized()``
+    unconditionally and raised on the first one, which meant `realism_report` crashed on
+    exactly the post-bevel geometry it exists to assess. Nothing caught it because the test
+    engine's bevel duplicates a face rather than producing real geometry.
+
+    A degenerate triangle has no meaningful orientation, so it contributes no dihedral
+    angle and is skipped rather than guessed at.
+    """
     a, b, c = verts[tri[0]], verts[tri[1]], verts[tri[2]]
-    return (b - a).cross(c - a).normalized()
+    normal = (b - a).cross(c - a)
+    # Guard on exactly the threshold `Vec3.normalized()` itself raises below, not a tighter
+    # one. A first attempt used 1e-12 and still crashed: a sliver whose cross product falls
+    # between the two thresholds passes the check and then trips the very call it guards.
+    if normal.length() < EPSILON:
+        return None
+    return normal.normalized()
 
 
 def _build_adjacency(

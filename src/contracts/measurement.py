@@ -202,7 +202,10 @@ class Defect:
     def describe(self) -> str:
         where = f"{self.object_id}"
         if self.other_object_id:
-            where += f" ∩ {self.other_object_id}"
+            # ASCII on purpose. This string goes to agent tool responses, log files and a
+            # Windows console, and the default console encoding there is cp1252 — a set
+            # intersection sign raises UnicodeEncodeError and takes the whole call down.
+            where += f" x {self.other_object_id}"
         if self.magnitude is None:
             mag = ", magnitude not measurable"
         else:

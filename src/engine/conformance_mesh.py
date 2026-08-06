@@ -15,6 +15,7 @@ from contracts import EngineError, EngineProtocol, Transform, Vec3
 from testing import unit_cube
 
 __all__ = [
+    "check_snapshot_triangulates_a_quad_mesh",
     "check_primitive_has_expected_world_bounds",
     "check_create_mesh_produces_a_closed_manifold",
     "check_create_primitive_returns_the_actual_assigned_id",
@@ -143,3 +144,33 @@ def check_join_brings_source_vertices_into_the_targets_local_space(
     # too small to reach the source's original position.
     assert joined_bounds.maximum.x >= source_bounds_before.maximum.x - 1e-6
     assert joined_bounds.minimum.x <= target_bounds_before.minimum.x + 1e-6
+
+
+def check_snapshot_triangulates_a_quad_mesh(engine) -> None:
+    """A mesh this engine did not create is not already triangles.
+
+    Blender's own startup cube is quads, and so is every imported asset and every
+    hand-modelled .blend. An earlier implementation assumed triangles and raised on the
+    first outside mesh it saw, which meant `measure` could not inspect exactly the geometry
+    a user most wants checked.
+    """
+    verts = [
+        Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(1, 1, 0), Vec3(0, 1, 0),
+        Vec3(0, 0, 1), Vec3(1, 0, 1), Vec3(1, 1, 1), Vec3(0, 1, 1),
+    ]
+    quads = [
+        (0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4),
+        (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7),
+    ]
+    engine.create_mesh("quadbox", verts, quads)
+
+    snap = engine.snapshot("quadbox")
+
+    assert all(len(t) == 3 for t in snap.triangles), "snapshot returned a non-triangle face"
+    assert snap.triangle_count == 12, f"6 quads should fan to 12 triangles, got {snap.triangle_count}"
+    assert snap.polygon_count == 6, (
+        f"polygon_count must survive triangulation as the FACE count, got {snap.polygon_count} "
+        "— polygon budgets and topology quality are stated in faces, not triangles"
+    )
+    for tri in snap.triangles:
+        assert all(0 <= i < snap.vertex_count for i in tri)

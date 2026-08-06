@@ -21,6 +21,7 @@ from ._repair import boundary_loops
 from ._shared import (
     apply_modifier_result,
     build_snapshot_topology,
+    canonical_edges,
     delete_object,
     edge_lookup_by_original_vertices,
     get_object,
@@ -36,18 +37,35 @@ _BOOLEAN_MODES = {"union": "UNION", "difference": "DIFFERENCE", "intersect": "IN
 _BOOLEAN_SOLVERS = {"fast": "FLOAT", "exact": "EXACT", "manifold": "MANIFOLD"}
 
 
-def _resolve_edges(bm, mesh, edge_indices: Sequence[tuple[int, int]]):
-    """Translate caller-supplied edges — ``(vertex_a, vertex_b)`` pairs in the UV-split
-    vertex numbering a prior ``snapshot(...).edges()`` call returned elements of — back to
-    real bmesh edges (invariant #2 in ``_shared.py``). Despite the Protocol's
-    ``Sequence[int]`` hint, every conformance check that exercises an explicit selection
-    (``check_bevel_edges_with_explicit_selection_increases_triangle_count``,
-    ``check_bevel_edges_moves_only_the_selected_edges_geometry``) passes elements straight
-    out of ``.edges()`` — i.e. 2-tuples, not positions into that list."""
-    _, _, _, orig_of = build_snapshot_topology(mesh)
+def _resolve_edges(bm, mesh, edge_indices: Sequence[int] | Sequence[tuple[int, int]]):
+    """Translate a caller's edge selection back to real bmesh edges.
+
+    **The contract form is an integer**: a position in the list
+    ``MeshSnapshot.edges()`` returns, which is the canonical ordering both sides agree on.
+    That is what ``EngineProtocol`` declares and what ``src/detail/`` — the real consumer,
+    selecting edges that would plausibly catch light — actually passes.
+
+    A ``(vertex_a, vertex_b)`` pair is also accepted. Two frozen conformance checks pass
+    elements straight out of ``.edges()`` rather than positions into it, and an earlier
+    implementation matched *them* rather than the contract. Both suites passed and the one
+    real caller raised ``TypeError`` the first time it ran — so the contract form is now
+    primary and the pair form is tolerated rather than the other way round.
+
+    An index that resolves to no real edge is skipped rather than raising: the selection is
+    a heuristic and a stale index should cost one bevel, not the whole operation.
+    """
+    _, triangles, _, orig_of = build_snapshot_topology(mesh)
+    canonical = canonical_edges(triangles)
     lookup = edge_lookup_by_original_vertices(bm.edges)
+
     resolved = []
-    for a, b in edge_indices:
+    for item in edge_indices:
+        if isinstance(item, (int,)) and not isinstance(item, bool):
+            if not 0 <= item < len(canonical):
+                continue
+            a, b = canonical[item]
+        else:
+            a, b = item
         edge = lookup.get(frozenset((orig_of[a], orig_of[b])))
         if edge is not None:
             resolved.append(edge)

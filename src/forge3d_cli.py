@@ -22,6 +22,17 @@ SRC = Path(__file__).resolve().parent
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+# A Windows console defaults to cp1252, which cannot encode an em dash — and this tool's
+# error messages, defect reports and export banners are full of them. Without this, the
+# first clipping defect printed on the primary target platform raises UnicodeEncodeError
+# and takes down whatever was reporting it. Only the entry point does this; a library must
+# not reconfigure its caller's streams.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # already redirected, or not a text stream
+        pass
+
 __all__ = ["main", "doctor"]
 
 

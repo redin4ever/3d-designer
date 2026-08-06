@@ -498,3 +498,33 @@ def test_roblox_profile_converts_metres_to_studs() -> None:
 def test_unknown_export_profile_lists_the_known_ones() -> None:
     with pytest.raises(KeyError, match="roblox"):
         profile_for("cryengine")
+
+
+# --------------------------------------------------------------- platform reality
+
+def test_every_report_string_survives_a_windows_console() -> None:
+    """cp1252 is the default console encoding on the primary target platform, and it cannot
+    encode an em dash or a set-intersection sign. These strings go to agent tool responses,
+    to log files, and to a terminal — one unencodable character raises UnicodeEncodeError
+    and takes down whatever was reporting, which on a clipping defect is the exact moment
+    the tool is doing its most valuable work."""
+    from contracts import ActionReport, ExportReport
+
+    defect = Defect.of(
+        DefectClass.PART_CLIPPING, "post_01", "interpenetrates the tread",
+        other_object_id="tread_04", magnitude=0.03,
+        suggestion="declare a JoineryIntent or move the post",
+    )
+    report = ActionReport(
+        op_id="op-1", ok=False, summary="added railing",
+        new_problems=(defect,), error_rule="ops.bad_dimension",
+        error_detail="baluster_gap is -1", error_suggestion="pass a positive value",
+        operator_notes=("make it simpler",),
+    )
+    export_report = ExportReport(
+        path="out.glb", profile="roblox", ok=True, triangle_count=12_000,
+        defects=(defect,), budget=10_000, over_budget_by=2_000,
+    )
+
+    for text in (defect.describe(), report.render(), export_report.banner):
+        text.encode("cp1252")  # raises UnicodeEncodeError if this would crash on Windows

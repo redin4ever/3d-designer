@@ -269,10 +269,10 @@ class ExportReport:
             return f"Exported {self.path} for {self.profile} — {self.triangle_count} tris, clean."
         parts = [f"Exported {self.path} for {self.profile} with issues:"]
         for d in self.defects:
-            parts.append(f"  • {d.describe()}")
+            parts.append(f"  - {d.describe()}")
         if self.over_budget_by:
             parts.append(
-                f"  • {self.triangle_count} tris is {self.over_budget_by} over the "
+                f"  - {self.triangle_count} tris is {self.over_budget_by} over the "
                 f"{self.budget} budget for this profile"
             )
         return "\n".join(parts)

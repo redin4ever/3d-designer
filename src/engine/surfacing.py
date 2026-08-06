@@ -151,6 +151,8 @@ class SurfacingMixin:
         bm.from_mesh(mesh)
         lookup = edge_lookup_by_original_vertices(bm.edges)
         for idx in edge_indices:
+            if not 0 <= idx < len(canonical):
+                continue  # a stale index costs one seam, not the whole unwrap
             a, b = canonical[idx]
             edge = lookup.get(frozenset((orig_of[a], orig_of[b])))
             if edge is not None:

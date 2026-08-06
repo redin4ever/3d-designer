@@ -182,12 +182,23 @@ class MeshOpsMixin:
         if len(material_slots) > 1:
             triangle_materials = [poly.material_index for poly in mesh.polygons]
 
+        if triangle_materials is not None and len(triangle_materials) != len(triangles):
+            # A polygon that fan-triangulates into N triangles needs its material index
+            # repeated N times, or the per-triangle array no longer lines up with the
+            # triangle list and the contract rejects the snapshot.
+            triangle_materials = [
+                poly.material_index
+                for poly in mesh.polygons
+                for _ in range(max(1, poly.loop_total - 2))
+            ]
+
         return MeshSnapshot(
             object_id=obj.name,
             vertices=vertices,
             triangles=triangles,
             transform=read_transform_fields(obj),
             uvs=uvs,
+            polygon_count=len(mesh.polygons),
             material_slots=material_slots,
             triangle_materials=triangle_materials,
         )

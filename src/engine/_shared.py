@@ -185,8 +185,18 @@ def build_snapshot_topology(mesh):
                 if has_uv:
                     uvs.append(uv)
             corners.append(new_idx)
-        # invariant #1 guarantees every polygon is already a triangle.
-        triangles.append(tuple(corners))
+
+        # Fan-triangulate. Geometry this engine creates is already triangles, but a mesh
+        # it did not create is not — Blender's own startup cube is quads, and so is every
+        # imported asset and every hand-modelled .blend. Assuming triangles made
+        # `snapshot()` raise on the first mesh from outside, which meant `measure` could
+        # not inspect any of them: the exact geometry a user most wants checked.
+        #
+        # A fan is correct for convex polygons, which Blender quads overwhelmingly are.
+        # `polygon_count` below preserves the pre-triangulation face count, because
+        # polygon budgets and topology quality are stated in faces, not triangles.
+        for i in range(1, len(corners) - 1):
+            triangles.append((corners[0], corners[i], corners[i + 1]))
 
     return vertices, triangles, uvs, orig_of
 

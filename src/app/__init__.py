@@ -99,9 +99,19 @@ def build_app(
     scene_id: str = "scene",
     cadence: CheckCadence = CheckCadence.EVERY_GEOMETRY_CHANGE,
     attach_viewer: bool = True,
+    reset_scene: bool = True,
 ) -> App:
-    """Construct and wire everything. This is the only function that knows the whole shape."""
+    """Construct and wire everything. This is the only function that knows the whole shape.
+
+    ``reset_scene`` clears the engine before anything else. It defaults to true because
+    Blender's startup scene contains a cube, a camera and a light, and without this every
+    session begins with a stray ``Cube`` the agent never made — which then shows up in
+    object counts, in clipping checks against real geometry, and in exports. Pass
+    ``reset_scene=False`` to work with a ``.blend`` that is already open.
+    """
     engine = build_engine(prefer_blender=prefer_blender)
+    if reset_scene:
+        engine.reset()
     handlers = build_handlers(include_raw=include_raw)
 
     from scene import Scene

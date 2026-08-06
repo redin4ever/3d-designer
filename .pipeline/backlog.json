@@ -9,6 +9,62 @@
     "status": "fixed"
   },
   {
+    "id": "B-00F",
+    "type": "defect",
+    "module": "engine",
+    "priority": "P0",
+    "status": "fixed",
+    "title": "engine.snapshot() assumed every mesh was already triangulated (a comment said so outright). True for geometry it created, false for Blenders own startup cube and every imported asset or hand-modelled .blend — so snapshot() raised on the first outside mesh and measure could not inspect exactly the geometry a user most wants checked. Now fan-triangulates; polygon_count preserves the face count."
+  },
+  {
+    "id": "B-00G",
+    "type": "defect",
+    "module": "engine+detail",
+    "priority": "P0",
+    "status": "fixed",
+    "title": "bevel_edges resolved edge_indices as (vertex,vertex) pairs, matching two conformance checks that had drifted from the contracts Sequence[int]. detail follows the contract and passed ints, so the real consumer raised TypeError on first use while both suites stayed green. The engine agent flagged this honestly in testsSuspect. Contract form is now primary."
+  },
+  {
+    "id": "B-00H",
+    "type": "defect",
+    "module": "detail",
+    "priority": "P1",
+    "status": "fixed",
+    "title": "_triangle_normal called normalized() unconditionally and raised on degenerate slivers, which real Blender bevels produce. realism_report crashed on exactly the post-bevel geometry it exists to assess. Never caught because FakeEngines bevel duplicates a face rather than producing real geometry."
+  },
+  {
+    "id": "B-00I",
+    "type": "defect",
+    "module": "contracts+cli",
+    "priority": "P1",
+    "status": "fixed",
+    "title": "Defect.describe() emitted a set-intersection sign and reports used bullet characters; cp1252 is the default Windows console encoding and cannot encode them, so printing a clipping defect raised UnicodeEncodeError on the primary target platform. ASCII in machine-readable report text, UTF-8 forced at the CLI entry point, regression test encodes every report string as cp1252."
+  },
+  {
+    "id": "B-00J",
+    "type": "defect",
+    "module": "app",
+    "priority": "P1",
+    "status": "fixed",
+    "title": "build_app did not reset the engine, so Blenders startup cube/camera/light were in every session and showed up in object counts, clipping checks and exports as geometry the agent never made."
+  },
+  {
+    "id": "B-00K",
+    "type": "improvement",
+    "module": "ops",
+    "priority": "P2",
+    "status": "open",
+    "title": "add_railing sockets posts and balusters into whatever it is mounted on but declares no JoineryIntent, so a stair-plus-railing reports 94 clipping defects an agent must dismiss one by one. The railing should declare its own joinery for the parts it deliberately embeds."
+  },
+  {
+    "id": "B-00L",
+    "type": "improvement",
+    "module": "detail",
+    "priority": "P2",
+    "status": "open",
+    "title": "Real Blender bevel produces a mean triangle aspect ratio of ~116 and edge-length CoV ~1.6 on a simple tread — very poor topology. The tool measures and reports this correctly; the bevel itself needs better parameters or a cleanup pass."
+  },
+  {
     "id": "B-00C",
     "type": "defect",
     "module": "orchestration+scene+mcp_server",
