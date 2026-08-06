@@ -11,22 +11,40 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
+from .engine import EngineProtocol
 from .geometry import MeshSnapshot
-from .operations import Operation
+from .operations import Operation, OperationResult
 from .phases import CheckCadence, LockContention, Phase, WriteLease
 
 __all__ = [
     "SceneDocument",
+    "ScenePort",
     "Checkpoint",
     "ChangeKind",
     "SceneChangeEvent",
     "UndoBarrier",
     "SCHEMA_VERSION",
+    "MIN_READABLE_SCHEMA",
 ]
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+"""Bumped from 1 by ADR-015 (Gate B 1.2).
+
+Version 1 serialised nine of :class:`~contracts.operations.Operation`'s fields and silently
+dropped ``placements``, ``joinery`` and ``acceptance`` — so a saved scene came back with its
+geometry and without the reason for it, and ADR-002's stated payoff ("move the stair, and
+the railing constrained to its outer edge follows") did not survive a reload.
+
+Version 2 carries all of them. A v1 file still loads, and must warn while doing so: reading
+one silently would reproduce the original bug one layer up, as a scene that looks intact and
+has quietly lost its constraints.
+"""
+
+MIN_READABLE_SCHEMA = 1
+"""The oldest document version this build can open. Older is an error; newer is an error;
+anything between this and :data:`SCHEMA_VERSION` opens with a named warning."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,3 +264,54 @@ class SceneChangeEvent:
     phase: Phase | None = None
     log_line: str = ""
     head: int = 0
+
+
+@runtime_checkable
+class ScenePort(Protocol):
+    """The slice of ``src/scene``'s interface that ``orchestration`` and ``mcp_server`` use.
+
+    **Declared here, in the frozen surface, on purpose.** This Protocol previously lived in
+    ``src/orchestration/scene_port.py`` as that module's local guess about a module that did
+    not exist yet, and the guess was wrong twice — each time producing a P0 that three green
+    test suites could not see, because the doubles matched the *declaration* rather than the
+    real ``Scene``:
+
+    1. ``document`` was declared as a method; ``Scene`` exposes a property. Both consumers
+       and both doubles matched the declaration, so the real trio could never have worked.
+    2. ``apply`` was declared without ``lease``, so ``Orchestrator.perform`` called
+       ``apply(op)`` and got ``LockContention`` against the lease it had just verified —
+       every mutating call through the real agent path failed, 100% of the time.
+
+    One declaration both sides compile against is the only arrangement in which a double
+    cannot agree with the wrong side of a contract. That is what this package is for, and
+    this type was the last one still outside it.
+    """
+
+    @property
+    def engine(self) -> EngineProtocol:
+        """The engine behind this scene, so measurements run against real geometry rather
+        than against placeholders. Read-only; nothing reached through here mutates."""
+        ...
+
+    @property
+    def document(self) -> SceneDocument:
+        """The live document — phase, head, the operation log, and ``active_lease``, the
+        one field the write lock is held in."""
+        ...
+
+    def apply(
+        self, op: Operation, *, lease: WriteLease | None = None, snapshot_path: str = ""
+    ) -> OperationResult:
+        """Append ``op`` to the log and evaluate it against the live engine.
+
+        ``lease`` is the caller's proof it holds the single write lock, and it is part of
+        this signature rather than an ambient concern for the reason recorded above.
+        """
+        ...
+
+    def undo(self, steps: int = 1) -> None: ...
+
+    def subscribe(self, listener: object) -> None:
+        """Register a listener for :class:`SceneChangeEvent`. ``scene`` never imports
+        ``viewer``; this is the arrow that lets a change reach it anyway."""
+        ...

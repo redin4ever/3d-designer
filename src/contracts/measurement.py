@@ -40,6 +40,26 @@ class MetricKind(StrEnum):
     VOLUME = "volume"
     TRIANGLE_COUNT = "triangle_count"
 
+    # The three realism proxies. Filed twice as a contract request during Phase 4 and
+    # deferred both times; `detail` and `uv` shipped reusing ANGLE/DISTANCE/GAP_WIDTH with
+    # the real name buried in `Measurement.detail`, which meant a caller could not filter
+    # or threshold on them and nothing could express "this bevel is too slivery" as an
+    # acceptance query. Gate B 3.4 makes bevel topology quality a deliverable, so they can
+    # no longer be stand-ins.
+    SHARP_EDGE_RATIO = "sharp_edge_ratio"
+    """Proportion of edges above the sharp-edge angle threshold. Low on a blockout box,
+    high on a detailed hard-surface part — the crudest available proxy for "does this look
+    modelled or extruded"."""
+
+    TRIANGLE_ASPECT_RATIO = "triangle_aspect_ratio"
+    """Mean longest-side / shortest-altitude over a mesh's triangles. 1.0 is equilateral;
+    real Blender bevels currently measure ~116 on a simple tread, which is what slivers
+    look like as a number, and they shade and bake badly."""
+
+    EDGE_LENGTH_UNIFORMITY = "edge_length_uniformity"
+    """Coefficient of variation of edge length. High values mean a mesh whose density
+    changes abruptly, which subdivides and unwraps poorly."""
+
 
 class DefectClass(StrEnum):
     """The nine defect classes.
@@ -318,8 +338,42 @@ def reconcile_tolerance(*tolerances: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class AcceptanceResult:
+    """Whether one definition of done holds, and — when it does not — how to make it hold.
+
+    ADR-012 removed the phase-promotion override at Gate B 1.1, so a failing query is now
+    the only thing standing between an unattended agent and a phase it cannot leave. That
+    makes the *content* of a failure load-bearing rather than informational: ``subject``,
+    ``actual``, ``expected`` and ``suggested_operation`` are what an agent has to work
+    from, and a failure carrying none of them is a dead end with nobody watching.
+    """
+
     query_id: str
     passed: bool
     actual: float | None = None
     reason: str = ""
     defects: tuple[Defect, ...] = ()
+    subject: str = ""
+    """The object this concerns, so an agent does not have to search for it."""
+
+    expected: float | None = None
+    """The threshold that was missed, alongside :attr:`actual` which missed it."""
+
+    suggested_operation: str = ""
+    """The operation that would fix this, named concretely — e.g.
+    ``"fill_boundary_holes(object_id='wall_n')"``. Not advice; a call."""
+
+    def describe(self) -> str:
+        if self.passed:
+            return f"PASS {self.query_id}"
+        parts = [f"FAIL {self.query_id}"]
+        if self.subject:
+            parts.append(f"on {self.subject}")
+        if self.actual is not None and self.expected is not None:
+            parts.append(f"measured {self.actual:.6g}, needs {self.expected:.6g}")
+        elif self.actual is not None:
+            parts.append(f"measured {self.actual:.6g}")
+        if self.reason:
+            parts.append(f"— {self.reason}")
+        if self.suggested_operation:
+            parts.append(f"→ try {self.suggested_operation}")
+        return " ".join(parts)

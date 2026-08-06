@@ -157,8 +157,25 @@ class Placement:
 
     object_id: str
     position: Vec3
+
     up: Vec3
+    """Where the object's own local **+Z** points, expressed in world space.
+
+    Documented here rather than left to each caller's reading, which is the contract
+    request `constraints` filed in Phase 4 and adapted around locally. Three modules had
+    independently assumed this same meaning — `constraints` in its solver, `align` in
+    `make_plumb`, and `ops` in `railing.py`, whose flagship test asserts
+    ``rotation.rotate(Vec3(0,0,1)) ≈ Vec3(0,0,1)`` for a plumb post. They agreed by luck;
+    now they agree by declaration.
+
+    "Plumb" is exactly ``up == WORLD_UP``.
+    """
+
     forward: Vec3
+    """Where the object's own local **+Y** points, in world space. Together with
+    :attr:`up` this fixes the orientation completely; the third axis is their cross
+    product and is never stored, so the two can never disagree with a stored third."""
+
     residuals: tuple[tuple[str, float], ...] = ()
     """``(constraint description, unsatisfied amount)`` for soft constraints. Empty when
     every constraint was met exactly."""

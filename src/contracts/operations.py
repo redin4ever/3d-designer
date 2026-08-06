@@ -5,6 +5,12 @@ acceptance query. Operations are neither primitives (``add_cube`` — a railing 
 of them and drift accumulates over that distance) nor whole-object composites
 (``build("a staircase")`` — measured at -12.6% Exec@1 because the model must get a dozen
 parameters right at once with no intermediate check). ADR-004.
+
+**Over the 300-line soft cap, deliberately** (Rule 2): every type here is part of one
+frozen surface that sixteen modules import, and this package's import order is acyclic by
+hand (see ``CLAUDE.md``). Splitting it would add an import edge between two halves of the
+same concept and buy nothing — the seam would be "the first half", which the rule names as
+a bad seam. It is under a third of the hard cap and stays there.
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from .constraints import ConstraintSet
 from .engine import EngineProtocol
+from .errors import RuleError
 from .export_profiles import AssetClass
 from .measurement import AcceptanceQuery, Defect, Measurement, MeasurementReport
 
@@ -149,6 +156,18 @@ class OperationResult:
     error_rule: str = ""
     error_detail: str = ""
     error_suggestion: str = ""
+    assumptions: tuple[str, ...] = ()
+    """Values the handler supplied because the caller omitted them.
+
+    Gate A 6.4 chose that this tool never carries a table of real-world dimensions — the
+    agent supplies every one. Phase 6 found ``add_railing`` quietly defaulting three
+    cross-sections to 5cm/5cm/3cm, invisibly. Gate B 1.4 kept the defaults and required
+    them to be *reported*, which is this field: an agent that can see what was assumed on
+    its behalf can correct it, and one that cannot is being handed a hidden dimension
+    table under another name.
+
+    One human-readable line per assumption, naming the parameter and the value used.
+    """
 
 
 @runtime_checkable
@@ -248,6 +267,32 @@ class ActionReport:
     ``summary`` where two implementations will do it two different ways.
     """
 
+    assumptions: tuple[str, ...] = ()
+    """Carried up from :attr:`OperationResult.assumptions` — what the tool supplied that
+    the agent did not (Gate B 1.4)."""
+
+    breakdown: tuple[tuple[str, int], ...] = ()
+    """``(kind, count)`` pairs summarising what was produced, when the per-object list is
+    too long to send.
+
+    Gate B 4.3: one ``add_railing`` returned ~3,398 tokens listing dimensions and triangle
+    count for all 40 objects it made, and a small room cost ~5,400 tokens of check output
+    alone. Above :data:`DETAIL_THRESHOLD` objects the report carries this plus totals
+    instead, and ``detail_hint`` names the tool that will give per-object detail on
+    request. Pairs rather than a dict so the report stays comparable and hashable.
+    """
+
+    detail_omitted: int = 0
+    """How many objects' per-object detail was left out. Never silently zero when
+    something was dropped — a summarised report that does not say it summarised reads as
+    a complete one, which is the same failure as ``checks_skipped`` and is why that field
+    exists too."""
+
+    detail_hint: str = ""
+    """How to get what was omitted, e.g. ``"call describe_object(<id>)"``."""
+
+    total_triangles: int = 0
+
     def render(self) -> str:
         """Compact text form. Deliberately terse: token efficiency has a measured
         cost/accuracy tradeoff and a concise format runs about a third the tokens of a
@@ -255,10 +300,20 @@ class ActionReport:
         lines = [f"{'OK' if self.ok else 'FAIL'} {self.op_id} — {self.summary}"]
         if self.changed:
             lines.append(f"CHANGED  {len(self.changed)} object(s): {', '.join(self.changed[:8])}")
+        if self.breakdown:
+            parts = ", ".join(f"{n}x {kind}" for kind, n in self.breakdown)
+            lines.append(f"MADE     {parts}" + (f" — {self.total_triangles} tris" if self.total_triangles else ""))
         for m in self.measurements:
             lines.append(f"MEASURE  {m.describe()}")
         for d in self.new_problems:
             lines.append(f"PROBLEM  {d.describe()}")
+        for a in self.assumptions:
+            lines.append(f"ASSUMED  {a}")
+        if self.detail_omitted:
+            lines.append(
+                f"NOTE     per-object detail omitted for {self.detail_omitted} object(s)"
+                + (f" — {self.detail_hint}" if self.detail_hint else "")
+            )
         if self.checks_skipped:
             lines.append("NOTE     verification skipped by cadence setting — not a clean result")
         for note in self.operator_notes:
@@ -268,6 +323,15 @@ class ActionReport:
             if self.error_suggestion:
                 lines.append(f"TRY      {self.error_suggestion}")
         return "\n".join(lines)
+
+
+DETAIL_THRESHOLD = 8
+"""Above this many changed objects, an :class:`ActionReport` summarises instead of listing.
+
+Eight is the measured knee, not a round number: at 40 objects the per-object form cost
+~3,398 tokens against ~220 summarised, and below about eight the per-object form is both
+cheaper than a follow-up call and more useful. Gate B 4.3.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,19 +454,15 @@ class ToolSpec:
             raise ValueError(f"tool {self.name!r} is visible to no role, so nothing can call it")
 
 
-class ToolError(Exception):
+class ToolError(RuleError):
     """The error shape every tool failure takes.
 
     Gate A 4.2, verbatim: the agent is told *which rule broke*. Never a raw traceback,
     never a bare code — practitioner reports consistently describe agents looping on the
     same failing call when handed opaque errors.
+
+    Now a :class:`~contracts.errors.RuleError`, sharing one shape with ``EngineError``,
+    ``LockContention``, ``RunPaused`` and ``ProposalConflict``. That is what lets the
+    boundary in ``app/handlers.py`` catch *one* type and treat anything else as an unnamed
+    failure to be wrapped, which is how Gate A 4.2 becomes total rather than partial.
     """
-
-    def __init__(self, rule: str, detail: str, suggestion: str = "") -> None:
-        super().__init__(f"{rule}: {detail}" + (f" — {suggestion}" if suggestion else ""))
-        self.rule = rule
-        self.detail = detail
-        self.suggestion = suggestion
-
-    def as_dict(self) -> dict[str, str]:
-        return {"rule": self.rule, "detail": self.detail, "suggestion": self.suggestion}

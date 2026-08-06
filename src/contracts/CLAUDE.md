@@ -28,8 +28,13 @@ python -m pytest src/contracts -q
 - **Never import a sibling module.** `contracts` sits below everything; a dependency here
   would invert the whole graph.
 - **Import order inside the package is acyclic** and must stay so:
-  `geometry → engine → measurement → constraints → export_profiles → operations → phases →
-  scene_doc → wire`.
+  `errors → geometry → engine → measurement → constraints → export_profiles → operations →
+  phases → scene_doc → wire`.
+
+  `errors` was added at the bottom in pass 2 and is the only ordering change since the
+  package froze. It holds `RuleError`, the one shape every named failure takes, so that
+  "does this failure name a rule" is a single `isinstance` at the boundary rather than four
+  duck-typed checks — which is how Gate A 4.2 came to be half-kept.
 - **A validation without a regression test is not finished.** Every `__post_init__` check
   here corresponds to a test in `contracts_test.py` named after the failure it prevents. If
   you add a guard, add the test that shows what it stops — otherwise a later reader will

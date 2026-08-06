@@ -20,6 +20,11 @@ from .constraints import (
     ConstraintSet,
     Placement,
 )
+from .errors import (
+    ProposalConflict,
+    RuleError,
+    RunPaused,
+)
 from .engine import (
     EngineError,
     EngineProtocol,
@@ -66,6 +71,7 @@ from .measurement import (
     reconcile_tolerance,
 )
 from .operations import (
+    DETAIL_THRESHOLD,
     ActionReport,
     ExportReport,
     HandlerRegistry,
@@ -82,22 +88,28 @@ from .operations import (
     ToolSpec,
 )
 from .phases import (
+    ALWAYS_LEGAL_ROLES,
     PHASE_ORDER,
+    PHASE_ROLES,
     CheckCadence,
     Conflict,
     LockContention,
     Phase,
     PhasePromotion,
+    PhaseViolation,
     RunState,
     WriteLease,
     WriteLockManager,
+    roles_for_phase,
 )
 from .scene_doc import (
+    MIN_READABLE_SCHEMA,
     SCHEMA_VERSION,
     ChangeKind,
     Checkpoint,
     SceneChangeEvent,
     SceneDocument,
+    ScenePort,
     UndoBarrier,
 )
 from .wire import (
@@ -114,6 +126,8 @@ from .wire import (
 )
 
 __all__ = [
+    # errors — the one shape every named failure takes (ADR-013, Gate B 5.4)
+    "RuleError", "RunPaused", "ProposalConflict",
     # geometry
     "EPSILON", "EPSILON_SAFE_RADIUS", "epsilon_at",
     "AABB", "MeshSnapshot", "Quat", "Transform", "Vec3", "WORLD_UP",
@@ -131,13 +145,14 @@ __all__ = [
     "OperationStatus", "JoineryIntent", "Operation", "OperationResult",
     "OperationHandler", "HandlerRegistry", "Proposal",
     "ActionReport", "ExportReport", "ToolRole", "ToolSpec",
-    "MutatingHandler", "ReadHandler", "ToolError",
+    "MutatingHandler", "ReadHandler", "ToolError", "DETAIL_THRESHOLD",
     # scene document
-    "SceneDocument", "Checkpoint", "UndoBarrier", "ChangeKind",
-    "SceneChangeEvent", "SCHEMA_VERSION",
+    "SceneDocument", "ScenePort", "Checkpoint", "UndoBarrier", "ChangeKind",
+    "SceneChangeEvent", "SCHEMA_VERSION", "MIN_READABLE_SCHEMA",
     # phases
-    "Phase", "PHASE_ORDER", "CheckCadence", "RunState", "WriteLease",
-    "WriteLockManager", "LockContention", "Conflict", "PhasePromotion",
+    "Phase", "PHASE_ORDER", "PHASE_ROLES", "ALWAYS_LEGAL_ROLES", "roles_for_phase",
+    "CheckCadence", "RunState", "WriteLease",
+    "WriteLockManager", "LockContention", "PhaseViolation", "Conflict", "PhasePromotion",
     # export
     "UpAxis", "Handedness", "AssetClass", "ExportProfile", "PROFILES",
     "DEFAULT_PROFILE", "profile_for",

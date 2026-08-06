@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, Sequence, runtime_checkable
 
+from .errors import RuleError
 from .geometry import AABB, MeshSnapshot, Transform, Vec3
 
 __all__ = [
@@ -37,19 +38,18 @@ __all__ = [
 ]
 
 
-class EngineError(RuntimeError):
+class EngineError(RuleError):
     """A geometry operation failed inside the engine.
 
     Carries the rule that broke rather than a raw traceback — Gate A 4.2 requires an
     agent be told *which rule broke, by how much, and what to try next*, because agents
     handed opaque errors loop on the same failing call.
-    """
 
-    def __init__(self, rule: str, detail: str, suggestion: str = "") -> None:
-        super().__init__(f"{rule}: {detail}" + (f" — {suggestion}" if suggestion else ""))
-        self.rule = rule
-        self.detail = detail
-        self.suggestion = suggestion
+    Derives from :class:`~contracts.errors.RuleError` so that "did this failure name a
+    rule" is one ``isinstance`` check at the boundary rather than four duck-typed ones.
+    ``RuleError`` is itself a ``RuntimeError``, so nothing that already caught this
+    changes meaning.
+    """
 
 
 class EngineUnavailable(EngineError):
