@@ -29,9 +29,25 @@ __all__ = [
     "CadencePayload",
     "ServerMessage",
     "ClientMessage",
+    "AnnotatePayload",
+    "FocusPayload",
+    "MAX_ANNOTATION_IMAGE_BYTES",
 ]
 
 WIRE_VERSION = 1
+
+MAX_ANNOTATION_IMAGE_BYTES = 4_000_000
+"""The largest crop an :class:`AnnotatePayload` may carry, as encoded characters.
+
+Declared here rather than in either endpoint because both have to agree, and the failure when
+they do not is the ugly kind: ``websockets`` does not error on an over-length frame, it
+**closes the connection**. The operator would see the live view drop, with no reason given, at
+the exact moment they tried to say something.
+
+Four million leaves comfortable room for the 1024px crop chosen at Q-23 — such a crop of this
+renderer's flat-shaded output typically base64-encodes to a few hundred kilobytes — while
+staying far enough under a raised transport limit that a large one still arrives.
+"""
 
 
 class ServerMessageType(StrEnum):
@@ -63,6 +79,11 @@ class ServerMessageType(StrEnum):
     RESYNC_REQUIRED = "resync_required"
     ERROR = "error"
 
+    FOCUS = "focus"
+    """The parts the operator has marked as important, echoed to every watcher. Gate A 10.1
+    chose many watchers on one session, and a mark one of them puts up that the others never
+    see makes the build look like it is being redirected by nobody."""
+
 
 class ClientMessageType(StrEnum):
     """Operator controls (Gate A 5.4). The build runs fully autonomously; these exist so
@@ -81,6 +102,70 @@ class ClientMessageType(StrEnum):
     """Payload: :class:`CadencePayload`. The settings control asked for at Gate A 3.1."""
 
     SELECT = "select"
+
+    ANNOTATE = "annotate"
+    """Payload: :class:`AnnotatePayload`. What the operator is pointing at, what they said
+    about it, and optionally a picture of it."""
+
+    SET_FOCUS = "set_focus"
+    """Payload: :class:`FocusPayload`. The complete set of parts the operator has marked as
+    important — declarative, so an empty set is how you clear."""
+
+
+@dataclass(frozen=True, slots=True)
+class AnnotatePayload:
+    """The operator pointing at part of the scene, with optional words and an optional crop.
+
+    Any one of the three is a complete annotation on its own: pointing with nothing to say is
+    a whole gesture (Q-04), and typing with nothing selected is the redirect composer that
+    already existed. What is refused is all three being empty.
+    """
+
+    object_ids: tuple[str, ...] = ()
+    text: str = ""
+    image: str = ""
+    """A ``data:`` URL, produced by ``canvas.toDataURL`` in the browser (A-012)."""
+
+    def __post_init__(self) -> None:
+        if not self.object_ids and not self.text.strip() and not self.image:
+            raise ValueError(
+                "an annotation with nothing in it — no object, no text, no image — would "
+                "travel the whole way to the agent and do nothing"
+            )
+        if self.image:
+            if not self.image.startswith("data:"):
+                # A remote URL here would have the server fetching an address the browser
+                # chose. That is not a capability this feature asked for, and ADR-009's
+                # trust boundary is this machine, not whatever the page decided to name.
+                raise ValueError(
+                    f"an annotation image must be a data: URL, not {self.image[:32]!r}"
+                )
+            if len(self.image) > MAX_ANNOTATION_IMAGE_BYTES:
+                raise ValueError(
+                    f"annotation image is {len(self.image)} bytes, over the "
+                    f"{MAX_ANNOTATION_IMAGE_BYTES} limit — send a smaller crop; a frame past "
+                    "the transport's limit closes the connection instead of erroring"
+                )
+
+
+@dataclass(frozen=True, slots=True)
+class FocusPayload:
+    """The complete set of parts the operator has marked as important.
+
+    Declarative, never a delta: the whole set arrives each time, so an empty one is how you
+    clear (Q-11). A delta protocol needs a separate clear message, and the two drift apart the
+    first time one is dropped — which for a standing instruction means the agent going on
+    being told something the operator has already taken back.
+    """
+
+    object_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if len(set(self.object_ids)) != len(self.object_ids):
+            # Focus is re-attached to every report (A-013), so a duplicate is not a one-off
+            # oddity — it tells the agent the same object matters twice, every turn, for the
+            # rest of the session.
+            raise ValueError("focus names the same object twice")
 
 
 @dataclass(frozen=True, slots=True)

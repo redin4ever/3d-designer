@@ -1,0 +1,118 @@
+/* The conversation panel — the transcript rows and the composer beneath them.
+ *
+ * Split out of app.css (which holds the page layout and the operator controls) along a
+ * component seam: this is one panel with one job, and app.css was already at its Rule 2
+ * budget. Same rule applies here as everywhere under frontend/src/ — every colour, size
+ * and space is a var(--token) from tokens.css, never a literal.
+ */
+
+.transcript {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-lg) var(--space-sm);
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.transcript-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  /* An instruction can be a sentence and an object id can be one long token; neither may
+     push the sidebar sideways (the narrow-viewport smoke test asserts exactly that). */
+  overflow-wrap: anywhere;
+}
+
+/* Operator and agent must be separable at a glance — that is what makes this a
+   transcript rather than a second log. Tinted and indented one way, plain the other. */
+.transcript-row[data-role='operator'] {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-2));
+  border-color: var(--accent-focus);
+  margin-left: var(--space-lg);
+}
+
+.transcript-row[data-role='agent'] {
+  background: var(--surface-3);
+  margin-right: var(--space-lg);
+}
+
+.transcript-row[data-role='system'] {
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.transcript-who {
+  font-family: var(--font-display);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.transcript-row[data-role='operator'] .transcript-who {
+  color: var(--ink-muted);
+}
+
+.transcript-text {
+  font-size: var(--text-body-sm);
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.transcript-row[data-role='system'] .transcript-text {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+
+/* The delivery marker. aria-hidden in the DOM, so this is the only channel it has. */
+.transcript-state {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+
+.transcript-state:empty {
+  display: none;
+}
+
+.transcript-row[data-state='unconfirmed'] .transcript-state {
+  color: var(--accent-hover);
+}
+
+.composer {
+  padding: var(--space-xs) var(--space-lg) var(--space-md);
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.composer .control-row {
+  width: 100%;
+}
+
+.composer input[type='text'] {
+  flex: 1 1 auto;
+}
+
+/* Always visible, directly under the field it describes, and referenced from it by
+   aria-describedby. What "sent" means here is unusual enough that a user who misreads it
+   concludes the product is broken, so it cannot live in a tooltip. */
+.composer-note {
+  margin: var(--space-xxs) 0 0;
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  color: var(--muted);
+}

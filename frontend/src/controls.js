@@ -90,8 +90,12 @@ export function buildSetCadenceMessage(cadence) {
  * catching a validation error into `onError` (e.g. an empty redirect) instead of letting
  * it throw into an event listener and vanish silently.
  *
- * @param {HTMLElement} root the controls panel's container element
- * @param {{send: (msg: object) => void, onError: (message: string) => void}} io
+ * @param {HTMLElement} root an element containing the controls. main.js passes the whole
+ *   layout, not just `.controls-panel`, because the redirect composer lives in the
+ *   conversation panel now — an operator types their instruction where they can see it
+ *   land, not in a box on the other side of the page.
+ * @param {{send: (msg: object) => boolean|void, onError: (message: string) => void}} io
+ *   `send` returning false means the message never left; anything else counts as queued.
  */
 export function attachControls(root, io) {
   const pauseButton = root.querySelector('[data-action="pause"]');
@@ -102,14 +106,17 @@ export function attachControls(root, io) {
   const redirectInput = root.querySelector('[data-field="redirect-text"]');
   const cadenceSelect = root.querySelector('[data-field="cadence"]');
 
+  // Returns whether the message was actually queued: false if it failed validation, and
+  // false if `send` reported it never left (the socket is down). Callers use that to
+  // decide whether it is safe to throw away what the operator typed.
   const guarded = (build) => {
     try {
-      send_(build());
+      return io.send(build()) !== false;
     } catch (err) {
       io.onError(err instanceof Error ? err.message : String(err));
+      return false;
     }
   };
-  const send_ = (message) => io.send(message);
 
   pauseButton?.addEventListener('click', () => guarded(buildPauseMessage));
   resumeButton?.addEventListener('click', () => guarded(buildResumeMessage));
@@ -124,8 +131,11 @@ export function attachControls(root, io) {
   redirectForm?.addEventListener('submit', (event) => {
     event.preventDefault();
     const text = redirectInput?.value ?? '';
-    guarded(() => buildRedirectMessage(text));
-    if (redirectInput) redirectInput.value = '';
+    const queued = guarded(() => buildRedirectMessage(text));
+    // Clear only once the message is actually queued. Clearing unconditionally threw the
+    // operator's words away whenever the socket was down — the one moment they most need
+    // to be able to press Send again without retyping.
+    if (queued && redirectInput) redirectInput.value = '';
   });
 
   cadenceSelect?.addEventListener('change', () => {

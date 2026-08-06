@@ -85,12 +85,18 @@ class Orchestrator(
         self._registry = registry
         self._pending: list[Proposal] = []
         self._operator_notes: list[str] = []
+        # Two operator channels with deliberately opposite lifetimes: annotations are events
+        # and drain on delivery like notes; focus is standing state and does not (A-013).
+        self._annotations: list = []
+        self._focus: tuple[str, ...] = ()
+        self._annotation_images: dict[str, str] = {}
         self._state: RunState = RunState.RUNNING
         self._lock_tick = 0
         self._index = None
         self._index_engine = None
 
         # Re-entrant: `accept` calls `perform`, and both are part of the write path.
+        self._report_listeners: list = []
         self._write_mutex = threading.RLock()
         self._notes_mutex = threading.Lock()
         self._pending_mutex = threading.Lock()

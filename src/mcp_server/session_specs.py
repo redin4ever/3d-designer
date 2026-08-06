@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from contracts import ToolRole, ToolSpec
 
+from .operator_context import get_operator_context
 from .phase_tools import get_phase, promote_phase
 from .scene_query import DEFAULT_PAGE, MAX_PAGE, describe_object, list_objects
 
@@ -29,6 +30,33 @@ __all__ = ["SESSION_SPECS"]
 _NO_PARAMS = {"type": "object", "properties": {}, "additionalProperties": False}
 
 SESSION_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name="get_operator_context",
+        description=(
+            "What the person watching this build has marked as important, and the picture "
+            "behind an annotation. An ActionReport carries their words and the parts they "
+            "pointed at, but it is text and cannot carry an image — when a report says "
+            "'image attached (an-1)', this is what returns it. Call with no arguments for "
+            "the cheap version: what is focused and which images are available."
+        ),
+        roles=(ToolRole.INSPECT,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "annotation_id": {
+                    "type": "string",
+                    "description": (
+                        "The id a report named, e.g. 'an-1'. Omit to list what is available "
+                        "without fetching any image."
+                    ),
+                }
+            },
+            "additionalProperties": False,
+        },
+        handler=get_operator_context,
+        mutating=False,
+        examples=("what is the operator focused on", "show me the image they attached"),
+    ),
     ToolSpec(
         name="get_phase",
         description=(

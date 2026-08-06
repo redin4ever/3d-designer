@@ -226,6 +226,52 @@ class Proposal:
 
 
 @dataclass(frozen=True, slots=True)
+class OperatorAnnotation:
+    """The operator pointed at part of the scene and said something about it.
+
+    Typed rather than rendered into an ``operator_notes`` string for the reason
+    ``operator_notes`` itself gives for existing: the alternative is smuggling structure into
+    free text, where two implementations will do it two different ways and the agent gets
+    neither reliably.
+
+    ``facts`` carries the measurements with the annotation rather than a pointer to them —
+    Q-02 chose "everything already measured", and the whole value of that answer is the agent
+    not having to spend a call asking what it is looking at.
+
+    ``has_image``/``annotation_id`` exist because this is text and an image is not. A report
+    cannot carry a picture, so it says one is waiting and names the call that returns it.
+    Dropping the half of Q-03 that the report cannot carry would be the quiet failure.
+
+    """
+
+    object_ids: tuple[str, ...] = ()
+    text: str = ""
+    facts: tuple[str, ...] = ()
+    has_image: bool = False
+    annotation_id: str = ""
+
+    def render(self) -> str:
+        """One compact block, in ``ActionReport.render``'s terse house style.
+
+        The image line is emitted only when there is an image. An agent that spent a turn
+        calling ``get_operator_context`` for a picture that did not exist would learn to stop
+        trusting the marker, and then miss the ones that are real.
+        """
+        parts: list[str] = []
+        if self.object_ids:
+            parts.append("pointing at " + ", ".join(self.object_ids))
+        if self.text:
+            parts.append(self.text)
+        lines = [" — ".join(parts)] if parts else []
+        lines.extend(f"  {fact}" for fact in self.facts)
+        if self.has_image:
+            lines.append(
+                f"  image attached ({self.annotation_id}) — call get_operator_context()"
+            )
+        return "\n".join(lines)
+
+
+@dataclass(frozen=True, slots=True)
 class ActionReport:
     """What an agent gets back after every action.
 
@@ -265,6 +311,23 @@ class ActionReport:
     agent: riding out on the next tool response. This field is that path, and it is
     required rather than optional, because the alternative is smuggling it into
     ``summary`` where two implementations will do it two different ways.
+    """
+
+    operator_annotations: tuple[OperatorAnnotation, ...] = ()
+    """What the operator pointed at since the last report, with their words and measurements.
+
+    Travels the same route as :attr:`operator_notes` and for the same reason — MCP is
+    call/response — but typed, because an annotation has parts an agent needs separately.
+    Drained on delivery like a note: pointing at something is an event, not a state.
+    """
+
+    operator_focus: tuple[str, ...] = ()
+    """The parts the operator has marked as important, re-attached to **every** report.
+
+    Not drained (A-013). Q-10 chose "a standing instruction it re-reads every turn" and Q-11
+    chose "until you clear it", and both are the same requirement: a focus set delivered once
+    is forgotten by the third action, which is exactly where an operator would notice it had
+    stopped working. This is the one field on this dataclass that is deliberately repeated.
     """
 
     assumptions: tuple[str, ...] = ()
@@ -318,6 +381,13 @@ class ActionReport:
             lines.append("NOTE     verification skipped by cadence setting — not a clean result")
         for note in self.operator_notes:
             lines.append(f"OPERATOR {note}")
+        for annotation in self.operator_annotations:
+            lines.append(f"OPERATOR {annotation.render()}")
+        if self.operator_focus:
+            # Every report, not just the one after it was set. A standing instruction that
+            # appears once is one the agent has forgotten by its third action — which is
+            # exactly where the operator would notice it had stopped working (Q-10).
+            lines.append(f"FOCUS    the operator is watching: {', '.join(self.operator_focus)}")
         if not self.ok:
             lines.append(f"ERROR    {self.error_rule}: {self.error_detail}")
             if self.error_suggestion:

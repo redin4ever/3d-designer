@@ -18,6 +18,16 @@ from ops import OPS, acceptance_for, validate_params
 #: One minimal, otherwise-valid params dict per registered kind — used to smoke-test
 #: acceptance_for without also exercising validate_params's rejection paths.
 _MINIMAL_VALID_PARAMS: dict[str, dict] = {
+    # The direct edits (Q-14). Each acts on something that already exists, so the acceptance
+    # query is about the object surviving the edit rather than about a shape being built.
+    "move_object": {"object_id": "hero", "translation": [1.0, 0.0, 0.0]},
+    "rotate_object": {"object_id": "hero", "axis": "z", "degrees": 90.0},
+    "scale_object": {"object_id": "hero", "scale": [2.0, 2.0, 2.0]},
+    "delete_object": {"object_id": "hero"},
+    "duplicate_object": {"object_id": "hero", "new_id": "hero_copy"},
+    "rename_object": {"object_id": "hero", "new_id": "hero_renamed"},
+    "set_object_material": {"object_id": "hero", "material_id": "seed_paint"},
+
     "add_primitive": {"object_id": "prim", "kind": "cube", "size": Vec3(1, 1, 1)},
     "add_wall": {
         "object_id": "wall",

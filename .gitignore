@@ -29,3 +29,10 @@ venv/
 # Generated artefacts
 artifacts/
 .tmp/
+
+# add-feature internals — only the record of what was decided is tracked
+.feature/*
+!.feature/state.json
+!.feature/seams.json
+!.feature/questions.json
+!.feature/plan.json

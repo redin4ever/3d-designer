@@ -184,6 +184,36 @@ select {
   color: var(--ink-subtle, var(--muted));
 }
 
+/* The sidebar holds two stacked panels: the conversation on top (where the operator is
+ * looking) and the machine action log below it. Both scroll independently; neither may
+ * push the other off the screen, which is what min-height: 0 on each is for. */
+.chat-panel,
+.log-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-panel {
+  flex: 3 1 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.log-panel {
+  flex: 2 1 0;
+}
+
+/* Stacked layout: the sidebar's grid row is content-height there, not 1fr, so a zero
+ * flex-basis has nothing to divide and collapses both panels onto each other. Size them
+ * by content instead and let the page scroll. Placed after the rules above because a
+ * media query adds no specificity — source order is what decides this one. */
+@media (max-width: 768px) {
+  .chat-panel,
+  .log-panel {
+    flex: 0 0 auto;
+  }
+}
+
 .action-log {
   list-style: none;
   margin: 0;
@@ -192,7 +222,7 @@ select {
   flex: 1 1 auto;
   min-height: 0;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-caption);
 }
 
 .log-row {
@@ -279,18 +309,6 @@ input[type='text']:focus,
 input[type='number']:focus,
 select:focus {
   border-color: var(--hairline-strong);
-}
-
-.redirect-group {
-  flex: 1 1 240px;
-}
-
-.redirect-group .control-row {
-  width: 100%;
-}
-
-.redirect-group input[type='text'] {
-  flex: 1 1 auto;
 }
 
 .control-error {

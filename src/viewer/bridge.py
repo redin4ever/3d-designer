@@ -18,14 +18,19 @@ from typing import Callable
 
 from contracts import WIRE_VERSION, ServerMessage, ServerMessageType
 
+from .annotate import AnnotateMixin
 from .client import ClientMixin
 from .report import ReportMixin
 from .translate import TranslateMixin
 
+TRANSCRIPT_HISTORY = 200
+"""How many conversation lines a reconnecting client is handed. Matches the frontend
+transcript's own cap: replaying more than it will keep is work thrown away."""
+
 __all__ = ["ViewerBridge"]
 
 
-class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
+class ViewerBridge(TranslateMixin, ClientMixin, AnnotateMixin, ReportMixin):
     """Subscribes to one ``scene`` and optionally routes control messages through one
     ``orchestrator``. See ``README.md`` for the full contract.
 
@@ -42,6 +47,10 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         self._notifier: Callable[[], None] | None = None
         self._last_highlight: tuple[str, ...] = ()
         self._seen_conflicts: set[str] = set()
+        self._transcript: list[ServerMessage] = []
+        # Annotation images, held out of the report and out of the transcript. See annotate.py.
+        self._images: dict[str, str] = {}
+        self._annotation_seq = 0
 
     def set_notifier(self, notifier: Callable[[], None] | None) -> None:
         """Register a zero-argument callback fired whenever a message is queued.
@@ -87,6 +96,8 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         already closed underneath it. ``scene.apply`` completing correctly is not allowed
         to depend on anything about the browser.
         """
+        if message.type is ServerMessageType.LOG:
+            self._remember(message)
         try:
             self._queue.append(message)
         except Exception:
@@ -110,6 +121,26 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         touch the outbound queue — this is a pull, for an explicit resync request, not a
         push."""
         return self._build_full_scene_message()
+
+    def _remember(self, message: ServerMessage) -> None:
+        """Keep a bounded history of the conversation, so a refresh does not erase it.
+
+        The transcript lived only in the browser, so reloading the page — or opening it in
+        a second window — showed an empty conversation while the run carried on. Nothing
+        was lost on the backend; there was simply no way to ask for it. This is that.
+
+        Bounded, because a long build is thousands of operations and a session that
+        remembered all of them would hold the whole run in memory and hand every new
+        watcher a wall of text. The cap matches the frontend transcript's own.
+
+        In memory and per-process on purpose: this is session history, not scene history.
+        The scene itself persists in the operation log; a restarted server genuinely has
+        nothing to say about a conversation that happened before it existed, and pretending
+        otherwise would mean writing chat to disk that no one asked to keep.
+        """
+        self._transcript.append(message)
+        if len(self._transcript) > TRANSCRIPT_HISTORY:
+            del self._transcript[: len(self._transcript) - TRANSCRIPT_HISTORY]
 
     def greeting(self) -> tuple[ServerMessage, ...]:
         """Everything a freshly-connected client needs before the first change arrives.
@@ -140,4 +171,30 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
             )
         )
         messages.append(self._build_full_scene_message(seq=seq))
+
+        # The conversation so far, after the scene, replayed at the same `seq` as
+        # everything else in the greeting for the reason above: consuming numbers here
+        # would push every already-connected watcher past its baseline and trigger a full
+        # resync in each of them, just because somebody opened a second tab.
+        messages.extend(
+            ServerMessage(
+                type=ServerMessageType.LOG,
+                seq=seq,
+                text=past.text,
+                data={**past.data, "replayed": True},
+            )
+            for past in self._transcript
+        )
+
+        # What the operator is watching, at the same seq as the rest of the greeting and for
+        # the same arithmetic. Focus lives on the orchestrator, so it outlives a page refresh
+        # — and a greeting that omitted it would show a reconnecting operator an unmarked
+        # scene while the agent went on being told those parts matter, with nothing anywhere
+        # saying the two disagreed. Sent only when there is something to say: a message per
+        # connection announcing that nothing is focused is noise on every reconnect, in the
+        # overwhelmingly common case of an autonomous run nobody has marked anything in.
+        focused = tuple(getattr(self._orchestrator, "focus", ()) or ())
+        if focused:
+            messages.append(self._focus_message(object_ids=focused, seq=seq))
+
         return tuple(messages)

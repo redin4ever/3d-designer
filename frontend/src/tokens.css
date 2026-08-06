@@ -42,6 +42,18 @@
   --on-accent: #ffffff;
   --brand-secure: #7a7fad;
 
+  /* EXTENSION, not from DESIGN.md: the parts the operator has marked as important.
+     Named --marked, not --focus: --focus-ring already means keyboard focus here, and two
+     unrelated meanings under one word is how a later reader reaches for the wrong one
+     (Q-13). Deliberately not --accent, which already means "the agent just changed
+     this" in the live view — HIGHLIGHT flashes and fades, focus stays lit, and if the
+     two shared a colour the operator could not tell a mark they put up from a change
+     that happened to them. Amber reads as attention rather than as a state change,
+     separates from --accent at a glance, and is distinguishable from it for the common
+     red-green deficiencies, where two blues would not be. */
+  --marked: #d9a441;
+  --marked-soft: rgba(217, 164, 65, 0.18);
+
   /* Semantic (DESIGN.md "Semantic") */
   --success: #27a644;
   --overlay: #000000;
@@ -70,6 +82,32 @@
   --font-display: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   --font-text: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /* Type scale (DESIGN.md "Typography"), transcribed verbatim from the frontmatter's
+     `typography` block. Only the two rungs this console actually uses are mapped; add the
+     rest here rather than writing a px literal into a stylesheet. */
+  --text-body-sm: 14px;
+  --text-caption: 12px;
+
+  /* Elevation 2 — a control raised off the panel behind it (DESIGN.md "Elevation & Depth",
+     level 2: surface-2 lift, 1px hairline-strong), plus that section's "subtle white edge
+     highlight on the top edge of lifted panels".
+
+     EXTENSION, not from the frontmatter: DESIGN.md describes this treatment in prose and
+     has no token for it, so each raised control would otherwise re-derive it and drift.
+     The lift is a surface step and a 1px top highlight rather than a drop shadow because
+     DESIGN.md is explicit that this brand "resists drop shadows on dark almost entirely" —
+     the highlight is what reads as elevation here. Built from --ink via color-mix so the
+     one near-white in the system stays the only near-white in the system. */
+  --surface-raised: var(--surface-2);
+  --surface-raised-hover: var(--surface-3);
+  --hairline-raised: var(--hairline-strong);
+  --elevation-raised: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
+
+  /* Elevation 3 — dropdown menus and dialogs (DESIGN.md "Elevation & Depth", level 3),
+     with the scrim that separates a modal from the page it covers. */
+  --surface-overlay: var(--surface-3);
+  --scrim: color-mix(in srgb, var(--overlay) 62%, transparent);
 
   /* Elevation 4 — focus ring (DESIGN.md "Elevation & Depth") */
   --focus-ring: 2px solid var(--accent-focus);
