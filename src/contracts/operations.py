@@ -61,8 +61,34 @@ class JoineryIntent:
     tolerance: float = 1e-3
     reason: str = ""
 
-    def permits(self, overlap: float) -> bool:
-        return overlap <= self.depth + self.tolerance
+    axis: str = ""
+    """Which world axis the part is inserted along — ``"x"``, ``"y"``, ``"z"``, or empty.
+
+    A socket depth is a distance along **one** direction. The overlap between two boxes is
+    three numbers, and picking the wrong one is not a rounding error: for a post driven
+    through a deck, the smallest overlap is the post's own cross-section, which stays tiny
+    no matter how far through it goes. Comparing a declared 150 mm socket against that
+    reported a post 500 mm clean through the deck as within intent.
+
+    Empty means "use the deepest overlap", which is the right default: a socket is by
+    definition an insertion, so the axis it goes in along is the one with the most overlap.
+    Name it explicitly when the geometry is ambiguous.
+    """
+
+    def permits(self, insertion_depth: float) -> bool:
+        """Whether this declared joint covers how far the part is actually inserted.
+
+        ``insertion_depth`` must be the overlap **along the axis the part goes in**, which
+        the caller computes (``measure.find_clipping``). It is deliberately not the
+        minimum-translation distance: for a post driven through a deck, the smallest
+        overlap is the post's own cross-section, which stays tiny however far through it
+        goes — and comparing a declared 150 mm socket against that reported a post 500 mm
+        clean through as within intent.
+        """
+        return insertion_depth <= self.depth + self.tolerance
+
+    def axis_index(self) -> int | None:
+        return {"x": 0, "y": 1, "z": 2}.get(self.axis.lower())
 
 
 @dataclass(frozen=True, slots=True)

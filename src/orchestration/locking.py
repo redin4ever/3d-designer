@@ -48,8 +48,19 @@ class LockingMixin:
           proves nothing (``contracts.WriteLease``'s own docstring).
         """
         doc = self._scene.document
+
+        # The clock has to advance even when nothing is being applied. Expiry used to be
+        # measured against `doc.head`, which only moves when an operation is applied —
+        # which only the current lease holder can do. So a holder that died mid-operation
+        # froze the clock at the exact moment it stopped, its lease could never go stale,
+        # and no other agent could ever acquire. The run wedged permanently, which is the
+        # one outcome a fully autonomous design cannot recover from. Agents die (Rule 6);
+        # counting attempts means a waiting agent advances the clock by waiting.
+        self._lock_tick = getattr(self, "_lock_tick", 0) + 1
+        now = doc.head + self._lock_tick
+
         current = doc.active_lease
-        if current is not None and not current.is_stale(doc.head) and current.holder != holder:
+        if current is not None and not current.is_stale(now) and current.holder != holder:
             raise LockContention(holder=current.holder, expires_at_op=current.expires_at_op)
 
         lease = WriteLease(
@@ -57,7 +68,7 @@ class LockingMixin:
             phase=phase,
             lease_id=uuid.uuid4().hex,
             granted_at_op=doc.head,
-            expires_at_op=doc.head + ttl_ops,
+            expires_at_op=now + ttl_ops,
         )
         doc.active_lease = lease
         return lease

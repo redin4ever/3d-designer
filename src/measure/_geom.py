@@ -20,6 +20,7 @@ __all__ = [
     "aabb_axis_overlaps",
     "dominant_local_axis",
     "signed_tetra_volume",
+    "insertion_depth",
 ]
 
 
@@ -93,3 +94,36 @@ def signed_tetra_volume(a: Vec3, b: Vec3, c: Vec3) -> float:
     ``metrics_test.py::test_volume_of_a_pyramid_is_not_its_bounding_box``).
     """
     return a.dot(b.cross(c)) / 6.0
+
+
+def insertion_depth(
+    overlaps: tuple[float, float, float],
+    extents_a: tuple[float, float, float],
+    extents_b: tuple[float, float, float],
+) -> tuple[float, int]:
+    """``(depth, axis_index)`` — how far one part is actually inserted into the other.
+
+    Neither the smallest nor the largest per-axis overlap answers this on its own, and
+    picking either produced a real defect:
+
+    - Two aligned 1 m cubes offset 30 mm share (0.03, 1.0, 1.0). The insertion is 30 mm
+      along x; the largest overlap is the full flush face and means nothing.
+    - A 0.1 x 0.1 x 2.0 post driven 500 mm into a deck shares (0.1, 0.1, 0.5). The
+      insertion is 500 mm along z; the smallest overlap is the post's own cross-section
+      and stays 0.1 however far through it goes.
+
+    What separates them is which axes are *partial*. An axis whose overlap equals the
+    smaller object's whole extent is fully engulfed on that axis — it carries no depth
+    information. The insertion is the shallowest genuinely partial axis; if every axis is
+    fully engulfed the part is entirely buried, and the deepest overlap is the honest
+    answer.
+    """
+    partial: list[tuple[float, int]] = []
+    for i in range(3):
+        containable = min(extents_a[i], extents_b[i])
+        if overlaps[i] < containable - 1e-9:
+            partial.append((overlaps[i], i))
+    if partial:
+        return min(partial)
+    deepest = max(range(3), key=lambda i: overlaps[i])
+    return (overlaps[deepest], deepest)

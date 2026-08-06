@@ -39,7 +39,9 @@ class ScenePort(Protocol):
         """
         ...
 
-    def apply(self, op: Operation, *, lease: object | None = None) -> OperationResult:
+    def apply(
+        self, op: Operation, *, lease: object | None = None, snapshot_path: str = ""
+    ) -> OperationResult:
         """Append ``op`` to the operation log and evaluate it against the live engine.
 
         ``lease`` is the caller's proof it holds the single write lock. It is part of this

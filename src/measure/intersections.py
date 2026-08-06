@@ -15,7 +15,8 @@ from typing import Sequence
 
 from contracts import Defect, DefectClass, EngineProtocol, JoineryIntent
 
-from ._geom import aabb_axis_overlaps, aabb_gap_vector
+from ._distance import mesh_distance
+from ._geom import aabb_axis_overlaps, insertion_depth
 from ._triangle_intersect import triangles_intersect
 
 __all__ = ["find_self_intersections", "find_clipping", "find_visual_gaps"]
@@ -64,10 +65,19 @@ def find_clipping(
     == {a, b}``, permitted when the measured overlap satisfies
     :meth:`JoineryIntent.permits`). A pair that only touches (zero overlap) never reports.
 
-    ``magnitude`` is the smallest of the three per-axis AABB overlaps — exact for two
-    axis-aligned boxes (which is what every test and every declared ``JoineryIntent``
-    depth in this product describes: a post socketed N mm into a deck), and the same
-    quantity :meth:`JoineryIntent.permits` compares its declared ``depth`` against.
+    Two different numbers, deliberately kept apart because conflating them was a real
+    defect:
+
+    - ``magnitude`` is the minimum translation that separates the pair — *how far something
+      has to move*. That is what an agent acts on.
+    - the **insertion depth** is the overlap along the axis the part actually goes in, and
+      that is what a declared ``JoineryIntent`` is compared against.
+
+    They differ sharply for exactly the joints this product cares about. A post driven
+    through a deck has a minimum overlap equal to its own cross-section, which stays tiny
+    however far through it goes — so comparing a declared 150 mm socket against it reported
+    a post 500 mm clean through as within intent. See ``_geom.insertion_depth`` for how the
+    axis is chosen; a ``JoineryIntent`` may name it outright.
 
     ``pairs`` is normally the output of ``spatial.pairs_overlapping(engine)``; this function
     takes the plain sequence of ids so it carries no dependency on the ``spatial`` module.
@@ -76,20 +86,35 @@ def find_clipping(
     """
     defects = []
     for a, b in pairs:
-        overlaps = aabb_axis_overlaps(engine.world_bounds(a), engine.world_bounds(b))
+        box_a, box_b = engine.world_bounds(a), engine.world_bounds(b)
+        overlaps = aabb_axis_overlaps(box_a, box_b)
         magnitude = min(overlaps)
         if magnitude <= 0.0:
             continue  # separated, or merely touching — not a defect either way
 
+        depth, axis = insertion_depth(overlaps, box_a.size.as_tuple(), box_b.size.as_tuple())
+        axis_name = "xyz"[axis]
+
         matching = [j for j in joinery if {j.object_id, j.into_object_id} == {a, b}]
-        if any(intent.permits(magnitude) for intent in matching):
+        if any(
+            intent.permits(
+                overlaps[i] if (i := intent.axis_index()) is not None else depth
+            )
+            for intent in matching
+        ):
             continue
 
         defects.append(
             Defect.of(
                 DefectClass.PART_CLIPPING, a,
-                f"{a} interpenetrates {b} by {magnitude:.4g}m",
+                f"{a} interpenetrates {b}: inserted {depth:.4g}m along {axis_name}, "
+                f"{magnitude:.4g}m to separate "
+                f"(overlap x/y/z = {overlaps[0]:.4g}/{overlaps[1]:.4g}/{overlaps[2]:.4g}m)",
                 magnitude=magnitude, other_object_id=b,
+                suggestion=(
+                    f"move {a} by {magnitude:.4g}m, or declare "
+                    f"JoineryIntent(depth={depth:.4g}, axis='{axis_name}') if intended"
+                ),
             )
         )
     return tuple(defects)
@@ -106,10 +131,14 @@ def find_visual_gaps(
     *strictly* greater than zero: two parts that merely touch are not a visual gap, and
     reporting them as one would bury every genuine gap in noise from ordinary abutting
     joints. ``DefectClass.VISUAL_GAP``.
+
+    Measured against real triangles, like :func:`measure.distance`: a bounding box
+    overstates any rotated part, so two visibly-open joints between rotated members read as
+    touching and no gap-closing work is ever triggered for them.
     """
     defects = []
     for a, b in pairs:
-        gap = aabb_gap_vector(engine.world_bounds(a), engine.world_bounds(b)).length()
+        gap, _exact = mesh_distance(engine.snapshot(a), engine.snapshot(b))
         if 0.0 < gap <= max_gap:
             defects.append(
                 Defect.of(

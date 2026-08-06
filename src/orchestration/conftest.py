@@ -39,11 +39,13 @@ class FakeScene:
         self._engine = FakeEngine()
         self.applied_with_lease: list[object] = []
 
-    def apply(self, op: Operation, *, lease: object | None = None) -> OperationResult:
+    def apply(
+        self, op: Operation, *, lease: object | None = None, snapshot_path: str = ""
+    ) -> OperationResult:
         # Record it so a test can assert the lease actually arrived — the real Scene
         # rejects the call without it.
         self.applied_with_lease.append(lease)
-        self._doc.append(op, snapshot_path="fake-snapshot" if op.opaque else "")
+        self._doc.append(op, snapshot_path=snapshot_path or ("fake-snapshot" if op.opaque else ""))
 
         # Actually create the geometry this operation claims to produce. The real Scene
         # does, and `perform` now measures what an operation touched — so a double that

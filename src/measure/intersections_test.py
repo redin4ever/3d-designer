@@ -166,3 +166,67 @@ def test_crossing_triangles_in_one_mesh_report_self_intersection(engine) -> None
     assert len(result) >= 1
     assert all(d.defect_class is DefectClass.SELF_INTERSECTION for d in result)
     assert all(d.object_id == "cross" for d in result)
+
+
+# ------------------------------------------------- QA findings Q-008 and Q-009
+#
+# Both were confirmed by adversarial verification and both come from measuring boxes
+# instead of geometry. ADR-005 gives these numbers authority over the agent's own
+# judgement, so a confidently wrong one is worse than none.
+
+def test_a_post_driven_through_a_deck_is_not_silenced_by_a_shallow_socket(engine) -> None:
+    """The distinction the product claims no library can make.
+
+    A 0.1m post driven 0.5m through a 1m deck shares (0.1, 0.1, 0.5) of overlap. The
+    smallest of those is the post's own cross-section, which stays 0.1 however far through
+    it goes — so comparing a declared 150mm socket against it reported a post clean through
+    the deck as within intent.
+    """
+    from contracts import JoineryIntent, Transform
+
+    engine.create_primitive("deck", "cube", Vec3(4.0, 4.0, 1.0),
+                            Transform(translation=Vec3(0, 0, -0.5)))
+    engine.create_primitive("post", "cube", Vec3(0.1, 0.1, 2.0),
+                            Transform(translation=Vec3(0, 0, 0.5)))
+
+    shallow = JoineryIntent(object_id="post", into_object_id="deck", depth=0.15)
+    still_reported = find_clipping(engine, [("deck", "post")], joinery=[shallow])
+
+    assert still_reported, "a post 0.5m through the deck was permitted by a 0.15m socket"
+    assert "inserted 0.5" in still_reported[0].detail, still_reported[0].detail
+
+
+def test_a_genuine_socket_deeper_than_declared_is_still_permitted(engine) -> None:
+    """The other half: the fix must not start reporting joints that really are intended."""
+    from contracts import JoineryIntent, Transform
+
+    engine.create_primitive("deck", "cube", Vec3(4.0, 4.0, 1.0),
+                            Transform(translation=Vec3(0, 0, -0.5)))
+    engine.create_primitive("post", "cube", Vec3(0.1, 0.1, 2.0),
+                            Transform(translation=Vec3(0, 0, 0.95)))  # 50mm in
+
+    intent = JoineryIntent(object_id="post", into_object_id="deck", depth=0.06)
+    assert find_clipping(engine, [("deck", "post")], joinery=[intent]) == ()
+
+
+def test_two_rotated_beams_that_never_touch_report_a_real_distance(engine) -> None:
+    """Both halves of the AABB defect in one fixture.
+
+    Two 4m beams yawed 45 degrees and offset 1.4m have wildly overlapping bounding boxes
+    and do not touch. Measured from boxes, the gap read 0.0 while find_clipping reported a
+    0.1m interpenetration — so the agent was told to move correct geometry to fix a
+    collision that does not exist, and simultaneously that a real 1.3m gap was closed.
+    """
+    import math
+
+    from contracts import Quat, Transform
+
+    yaw = Quat.from_axis_angle(Vec3(0, 0, 1), math.radians(45))
+    engine.create_primitive("p", "cube", Vec3(0.1, 4.0, 0.1), Transform(rotation=yaw))
+    engine.create_primitive("q", "cube", Vec3(0.1, 4.0, 0.1),
+                            Transform(rotation=yaw, translation=Vec3(1.0, 1.0, 0.0)))
+
+    from measure import distance, gap_width
+
+    assert distance(engine, "p", "q").value > 0.5, "a real gap still reads as touching"
+    assert gap_width(engine, "p", "q").value > 0.5

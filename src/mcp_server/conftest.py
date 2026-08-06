@@ -30,12 +30,14 @@ class FakeScene:
         self._engine = FakeEngine()
         self.applied_with_lease: list[object] = []
 
-    def apply(self, op: Operation, *, lease: object | None = None) -> OperationResult:
+    def apply(
+        self, op: Operation, *, lease: object | None = None, snapshot_path: str = ""
+    ) -> OperationResult:
         # The lease is recorded rather than ignored: the real `Scene` rejects the call
         # without it, and a double that quietly accepts anything is how a lock bug reaches
         # production with every suite green.
         self.applied_with_lease.append(lease)
-        self._doc.append(op, snapshot_path="fake-snapshot" if op.opaque else "")
+        self._doc.append(op, snapshot_path=snapshot_path or ("fake-snapshot" if op.opaque else ""))
         return OperationResult(
             op_id=op.op_id,
             ok=True,

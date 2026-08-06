@@ -346,3 +346,83 @@ def test_phase_promotion_can_actually_execute() -> None:
     assert app.scene.document.phase is Phase.REFINE
     forced = [o for o in app.scene.document.operations if o.kind == "phase_promotion"]
     assert forced and forced[-1].params["forced"] is True, "the override was not recorded"
+
+
+# ------------------------------------------------------ QA round 2 regressions
+
+def test_a_failed_operation_leaves_no_orphan_geometry() -> None:
+    """`scene.apply`'s own contract says the engine must be exactly as observable as it
+    was before a failed call. It was not: a handler that created geometry and then raised
+    left it live and unlogged — one failed add_railing left 29 orphaned parts, which then
+    appeared in the live view as geometry with no history and vanished on the next
+    save/load."""
+    from contracts import Vec3
+
+    app = build_app(prefer_blender=False, attach_viewer=False)
+
+    def half_then_fail(engine, op):
+        engine.create_primitive("orphan_a", "cube", Vec3(1, 1, 1))
+        engine.create_primitive("orphan_b", "cube", Vec3(1, 1, 1))
+        raise RuntimeError("failed after creating two objects")
+
+    app.scene._handlers["half_then_fail"] = half_then_fail  # noqa: SLF001
+    before = set(app.engine.list_objects())
+
+    with pytest.raises(RuntimeError):
+        app.scene.apply(Operation(op_id="op-boom", kind="half_then_fail"))
+
+    assert set(app.engine.list_objects()) == before, "the failed handler left orphans behind"
+    assert app.scene.document.head == 0, "a failed operation was recorded in the log"
+
+
+def test_a_dead_writer_does_not_wedge_the_lock_forever() -> None:
+    """Lease expiry was measured against document.head, which only advances when an
+    operation is applied — which only the current holder can do. A holder that died
+    mid-operation froze the clock at that moment, so its lease could never go stale and no
+    other agent could ever acquire. Agents die (Rule 6); an autonomous run cannot recover
+    from a permanently wedged lock."""
+    from contracts import LockContention
+
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    app.orchestrator.acquire("doomed", app.orchestrator.phase, ttl_ops=3)
+
+    with pytest.raises(LockContention):
+        app.orchestrator.acquire("successor", app.orchestrator.phase)
+
+    # The doomed holder never applies anything and never releases — it is gone.
+    for _ in range(5):
+        try:
+            app.orchestrator.acquire("successor", app.orchestrator.phase)
+        except LockContention:
+            continue
+        break
+
+    live = app.orchestrator.current()
+    assert live is not None and live.holder == "successor", (
+        "the lock never became reclaimable — the run is wedged permanently"
+    )
+
+
+def test_an_opaque_operation_records_a_barrier_with_a_real_snapshot() -> None:
+    """SECURITY.md claims raw execution is recorded as an undo barrier with a real
+    snapshot. Nothing in the wired product computed a snapshot_path, so an opaque operation
+    either raised outright or recorded a barrier pointing at nothing — and undoing across
+    it re-executed the arbitrary script instead of restoring."""
+    from pathlib import Path
+
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    lease = app.orchestrator.acquire("admin", app.orchestrator.phase)
+
+    report = app.orchestrator.perform(
+        Operation(op_id="op-raw", kind="raw_execute", opaque=True,
+                  params={"source": "count = len(engine.list_objects())"}),
+        lease,
+    )
+
+    assert report.ok, f"{report.error_rule}: {report.error_detail}"
+    barrier = app.scene.document.barrier_before(0)
+    assert barrier is not None, "an opaque operation recorded no undo barrier"
+    assert barrier.snapshot_path, "the barrier has no snapshot to restore from"
+    assert Path(barrier.snapshot_path.split("#")[0]).exists(), (
+        f"barrier points at {barrier.snapshot_path}, which was never written"
+    )

@@ -15,6 +15,7 @@ import math
 
 from contracts import EngineProtocol, Measurement, MetricKind
 
+from ._distance import mesh_distance
 from ._geom import aabb_gap_vector, dominant_local_axis, signed_tetra_volume
 
 __all__ = [
@@ -56,13 +57,22 @@ def dimensions(engine: EngineProtocol, object_id: str) -> Measurement:
 
 
 def distance(engine: EngineProtocol, a: str, b: str) -> Measurement:
-    """Closest surface-to-surface distance between two objects.
+    """Closest surface-to-surface distance between two objects, in metres.
 
-    Never negative: 0 when the objects touch or overlap, never a signed penetration
-    depth — that is what :func:`measure.find_clipping` is for. ``MetricKind.DISTANCE``.
+    Never negative: 0 when the objects touch or overlap, never a signed penetration depth —
+    that is what :func:`measure.find_clipping` is for. ``MetricKind.DISTANCE``.
+
+    Measured against the real triangles, not the bounding boxes. An AABB is exact for an
+    axis-aligned box and badly wrong for anything rotated: two 4 m beams yawed 45° and
+    1.4 m apart reported 0.0 because their boxes overlap. ADR-005 gives this number
+    authority over the agent's own judgement, so a confidently wrong one is worse than
+    none — the agent moves correct geometry to close a gap that is not there.
     """
-    gap = aabb_gap_vector(engine.world_bounds(a), engine.world_bounds(b))
-    return Measurement(kind=MetricKind.DISTANCE, value=gap.length(), unit="m", subject=f"{a}|{b}")
+    value, exact = mesh_distance(engine.snapshot(a), engine.snapshot(b))
+    return Measurement(
+        kind=MetricKind.DISTANCE, value=value, unit="m", subject=f"{a}|{b}",
+        detail="" if exact else "bounding-box lower bound: too many triangles to sweep exactly",
+    )
 
 
 def angle_between(engine: EngineProtocol, a: str, b: str) -> Measurement:
@@ -85,15 +95,18 @@ def angle_between(engine: EngineProtocol, a: str, b: str) -> Measurement:
 def gap_width(engine: EngineProtocol, a: str, b: str) -> Measurement:
     """Shortest empty span between two objects.
 
-    0 when they touch or overlap — this is the number a "close every gap under 5mm"
-    task is defined against (ADR-005). Computed from the same AABB gap primitive as
-    :func:`distance` but kept as an independent call: the two metrics answer the same
-    question for axis-aligned boxes today but are conceptually distinct (surface
-    distance vs. empty span), so this does not simply relabel ``distance``'s result.
-    ``MetricKind.GAP_WIDTH``.
+    0 when they touch or overlap — this is the number a "close every gap under 5mm" task is
+    defined against (ADR-005). ``MetricKind.GAP_WIDTH``.
+
+    Measured against the real triangles, for the same reason :func:`distance` is: a
+    bounding box overstates any rotated object, and a gap reported as 0 means no
+    gap-closing work is ever triggered for a joint that is visibly open.
     """
-    gap = aabb_gap_vector(engine.world_bounds(a), engine.world_bounds(b))
-    return Measurement(kind=MetricKind.GAP_WIDTH, value=gap.length(), unit="m", subject=f"{a}|{b}")
+    value, exact = mesh_distance(engine.snapshot(a), engine.snapshot(b))
+    return Measurement(
+        kind=MetricKind.GAP_WIDTH, value=value, unit="m", subject=f"{a}|{b}",
+        detail="" if exact else "bounding-box lower bound: too many triangles to sweep exactly",
+    )
 
 
 def volume(engine: EngineProtocol, object_id: str) -> Measurement:

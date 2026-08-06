@@ -61,9 +61,15 @@ class DocumentMixin:
            the failure this ordering prevents.
         4. **Call the handler**: ``self._handlers[op.kind](self._engine, op)``. Let any
            exception it raises propagate to the caller completely unchanged — do not
-           catch it, do not append, do not emit. The log, the cache and the engine must
-           be exactly as observable as they were before this call. This is the
-           "failure" contract: a failed operation is never half-recorded.
+           append, do not emit. The log, the cache and the engine must be exactly as
+           observable as they were before this call. This is the "failure" contract: a
+           failed operation is never half-recorded.
+
+           That last sentence was a promise the code did not keep. A handler that created
+           geometry and then raised left it live in the engine, unlogged — 29 orphaned
+           parts from one failed ``add_railing``. The exception still propagates unchanged;
+           what changed is that objects the failed attempt created are removed first
+           (``_discard_orphans``), so the engine really is as it was found.
         5. **On ``OperationResult.ok is False``**: return the result as-is. Do not
            append, do not emit. A reported failure and a raised exception both mean
            "nothing changed" as far as the log is concerned.
@@ -112,9 +118,22 @@ class DocumentMixin:
                 "snapshot — capture one before appending."
             )
 
-        result = self._handlers[op.kind](self._engine, op)
+        # An operation is all-or-nothing. A handler that creates geometry and then fails
+        # used to leave it live in the engine with no log entry: `add_railing` failing on
+        # its third `create_mesh` left 29 orphaned parts behind. They then showed up in the
+        # live view as geometry with no history, were counted by every measurement, and
+        # vanished on the next save/load — because the log, which is the source of truth,
+        # never knew about them. Snapshotting the object list is the cheapest way to make
+        # the failure path leave the scene exactly as it found it.
+        before = set(self._engine.list_objects())
+        try:
+            result = self._handlers[op.kind](self._engine, op)
+        except Exception:
+            self._discard_orphans(before)
+            raise
 
         if not result.ok:
+            self._discard_orphans(before)
             return result
 
         self._document.append(op, snapshot_path=snapshot_path)
@@ -166,3 +185,24 @@ class DocumentMixin:
         self._cache.clear()
         for op in self._document.active_operations:
             self._handlers[op.kind](self._engine, op)
+
+    def _discard_orphans(self, before: set[str]) -> None:
+        """Remove anything the failed handler created, leaving the scene as it was found.
+
+        Only objects that did not exist before the attempt are touched, so a handler that
+        modified existing geometry before failing is not made worse — that residue is real
+        and is reported rather than silently reverted, because reverting a modification
+        needs the old geometry and this method does not have it. Deleting what was newly
+        created is unambiguous; that is why it is the part that is undone.
+
+        Never raises: this runs on the failure path, and an exception here would replace
+        the handler's real error with a cleanup error the agent cannot act on.
+        """
+        try:
+            for object_id in set(self._engine.list_objects()) - before:
+                try:
+                    self._engine.delete(object_id)
+                except Exception:  # noqa: BLE001 — one stubborn object must not stop the rest
+                    continue
+        except Exception:  # noqa: BLE001 — engine unusable; the original error still stands
+            return

@@ -44,6 +44,29 @@ def _touched(result: OperationResult) -> list[str]:
 class ReportingMixin:
     """Mixed into :class:`Orchestrator`. See ``src/orchestration/__init__.py``."""
 
+    def _capture_snapshot(self, op: Operation) -> str:
+        """Write the scene as it stands, and return the path.
+
+        Called before an opaque operation runs, because that is the only moment the
+        pre-execution state still exists. Without it `UndoBarrier.snapshot_path` pointed at
+        nothing and undoing across a raw call re-executed the arbitrary script instead of
+        restoring — a non-deterministic script then produced different geometry while the
+        system reported a clean `FULL_RESYNC`.
+        """
+        import tempfile
+        from pathlib import Path
+
+        directory = Path(tempfile.gettempdir()) / "forge3d-snapshots"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = str(directory / f"{op.op_id}.json")
+        save = getattr(self._scene, "save", None)
+        if save is None:
+            # Better an honest marker than a path to a file that was never written: the
+            # barrier still records that this point cannot be replayed across.
+            return f"{path}#unavailable-no-save"
+        save(path)
+        return path
+
     def _measure(self, op: Operation, result: OperationResult) -> tuple[Measurement, ...]:
         """Real measurements against live geometry for what this operation touched.
 
@@ -132,12 +155,19 @@ class ReportingMixin:
         if self.state is RunState.PAUSED:
             raise RunPaused()
 
+        # An opaque operation cannot be replayed, so rolling back across it needs a real
+        # snapshot to restore from. Nothing in the wired product computed one, so raw
+        # execution either raised outright or recorded a barrier that pointed at nothing —
+        # while SECURITY.md claimed the barrier as a defence. Capturing it here, before the
+        # code runs, is the only moment the pre-execution state still exists.
+        snapshot_path = self._capture_snapshot(op) if op.opaque else ""
+
         # Forward the lease we just verified. Without it the real Scene sees no lock proof
         # and raises LockContention against the caller's own live lease, so every mutating
         # call through the agent path failed 100% of the time. Invisible in every suite
         # because both FakeScene doubles implement `apply(self, op)` with no lock check —
         # a double agreeing with the wrong side of the contract.
-        result = self._scene.apply(op, lease=lease)
+        result = self._scene.apply(op, lease=lease, snapshot_path=snapshot_path)
 
         if self._cadence is CheckCadence.EVERY_GEOMETRY_CHANGE:
             checks_skipped = False
