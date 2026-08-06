@@ -30,6 +30,7 @@ This has three consequences worth stating plainly:
 ```
 src/
   contracts/       frozen shared surface — types, protocols, schemas. MAIN AGENT ONLY.
+  testing/         FakeEngine — a real in-memory EngineProtocol, not a mock. MAIN AGENT ONLY.
   engine/          the only bpy importer. Mesh CRUD, modifiers, UV/bake, glTF, subprocess fallback.
   spatial/         maintained BVH; broad-phase nearby-pair and region queries.
   measure/         all 7 metric queries + all 8 defect classes, incl. clipping. Pure, no mutation.
