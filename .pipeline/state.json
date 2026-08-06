@@ -1,7 +1,7 @@
 {
   "version": 1,
   "idea": "A tool/app that lets AI models create 3D models live: assists with blank/gap filling, raises design detail and realism beyond stitched-together cubes, handles angle adjustments and part clipping (e.g. railings), supports multi-agent/sub-agent task assignment, and is built to raise model accuracy, detail attention and spatial awareness. Blender/bpy acceptable as a base.",
-  "phase": 4,
+  "phase": 8,
   "pass": 2,
   "final": true,
   "startedAt": "2026-08-05",
@@ -16,11 +16,12 @@
     "B": "docs/decisions/gate-B.md"
   },
   "suites": {
-    "backend": "green",
-    "frontend": "green"
+    "backend": "green (901)",
+    "frontend": "green (31)"
   },
-  "next": "Phase 8 = Phase 4 (final build) then Phase 5 (final QA), then docs/PIPELINE-SUMMARY.md and stop",
-  "status": "running",
+  "next": "Run complete. See docs/PIPELINE-SUMMARY.md and docs/HANDOVER.md.",
+  "status": "finished",
   "blocked": null,
-  "branch": "build/pass-1"
+  "branch": "build/pass-1",
+  "stoppedEarly": "Phase 8 round 2 stopped by the user; 4 units never ran, 2 reconciled (engine finished, viewer reverted). See docs/HANDOVER.md."
 }

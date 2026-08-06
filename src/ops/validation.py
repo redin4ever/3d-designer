@@ -6,6 +6,12 @@ programmatic definition-of-done depends on both halves existing: a handler that 
 ``validate_params`` lets a negative dimension or an impossible spacing reach the engine as
 an opaque failure three calls later; an operation with no ``acceptance_for`` query is an
 operation nobody — not the agent, not a QA pass — can verify.
+
+Degenerate *geometry* — a path of zero length, a duplicated vertex, a direction that points
+nowhere — is refused here too (F-013, Gate B 5.4), by name and by index, rather than
+reaching ``_geom`` as a bare ``ValueError``. The shape-tolerance and degeneracy checks
+themselves live in ``_shapes.py``; this file is the per-kind dispatch that decides which
+ones apply.
 """
 
 from __future__ import annotations
@@ -16,6 +22,7 @@ from contracts import EPSILON, ToolError, Vec3
 
 from ._acceptance import acceptance_for
 from ._geom import path_arc_length
+from ._shapes import as_pair, check_distinct, check_path, normalised_points
 
 __all__ = ["validate_params", "acceptance_for"]
 
@@ -73,13 +80,25 @@ def _positive_count(value: int, name: str, kind: str) -> None:
 
 
 def _require_path(params: dict[str, Any], kind: str) -> list[Vec3]:
+    """The validated polyline: a real list, at least two points, no degenerate segment.
+
+    ``normalised_points`` has already turned any ``[x, y, z]`` entries into ``Vec3``, so
+    everything below this line may assume points.
+    """
     path = _require(params, "path", kind)
+    if not isinstance(path, (list, tuple)):
+        raise ToolError(
+            "ops.bad_path",
+            f"{kind}: path is {path!r}, which is not a list of points",
+            "pass `path` as a list of [x, y, z] points, in order along the run",
+        )
     if len(path) < 2:
         raise ToolError(
             "ops.bad_path",
             f"{kind}: path has {len(path)} point(s), needs at least 2",
             "pass at least a start and an end point in `path`",
         )
+    check_path(path, kind)
     return path
 
 
@@ -94,16 +113,29 @@ def _check_spacing_fits_path(spacing: float, path: list[Vec3], name: str, kind: 
 
 
 def _validate_pair_param(params: dict[str, Any], key: str, kind: str) -> None:
+    """A ``(width, depth)`` cross-section, normalised in place on the already-copied dict so
+    the handler downstream unpacks two floats whatever shape arrived."""
     if key not in params:
         return
-    w, d = params[key]
+    w, d = as_pair(params[key], key, kind)
     _positive(w, f"{key}[0]", kind)
     _positive(d, f"{key}[1]", kind)
+    params[key] = (w, d)
 
 
 def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
-    """Check ``params`` against ``kind``'s own requirements and return them, unchanged, on
-    success. See the module docstring and ``ops/CLAUDE.md`` for the bar every raised
+    """Check ``params`` against ``kind``'s own requirements and return them, normalised.
+
+    **Accepts either shape.** ``ops/CLAUDE.md`` says params carry :class:`~contracts.Vec3`
+    and that converting JSON belongs to the boundary (``app/handlers.py``) — still true, and
+    still where an agent's call is converted. But validation runs on whichever shape arrives
+    first, so a plain ``[x, y, z]`` from a replayed operation or a direct call is understood
+    here rather than crashing one layer below with an ``AttributeError`` that cannot name
+    the parameter. The returned dict is a **copy** with every point-shaped value as a
+    ``Vec3`` and every cross-section pair as a tuple of floats; ``op.params`` itself is
+    never touched, because it is replayed and must stay as it was logged.
+
+    See the module docstring and ``ops/CLAUDE.md`` for the bar every raised
     :class:`~contracts.ToolError` here is held to.
     """
     if kind not in _KNOWN_KINDS:
@@ -113,6 +145,7 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
             f"use one of: {', '.join(_KNOWN_KINDS)}",
         )
 
+    params = normalised_points(kind, params)
     _require(params, "object_id", kind)
 
     if kind == "add_primitive":
@@ -128,12 +161,7 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
         thickness = _require(params, "thickness", kind)
         _positive(height, "height", kind)
         _positive(thickness, "thickness", kind)
-        if (end - start).length() < EPSILON:
-            raise ToolError(
-                "ops.bad_path",
-                f"{kind}: end is coincident with start",
-                "pass an `end` distinct from `start`",
-            )
+        check_distinct(start, end, "start", "end", kind)
 
     elif kind == "add_floor":
         width = _require(params, "width", kind)

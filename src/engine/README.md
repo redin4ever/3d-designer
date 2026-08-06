@@ -74,10 +74,11 @@ which checks are in each of the other two registries, and why.
 - **Prefer the data API (`bpy.data`, `bmesh`) over `bpy.ops`.** Many operators `poll()`-fail
   without a window/screen/area, which in-process `bpy` never has. Where an operator is
   unavoidable, wrap it in `bpy.context.temp_override()`.
-- **`bpy`-as-a-module has no `bpy.context.window` at all** — stricter than
-  `blender --background`. UV bake is the operation most likely to need the subprocess
-  fallback (`create_engine(prefer_subprocess=True)`, shelling out to the real
-  `blender.exe`).
+- **`bpy`-as-a-module was expected to have no `bpy.context.window` at all** — stricter than
+  `blender --background`. That turned out to be false for this build: window access exists,
+  so UV unwrap, bake and glTF export all run in-process. The `prefer_subprocess` flag that
+  named a shell-out fallback was deleted at Gate B 2.3; it was never implemented and never
+  called. `EngineUnavailable` remains, for a machine that genuinely lacks the capability.
 - **A fresh `bpy` scene is not empty.** It holds a default cube, camera and light. `reset()`
   must clear all of it, not just objects this session created — see
   `conformance_session.check_reset_leaves_zero_objects` and, more pointedly,

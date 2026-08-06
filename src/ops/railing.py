@@ -33,6 +33,7 @@ from __future__ import annotations
 
 from contracts import EngineProtocol, Operation, OperationResult, Vec3
 
+from ._defaults import resolve_dimensions
 from ._geom import box_mesh, oriented_box_between
 from .validation import validate_params
 
@@ -63,15 +64,23 @@ def add_railing(engine: EngineProtocol, op: Operation) -> OperationResult:
     - posts: ``f"{op.op_id}_post_{i:03d}"``, arc-length order, corners included.
     - balusters: ``f"{op.op_id}_baluster_{i:03d}"``, same ordering convention.
     - top rail: ``f"{op.op_id}_top_rail"`` — exactly one, spanning the full path.
+
+    The three cross-sections are optional and the only dimensions this library supplies on
+    the caller's behalf. Every one it supplies comes back in
+    :attr:`~contracts.OperationResult.assumptions`, so an agent that did not choose a post
+    size can see the size it got and correct it (Gate B 1.4). The values themselves live in
+    ``_defaults.py``, not in this call site.
     """
     params = validate_params("add_railing", op.params)
     path = list(params["path"])
     height = params["height"]
     post_spacing = params["post_spacing"]
     baluster_gap = params["baluster_gap"]
-    post_w, post_d = params.get("post_size", (0.05, 0.05))
-    bal_w, bal_d = params.get("baluster_size", (0.03, 0.03))
-    rail_w, rail_d = params.get("rail_size", (0.05, 0.05))
+
+    dimensions, assumptions = resolve_dimensions("add_railing", params)
+    post_w, post_d = dimensions["post_size"]
+    bal_w, bal_d = dimensions["baluster_size"]
+    rail_w, rail_d = dimensions["rail_size"]
 
     corners = list(path[1:-1])  # every direction change forces a post/baluster here too
 
@@ -114,4 +123,6 @@ def add_railing(engine: EngineProtocol, op: Operation) -> OperationResult:
         engine.join(rail_id, extra_rail_ids)
 
     produced = tuple(post_ids) + tuple(baluster_ids) + (rail_id,)
-    return OperationResult(op_id=op.op_id, ok=True, produced_objects=produced)
+    return OperationResult(
+        op_id=op.op_id, ok=True, produced_objects=produced, assumptions=assumptions
+    )

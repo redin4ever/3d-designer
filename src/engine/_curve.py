@@ -12,13 +12,33 @@ from __future__ import annotations
 import math
 from typing import Sequence
 
-from contracts import Quat, Vec3, WORLD_UP
+from contracts import EngineError, Quat, Vec3, WORLD_UP
 
 __all__ = ["sample_polyline", "arc_length_to", "tangent_at", "rotation_from_up_to"]
 
 
 def sample_polyline(points: Sequence[Vec3], spacing: float) -> list[Vec3]:
-    """Positions at a regular arc-length interval along a polyline, endpoints always included."""
+    """Positions at a regular arc-length interval along a polyline, endpoints always included.
+
+    The ``spacing`` guard is not defensive decoration. ``t += spacing`` with ``spacing == 0``
+    never advances and the loop below never ends — a direct call hangs the process and grows
+    ``out`` until memory runs out, rather than returning something wrong a caller could
+    notice (F-025). ``array_along_curve`` happens to validate first, so nothing in the
+    product reaches this today; the twin in ``testing/mesh_helpers.py`` has guarded it since
+    it was written, and this copy having drifted is exactly the risk the duplication carries.
+
+    It raises the same ``engine.bad_spacing`` rule ``array_along_curve`` raises, so a direct
+    caller and a caller going through the mixin get an identical, actionable failure. (The
+    twin raises a bare ``ValueError``; matching *that* would mean an unnamed error escaping
+    ``src/engine/``, which this module's convention forbids — see ``CLAUDE.md``.)
+    """
+    if spacing <= 0:
+        raise EngineError(
+            "engine.bad_spacing",
+            f"spacing {spacing} must be positive",
+            "pass a spacing greater than zero — it is the arc length between samples, "
+            "so zero or less has no number of positions that satisfies it",
+        )
     out = [points[0]]
     carry = 0.0
     for a, b in zip(points, points[1:]):

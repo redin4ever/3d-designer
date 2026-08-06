@@ -31,7 +31,7 @@ This has three consequences worth stating plainly:
 src/
   contracts/       frozen shared surface — types, protocols, schemas. MAIN AGENT ONLY.
   testing/         FakeEngine — a real in-memory EngineProtocol, not a mock. MAIN AGENT ONLY.
-  engine/          the only bpy importer. Mesh CRUD, modifiers, UV/bake, glTF, subprocess fallback.
+  engine/          the only bpy importer. Mesh CRUD, modifiers, UV/bake, glTF. In-process only.
   spatial/         maintained BVH; broad-phase nearby-pair and region queries.
   measure/         all 7 metric queries + all 8 defect classes, incl. clipping. Pure, no mutation.
   constraints/     the 12-type constraint vocabulary, resolved to concrete transforms.
@@ -40,7 +40,7 @@ src/
   align/           quaternion-correct parallel / perpendicular / coplanar / plumb / flush.
   gaps/            repair — fill hole, weld, recalc normals, merge shells, close visual gaps.
   detail/          realism passes — heuristic bevel, surface detail, material variation.
-  uv/              UV seam decision, unwrap, PBR bake. Primary user of the subprocess fallback.
+  uv/              UV seam decision, unwrap, PBR bake. Runs in-process — bpy has window access here.
   scene/           the operation log: append, deterministic replay, per-op cache, undo, checkpoints.
   orchestration/   phase state machine, single-writer arbitration, conflict flagging,
                    check cadence policy, and assembly of the standard action report.

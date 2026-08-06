@@ -337,3 +337,56 @@ marginally over the soft cap (one line each, no user input needed).
 disk, `state.json` at `phase: 7, pass: 1`. One build pass remains, which is the frame for
 every Gate B question: not "should this be right eventually" but "does this go in the last
 pass".
+
+---
+
+## Phase 8 — the final pass (pass 2)
+
+Contracts reconciled first, in their own commit, before any module reopened: `RuleError` as
+the one shape every named failure takes, `WriteLease.roles` + `PHASE_ROLES` + `PhaseViolation`
+(ADR-013), `PhasePromotion.allow_override` deleted (ADR-012), `AcceptanceResult` gaining
+subject/expected/suggested_operation, the three realism `MetricKind` members deferred twice,
+`OperationResult.assumptions`, `ActionReport`'s summarisation fields, `SCHEMA_VERSION` 1→2
+(ADR-015), and `ScenePort` moved into the frozen surface. All 8 open contract requests
+reconciled — 7 resolved, 1 superseded.
+
+**Round 1: six writers on disjoint paths, all landed.** The headline is F-003. The write
+lock — the safety property the whole multi-agent design rests on — had never been tested
+against real OS concurrency, and when it was, it was broken: eight threads racing behind a
+barrier produced **three simultaneous holders of the "only" write lock**, because `acquire`
+was an unsynchronised check-then-write. A second race made `find_conflicts` raise a bare
+`KeyError` out of a read-only method, refusing 168 readers in one run. Both fixed, both
+pinned by tests using real threads and barriers rather than sleeps.
+
+Also in round 1: measure and detail published 10 MCP tools between them (INSPECT went 0→9);
+session tools landed so an agent can orient and finish; export runs through its handler
+outside the log; `can_promote` evaluates real acceptance queries with no override; undo
+restores from a geometry snapshot instead of re-running raw scripts; schema v2 keeps
+constraints across a reload; the automatic check finally checks neighbours;
+`find_self_intersections` went 6.59s → 0.021s on a 960-triangle sphere (306×); bevel mean
+aspect ratio 109.31 → 64.20, still manifold. **A-008 closed as verified** — 1 stud = 0.28 m,
+per Roblox's own units table, corroborated exactly by its mass row.
+
+**Round 2 was stopped by the user partway through.** Four units never ran (`mcp-live`,
+`geometry-consistency`, and the second halves of `engine` and `viewer`). Two were
+half-applied and reconciled explicitly per Rule 6 rather than left: `engine` was finished by
+hand (F-023 — `prefer_subprocess` deleted, `ARCHITECTURE.md` and `engine/README.md`
+corrected), and `viewer` was **reverted** to the last green commit rather than shipped with
+11 failing tests and a partially rewritten bridge. `ops` and `frontend` had completed before
+the stop and were kept.
+
+**Decided:** to revert rather than finish the viewer unit. A half-written module compiles
+about half the time, which is worse than it not existing, and there was no one left to catch
+the regression.
+
+**Assumed:** nothing new.
+
+**Queued:** everything round 2 did not reach is written into `docs/HANDOVER.md`,
+priority-ordered, with repros. The top item is that the installed MCP SDK is 2.0.0 while
+`transports._build_server` is written against the 1.x decorator API — found and honestly
+filed by the round-1 agent rather than hidden — so no live client can connect today even
+though everything behind the transport is verified working.
+
+**Repo now:** branch `build/pass-1`, 901 backend tests and 31 frontend tests green, doctor
+exit 0 with 43 tools across 9 roles, `docs/PIPELINE-SUMMARY.md` written, `state.json` at
+`status: finished`.

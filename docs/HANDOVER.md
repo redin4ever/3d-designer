@@ -182,6 +182,78 @@ Recorded because none of these has a single real run behind it, by any test or a
 
 ## Anything the final pass did not reach
 
-*(Filled in at the end of the run. The backlog in `.pipeline/backlog.json` is strictly
-priority-ordered and knowingly oversubscribed — roughly 19 substantive items against about 12
-slots — so this section is expected to be non-empty, and being explicit about it is the point.)*
+The final pass ran in two rounds. **Round 1 landed in full** (F-001 to F-018, all committed
+and green). **Round 2 was stopped by the user partway through**, so four of its six units
+never ran and two were half-applied and reconciled per Rule 6.
+
+### Reconciled at the stop
+
+| Unit | State | What was done |
+|---|---|---|
+| `ops` | **complete, kept** | F-021 and F-013's ops half landed before the stop and are green |
+| `frontend` | **complete, kept** | Puppeteer installed, `frontend/tests-browser/` written |
+| `engine` | **half-applied, finished by hand** | F-023 done (`prefer_subprocess` deleted, `ARCHITECTURE.md` and `engine/README.md` corrected). F-019 and F-025 were not started |
+| `viewer` | **half-applied, reverted** | The agent had written a real socket test suite (RED) and partially changed `bridge.py`/`translate.py`, leaving 11 failures. Reverted to the last green commit rather than shipping a broken module. `git show 30954de` is the baseline it returned to |
+| `mcp-live` | **never ran** | — |
+| `geometry-consistency` | **never ran** | — |
+
+### Not done, in priority order
+
+1. **F-002/live — the MCP SDK is 2.0 and the transport is written against 1.x.**
+   Found and honestly filed by the round-1 `mcp_server` agent rather than hidden.
+   `transports._build_server` uses `Server.list_tools()` / `Server.call_tool()` decorators,
+   which 2.0.0 dropped for `mcp.server.MCPServer.add_tool`. It refuses by name rather than
+   raising from inside the SDK, so **no live client can connect over stdio or HTTP today.**
+   Everything behind the transport works — `dispatch` is verified end to end against real
+   Blender — so this is wiring, not design. `src/mcp_server/CLAUDE.md` has the detail under
+   "Known gap". **This is the highest-value single item left**: Gate A 7.4 (drive it from a
+   consumer subscription) and Gate B 6.2 (the multi-agent guarantee) both run through it.
+
+2. **F-009 — `forge3d serve` still does not start the viewer socket.** Gate B 1.3 chose
+   auto-start. `viewer.serve()` is real and exported and nothing calls it, so no browser can
+   reach a running session. The CLI change is small; the viewer work under it is not (see 3).
+
+3. **The viewer socket has never carried a frame, and emits 5 of 13 message types.**
+   `frontend/src/main.js` fully handles `HIGHLIGHT`, `LOG`, `PROBLEMS`, `CONFLICT`,
+   `EXPORT_REPORT` and `RUN_STATE`; the backend constructs none of them, because
+   `translate.py` only ever sees a raw `SceneChangeEvent` and never `perform`'s
+   `ActionReport`. So Gate A 5.3's "latest change highlighted" shows nothing during a real
+   run. The reverted round-2 work had started exactly here — a `serve(bridge=...)` seam plus
+   a `report.py` translation path — and that is the shape of the fix.
+
+4. **F-019 — the scale curve past ~900 objects.** Gate B 2.4 chose to measure to a real few
+   thousand. Object creation is 0.78 ms/op at 900 and near-flat there; the stated target is
+   thousands and the curve was never followed further, in either pass.
+
+5. **F-025 — `_triangle_normal` exists four times and the copies disagree.**
+   `align/position.py:41`, `constraints/anchors.py:78`, `detail/edges.py:162`,
+   `uv/seams.py:71`. All four use `EPSILON` correctly since QA round 2, but three return
+   `None` on a degenerate triangle and `constraints/anchors.py:82` returns `Vec3(0,0,0)` and
+   then layers a second, undocumented `1e-9` threshold at `:95`. Nothing breaks today
+   because each caller matches its own copy — the danger is that "make anchors consistent
+   with the others" is exactly the drive-by edit that reintroduces the bug at `:95`.
+   **There is a live half to this**, found by the round-1 `detail` agent: `detail/edges.py`
+   treats anything under `EPSILON` (1e-4) as degenerate, which on real post-bevel geometry
+   silently drops legitimate sub-millimetre corner triangles from the sharp-edge proxy. A
+   4 mm bevel strip on a 1 m edge produces triangles well under that. `detail/topology.py`
+   already normalises by hand against `1e-15` for this reason.
+
+6. **F-013's remaining half — bare `ValueError`s in the geometry helpers.** `ops` got its
+   share. `align/_geom.py`, `constraints/_orientation.py`, `constraints/_position.py` and
+   `uv/unwrap.py` still raise unnamed errors that reach an agent as a raw traceback, against
+   Gate A 4.2's "what rule it broke". `contracts.errors.RuleError` is the base to hang them
+   on, and it exists.
+
+7. **F-026/F-027/F-028 — documentation and bookkeeping.** `mcp_server`'s docs were corrected
+   in round 1 and `engine`'s in the reconciliation; `viewer/CLAUDE.md` still claims
+   `websockets`/`starlette` are not installed (they are). Seven files sit marginally over the
+   300-line soft cap without the one required justification line — five of them in
+   `contracts/`, where splitting is explicitly disfavoured, so the honest fix is the line and
+   not a restructure. 24 entries in `.pipeline/backlog-pass-1.json` are built and green with
+   no `status` field.
+
+8. **A contract request the `detail` agent filed and worked around:** `MeshOps` has no
+   `replace_mesh(object_id, vertices, faces)`, so `cleanup_bevel_topology` has to
+   delete-then-recreate under the same id and therefore declines on any object that has been
+   UV unwrapped or carries more than one material slot. Harmless today because detail runs
+   before UV; it becomes a real limit the moment anyone re-details a finished asset.

@@ -85,21 +85,21 @@ class BlenderEngine(MeshOpsMixin, ModifierOpsMixin, SurfacingMixin, ExportingMix
                     pass
 
 
-def create_engine(prefer_subprocess: bool = False) -> EngineProtocol:
-    """Composition-root factory (ADR-008).
+def create_engine() -> EngineProtocol:
+    """Composition-root factory (ADR-008). In-process ``bpy``, and nothing else.
 
-    ``prefer_subprocess=False`` (the default) is in-process ``bpy`` — the normal path, and
-    the only one exercised by ``src/engine/blender_test.py``. ``prefer_subprocess=True`` is
-    the documented fallback for capabilities in-process ``bpy`` structurally cannot provide,
-    shelling out to the real ``blender.exe``. No test in this suite exercises that path, and
-    it is not implemented here — raising rather than silently falling back to the in-process
-    engine, which would hide the exact capability gap this flag exists to name.
+    This took a ``prefer_subprocess`` flag until Gate B 2.3, whose ``True`` branch was a bare
+    ``NotImplementedError``. Phase 4 established that ``bpy``-as-a-module **does** have
+    window access in this build — correcting an early research note — so unwrap, bake and
+    glTF export all run in-process and the fallback the flag named was never needed, never
+    built, and never called. A stub that looks load-bearing from the outside is worse than
+    no stub: it read as a supported deployment mode in ``ARCHITECTURE.md`` for a whole pass.
+
+    What is *not* removed is the capability check itself. :class:`~contracts.EngineUnavailable`
+    and the windowed-context reasoning stay, because a machine that genuinely lacks the
+    capability should be told so by name rather than by a silent wrong result.
+
     Nothing outside ``src/engine/`` should ever construct :class:`BlenderEngine` directly —
     this factory is the one seam the rest of the product is allowed to depend on.
     """
-    if prefer_subprocess:
-        raise NotImplementedError(
-            "engine.create_engine: prefer_subprocess=True (blender.exe subprocess fallback) "
-            "is not implemented — no check in this suite exercises it"
-        )
     return BlenderEngine()
