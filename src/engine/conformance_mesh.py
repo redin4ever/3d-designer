@@ -15,6 +15,7 @@ from contracts import EngineError, EngineProtocol, Transform, Vec3
 from testing import unit_cube
 
 __all__ = [
+    "check_snapshot_carries_vertices_no_face_references",
     "check_snapshot_triangulates_a_quad_mesh",
     "check_primitive_has_expected_world_bounds",
     "check_create_mesh_produces_a_closed_manifold",
@@ -174,3 +175,24 @@ def check_snapshot_triangulates_a_quad_mesh(engine) -> None:
     )
     for tri in snap.triangles:
         assert all(0 <= i < snap.vertex_count for i in tri)
+
+
+def check_snapshot_carries_vertices_no_face_references(engine) -> None:
+    """A vertex attached to nothing must still appear in the snapshot.
+
+    The real engine walked only `mesh.polygons`, so a loose vertex was dropped before
+    `measure` ever saw it — `find_loose_or_duplicate`'s loose-vertex detection was dead
+    code against Blender while working correctly against the fake. The detector could never
+    see the thing it exists to find, and a loose vertex is real: it bloats the mesh,
+    survives export, and is invisible in a viewport.
+    """
+    verts = [Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(0, 1, 0), Vec3(5, 5, 5)]
+    engine.create_mesh("with_loose", verts, [(0, 1, 2)])
+
+    snap = engine.snapshot("with_loose")
+
+    assert snap.vertex_count == 4, (
+        f"expected the unreferenced 4th vertex to survive, got {snap.vertex_count}"
+    )
+    referenced = {i for tri in snap.triangles for i in tri}
+    assert len(referenced) == 3, "the loose vertex should belong to no triangle"

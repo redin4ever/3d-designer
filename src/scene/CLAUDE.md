@@ -1,28 +1,12 @@
 # scene — local conventions
 
 See `README.md` for what this module is and its public interface. This file is
-implementation-facing: conventions for whoever writes the bodies of the stubs here.
+implementation-facing: conventions for whoever works on this module next.
 
 ## Status
 
-**RED by design.** Every method in `document.py`, `history.py`, `cache.py`, `events.py`
-and `persistence.py` raises `NotImplementedError("scene.<name>: not implemented")`.
-`Scene.__init__` and the `document` property (`__init__.py`) are real, already-working
-code — they are not stubs.
+**GREEN.** Every function here is implemented and its suite passes. This module was built test-first (Rule 4): the tests were written against the contract, run, and confirmed failing on `NotImplementedError` before any body existed.
 
-Currently **31 tests, 1 green, 30 red**:
-
-- Green: `events_test.py::test_scene_source_never_imports_the_viewer`. It parses every
-  source file in this package with `ast` and asserts none of them import anything named
-  `viewer` — it never constructs a `Scene` or calls a method, so it does not depend on any
-  stub being implemented.
-- Red: everything else, all failing with `NotImplementedError` (a handful of tests wrap a
-  call in `pytest.raises(SomeOtherError)`, which does not catch `NotImplementedError` — it
-  propagates past the `with` block, so those tests are red for the same underlying reason,
-  just surfaced as an uncaught exception rather than a caught-wrong-type failure).
-
-A change that makes the red count anything other than 0 or 30 needs an explanation in the
-commit message.
 
 ## Commands
 

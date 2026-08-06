@@ -346,3 +346,8 @@ def test_export_scale_moves_objects_as_well_as_resizing_them(engine, tmp_path) -
     translation was converted is to read the GLB that was actually written.
     """
     conformance.check_export_scale_moves_objects_as_well_as_resizing_them(engine, tmp_path)
+
+
+@pytest.mark.needs_blender
+def test_snapshot_carries_vertices_no_face_references(engine) -> None:
+    conformance.check_snapshot_carries_vertices_no_face_references(engine)

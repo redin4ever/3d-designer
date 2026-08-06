@@ -1,24 +1,12 @@
 # ops — local conventions
 
 See `README.md` for what this module is and its public interface. This file is
-implementation-facing: conventions for whoever writes the bodies of the stubs here.
+implementation-facing: conventions for whoever works on this module next.
 
 ## Status
 
-**RED by design.** Every function in `primitives.py`, `architecture.py`, `stairs.py`,
-`railing.py`, `arrays.py` and `validation.py` raises
-`NotImplementedError("ops.<name>: not implemented")`. `OPS` and `OP_SPECS` in `registry.py`
-are the one exception — real, fully-constructed data, not stubs (see below). 47 tests exist
-across this package: 7 pass today (`registry_test.py`, all against the real registry data),
-and 40 are red with `NotImplementedError` until the next pass implements the nine handlers
-plus `validate_params`/`acceptance_for`. A change that makes those two counts anything other
-than 7 and 40 needs an explanation in the commit message.
+**GREEN.** Every function here is implemented and its suite passes. This module was built test-first (Rule 4): the tests were written against the contract, run, and confirmed failing on `NotImplementedError` before any body existed.
 
-The tests were written against the contract in `src/contracts/` and the worked example in
-`docs/adr/ADR-004-typed-operations-constraint-placement.md` before any implementation
-existed (Rule 4) — they are the spec. Do not change a test to make it pass; if a test seems
-wrong, it is describing a real product requirement (re-read ADR-004 before concluding
-otherwise).
 
 ## Commands
 

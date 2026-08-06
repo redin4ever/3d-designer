@@ -52,10 +52,8 @@ there rather than in an unrequested sixth file):
 
 ## Status
 
-**RED by design.** Every method above raises `NotImplementedError("scene.<name>: not
-implemented")`. One test is a deliberate exception and is already green:
-`events_test.py::test_scene_source_never_imports_the_viewer` checks source files
-statically and calls no `Scene` method at all — see `CLAUDE.md` for the exact count.
+**GREEN.** Every function here is implemented and its suite passes. This module was built test-first (Rule 4): the tests were written against the contract, run, and confirmed failing on `NotImplementedError` before any body existed.
+
 
 ## Decisions this module makes (the contract does not fix these; tests below pin them)
 

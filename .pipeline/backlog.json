@@ -13,7 +13,7 @@
     "type": "defect",
     "module": "docs",
     "priority": "P2",
-    "status": "open",
+    "status": "fixed",
     "title": "Ten module CLAUDE.md/README.md files still say RED by design / raises NotImplementedError for modules that are fully green.",
     "source": "phase 5 QA, 2026-08-06"
   },
@@ -22,7 +22,7 @@
     "type": "defect",
     "module": "frontend",
     "priority": "P1",
-    "status": "open",
+    "status": "fixed",
     "title": "Primary-button hover fails WCAG AA at 2.87:1. DESIGN.md typography scale never reached tokens.css so app.css hardcodes off-scale px. No main landmark, no h1. Action log rebuilds the whole DOM inside an aria-live region on every append.",
     "source": "phase 5 QA, 2026-08-06"
   },
@@ -40,7 +40,7 @@
     "type": "defect",
     "module": "engine",
     "priority": "P1",
-    "status": "open",
+    "status": "fixed",
     "title": "snapshot() walks mesh.polygons, so a vertex referenced by no face is invisible on real Blender. measure.find_loose_or_duplicate is dead code against real geometry while working against the fake.",
     "source": "phase 5 QA, 2026-08-06"
   },
@@ -49,7 +49,7 @@
     "type": "defect",
     "module": "app+scene+raw",
     "priority": "P0",
-    "status": "open",
+    "status": "fixed",
     "title": "Nothing in the production wiring computes a snapshot_path, so raw execution either raises or records an unrestorable barrier. Undo across it re-runs the arbitrary script instead of restoring - SECURITY.md claims this defence and it does not exist.",
     "source": "phase 5 QA, 2026-08-06"
   },
@@ -58,7 +58,7 @@
     "type": "defect",
     "module": "orchestration",
     "priority": "P0",
-    "status": "open",
+    "status": "fixed",
     "title": "A dead writer wedges the lock forever: lease expiry is measured against document.head, but head only advances through apply, which only the dead lease holder can call.",
     "source": "phase 5 QA, 2026-08-06"
   },
@@ -67,7 +67,7 @@
     "type": "defect",
     "module": "scene",
     "priority": "P0",
-    "status": "open",
+    "status": "fixed",
     "title": "A handler that creates objects then raises leaves them live in the engine with no log entry - add_railing failing on its 3rd create_mesh left 29 orphans. They show in the live view as geometry with no history and vanish on the next save/load.",
     "source": "phase 5 QA, 2026-08-06"
   },
@@ -76,7 +76,7 @@
     "type": "defect",
     "module": "measure",
     "priority": "P0",
-    "status": "open",
+    "status": "fixed",
     "title": "distance and gap_width are computed from world AABBs only. Two beams yawed 45 degrees and 1.4m apart report distance 0.0 while find_clipping reports a 0.1m interpenetration between parts that never touch. Every test uses an unrotated cube.",
     "source": "phase 5 QA, 2026-08-06"
   },
@@ -85,7 +85,7 @@
     "type": "defect",
     "module": "measure",
     "priority": "P0",
-    "status": "open",
+    "status": "fixed",
     "title": "find_clipping reports min per-axis AABB overlap as magnitude and feeds it to JoineryIntent.permits. For anything thinner than it is deep - every post, dowel, tenon - the number collapses to the cross-section. A post 500mm through a deck reports 0.1m, and a declared 150mm socket silences it entirely.",
     "source": "phase 5 QA, 2026-08-06"
   },

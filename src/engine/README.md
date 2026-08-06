@@ -86,8 +86,7 @@ which checks are in each of the other two registries, and why.
 - **Blender stores UV coordinates per face-corner, not per vertex.** `MeshSnapshot` requires
   exactly one UV per vertex; satisfying that across a seam may mean splitting vertices in
   `snapshot()`.
-- Every method not yet implemented raises `NotImplementedError("engine.<name>: not
-  implemented")`. Replace the raise with real bpy code; do not change the signature — it is
+- Every method is implemented against real `bpy` and the conformance suite passes against both `FakeEngine` and a live Blender 5.2.
   the Protocol's, in `src/contracts/engine.py`.
 
 ## Running the tests

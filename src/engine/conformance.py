@@ -76,6 +76,7 @@ from .conformance_materials import (
     check_set_pbr_updates_roughness_observably,
 )
 from .conformance_mesh import (
+    check_snapshot_carries_vertices_no_face_references,
     check_snapshot_triangulates_a_quad_mesh,
     check_apply_transform_bakes_scale_into_vertices,
     check_create_mesh_produces_a_closed_manifold,
@@ -138,6 +139,7 @@ from .conformance_validation import (
 
 #: Every check that holds for any conforming ``EngineProtocol``. Both test files call these.
 UNIVERSAL_CHECKS = (
+    check_snapshot_carries_vertices_no_face_references,
     check_snapshot_triangulates_a_quad_mesh,
     check_primitive_has_expected_world_bounds,
     check_create_mesh_produces_a_closed_manifold,

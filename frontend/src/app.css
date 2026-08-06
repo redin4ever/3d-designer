@@ -250,7 +250,11 @@ button.btn.primary {
 }
 
 button.btn.primary:hover {
-  background: var(--accent-hover);
+  /* The lighter --accent-hover against white ink measures 2.87:1, below the 4.5:1 AA
+     floor for body text — the default state is already only 4.70:1, so lightening the
+     background on hover pushed it under. Darkening instead keeps the hover legible and
+     still reads as a state change. */
+  background: var(--accent-pressed);
 }
 
 input[type='text'],

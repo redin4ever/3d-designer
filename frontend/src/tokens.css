@@ -35,6 +35,10 @@
   --accent: #5e6ad2;
   --accent-hover: #828fff;
   --accent-focus: #5e69d1;
+  /* EXTENSION, not from DESIGN.md: its primary-hover (#828fff) measures 2.87:1
+     against white ink, below the 4.5:1 WCAG AA floor for body text. A filled
+     primary button needs a hover that darkens rather than lightens. 6.40:1. */
+  --accent-pressed: #4a55b8;
   --on-accent: #ffffff;
   --brand-secure: #7a7fad;
 

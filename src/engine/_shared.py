@@ -198,6 +198,21 @@ def build_snapshot_topology(mesh):
         for i in range(1, len(corners) - 1):
             triangles.append((corners[0], corners[i], corners[i + 1]))
 
+    # Carry vertices that no face references. Walking only `mesh.polygons` dropped them
+    # entirely, which made `measure.find_loose_or_duplicate`'s loose-vertex detection dead
+    # code against real Blender while working correctly against the fake — the detector
+    # could never see the thing it exists to find. A loose vertex is a real defect: it
+    # bloats the mesh, survives export, and is invisible in a viewport.
+    referenced = set(orig_of)
+    for orig_idx in range(len(mesh.vertices)):
+        if orig_idx in referenced:
+            continue
+        co = mesh.vertices[orig_idx].co
+        vertices.append(Vec3(co.x, co.y, co.z))
+        orig_of.append(orig_idx)
+        if has_uv:
+            uvs.append((0.0, 0.0))
+
     return vertices, triangles, uvs, orig_of
 
 

@@ -28,6 +28,10 @@ export function createActionLog(maxEntries = DEFAULT_MAX_ENTRIES) {
  */
 export function appendLogEntry(log, entry) {
   log.entries.push(entry);
+  // Total ever appended, never reset by the cap. Reconciling on list length alone
+  // cannot distinguish 'nothing new' from 'one added and one dropped off the front',
+  // and the second case renders a log that silently stops updating.
+  log.appended = (log.appended ?? 0) + 1;
   const overflow = log.entries.length - log.maxEntries;
   if (overflow > 0) {
     log.entries.splice(0, overflow);
@@ -36,26 +40,42 @@ export function appendLogEntry(log, entry) {
 }
 
 /**
- * Render the log into a container element, newest entry last (reading order). Rebuilds
- * the DOM list wholesale — simple and fast enough at `maxEntries` scale, and avoids a
- * second piece of diffing logic in a file with no framework to lean on.
+ * Render the log into a container element, newest entry last (reading order).
+ *
+ * Appends only what is new. Rebuilding wholesale was simpler, but this container is an
+ * aria-live region and this runs on every incoming message — so a full rebuild made a
+ * screen reader announce the entire reconstructed history on every geometry update.
  *
  * @param {ReturnType<typeof createActionLog>} log
  * @param {HTMLElement} container
  */
+function buildRow(entry) {
+  const row = document.createElement('li');
+  row.className = 'log-row';
+  if (entry.kind) row.dataset.kind = entry.kind;
+  const text = document.createElement('span');
+  text.className = 'log-row-text';
+  text.textContent = entry.text ?? '';
+  row.appendChild(text);
+  return row;
+}
+
 export function renderActionLog(log, container) {
-  container.textContent = '';
+  const appended = log.appended ?? log.entries.length;
+  const alreadyRendered = container.__renderedAppended ?? 0;
+  const fresh = Math.min(Math.max(appended - alreadyRendered, 0), log.entries.length);
+
   const fragment = document.createDocumentFragment();
-  for (const entry of log.entries) {
-    const row = document.createElement('li');
-    row.className = 'log-row';
-    if (entry.kind) row.dataset.kind = entry.kind;
-    const text = document.createElement('span');
-    text.className = 'log-row-text';
-    text.textContent = entry.text ?? '';
-    row.appendChild(text);
-    fragment.appendChild(row);
+  for (const entry of log.entries.slice(log.entries.length - fresh)) {
+    fragment.appendChild(buildRow(entry));
   }
-  container.appendChild(fragment);
+  if (fragment.childElementCount > 0) container.appendChild(fragment);
+
+  // Drop from the front so the DOM never outgrows the log the cap actually keeps.
+  while (container.childElementCount > log.entries.length) {
+    container.removeChild(container.firstElementChild);
+  }
+
+  container.__renderedAppended = appended;
   container.scrollTop = container.scrollHeight;
 }

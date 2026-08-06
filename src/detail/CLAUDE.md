@@ -1,15 +1,11 @@
 # detail — local conventions
 
 See `README.md` for what this module is and its public interface. This file is
-implementation-facing: conventions for whoever writes the bodies of the stubs here.
+implementation-facing: conventions for whoever works on this module next.
 
 ## Status
 
-Currently **RED by design**. Every function in `edges.py`, `apply.py`, `surface.py`,
-`materials.py` and `report.py` raises `NotImplementedError("detail.<name>: not implemented")`.
-`EdgeSelection` (`edges.py`) and `DetailResult` (`results.py`) are real, constructed
-dataclasses — they are not stubs and their own tests (`edges_test.py`,
-`results_test.py`) already pass.
+**GREEN.** Every function here is implemented and its suite passes. This module was built test-first (Rule 4): the tests were written against the contract, run, and confirmed failing on `NotImplementedError` before any body existed.
 
 The tests in this directory were written against the module brief and `docs/decisions/gate-A.md`
 waves 1.3 and 8.3/8.4 before any implementation existed (Rule 4) — they are the spec. Do not

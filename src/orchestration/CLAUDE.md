@@ -1,7 +1,7 @@
 # orchestration — local conventions
 
 See `README.md` for what this module is and its public interface. This file is
-implementation-facing: conventions for whoever writes the bodies of the stubs here.
+implementation-facing: conventions for whoever works on this module next.
 
 ## Status
 

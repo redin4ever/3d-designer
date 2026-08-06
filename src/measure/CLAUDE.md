@@ -1,16 +1,11 @@
 # measure — local conventions
 
 See `README.md` for what this module is and its public interface. This file is
-implementation-facing: conventions for whoever writes the bodies of the stubs here.
+implementation-facing: conventions for whoever works on this module next.
 
 ## Status
 
-Currently **RED by design**. Every function in `metrics.py`, `topology.py`,
-`intersections.py` and `report.py` raises `NotImplementedError("measure.<name>: not
-implemented")`. The tests in this directory were written against the contract in
-`src/contracts/` before any implementation existed (Rule 4) — they are the spec. Do not
-change a test to make it pass; if a test seems wrong, it is describing a real product
-requirement (re-read `docs/adr/ADR-005-verification-split.md` before concluding otherwise).
+**GREEN.** Every function here is implemented and its suite passes. This module was built test-first (Rule 4): the tests were written against the contract, run, and confirmed failing on `NotImplementedError` before any body existed.
 
 ## Commands
 
