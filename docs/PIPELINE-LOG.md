@@ -280,3 +280,60 @@ both reuse unrelated kinds with the real name in `Measurement.detail`).
 
 **Repo now:** branch `build/pass-1`, 15 commits, 17 modules green, `state.json` at
 `phase: 4, pass: 1` pending the module-review workflow's verified findings.
+
+---
+
+## Phase 6 — Review research (pass 1)
+
+Five read-only agents, none of which fixed anything. `behaviour` and `experience` drove the
+real product against real Blender 5.2.0 LTS rather than reading it; `landscape` re-checked
+the field on 2026-08-06; `drift` walked all 48 Gate A decisions and 11 ADRs against source;
+`debt` totalled the bill. Briefs in `docs/research/review-1/`, synthesis in `SUMMARY.md`.
+
+**What it found, in one sentence: almost everything works, and almost none of it is
+reachable.** Thirty of thirty-one operations produce correct, measured geometry — a railing
+on a 31.7° rake gives 16 posts plumb to 1.000000, two 45°-yawed beams 1.4 m apart measure
+1.314 m, repairs are verified by re-running the detector that found the defect. And an agent
+connected over MCP cannot call `measure` at all, cannot call `detail` at all, cannot ask what
+phase it is in, cannot promote a phase, and crashes with a raw `KeyError` the moment it tries
+to export.
+
+Drift against Gate A: **36 match, 2 deliberate and recorded, 11 undocumented, 1 not built.**
+The undocumented ones cluster: `export_scene` registered with no handler and carved out of
+the one test built to catch that; `can_promote` checking that *anything happened* rather than
+that acceptance queries pass, contradicting ADR-005 and ADR-007 with no superseding ADR; the
+whole browser control surface built, tested and never started by `forge3d serve`; `INSPECT`
+and `DETAIL` roles empty; save/load silently dropping every constraint, which is ADR-002's
+entire stated payoff.
+
+Three things nobody specified, found only by running it: the default check cadence costs
+**6.5 s to find nothing on a sphere that took 0.006 s to create** (O(triangles²), while
+`src/spatial/` exists unused for exactly this); `undo` is **session-fatal** once the log
+touches an object it did not create, which is the documented `reset_scene=False` workflow;
+and undo across a `raw_execute` barrier still **re-executes** rather than restoring — QA
+round 2 fixed the capture half, not the read-back half, so `SECURITY.md`'s guarantee is
+still untrue.
+
+`landscape` corrected a stale premise honestly: the original survey's "only unshipped papers
+do this" no longer holds — `blender-ai-mcp` (52★) ships live geometry assertions today and
+NVIDIA shipped a Blender validation blueprint on 2026-07-20. Neither is mature, but a
+52-star addon currently exposes more agent-callable measurement than this product does.
+
+**Decided:** nothing. This phase observes and files; Gate B decides.
+
+**Assumed:** nothing new. Two existing assumptions moved: **A-008** (1 stud = 0.28 m) is
+still unverified and sits in the primary export profile; **A-009** is contradicted —
+Puppeteer is declared but not installed, so nothing has ever run in a real browser.
+
+**Queued for Gate B:** 23 candidate decisions came back; 18 survived the Phase 6 filter as
+`R-001`–`R-018` in `.pipeline/question-backlog.json`, each with the evidence that raised it,
+grouped into six waves: unreachable capability, verification that does not verify, what the
+checks cost, durability, prove-vs-build, and the cut list. Dropped by the filter and
+recorded instead of asked: routing `ops/` through `constraints.solve` (no observed drift),
+benchmarking against `blender-ai-mcp` (real, but not a build-pass decision), and seven files
+marginally over the soft cap (one line each, no user input needed).
+
+**Repo now:** branch `build/pass-1`, 17 modules green, five review briefs and a synthesis on
+disk, `state.json` at `phase: 7, pass: 1`. One build pass remains, which is the frame for
+every Gate B question: not "should this be right eventually" but "does this go in the last
+pass".
