@@ -18,6 +18,7 @@
 import './camera.test.js';
 import './controls.test.js';
 import './log.test.js';
+import './raster.test.js';
 import './socket.test.js';
 import './tokens.test.js';
 import './viewport.test.js';

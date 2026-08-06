@@ -5,8 +5,8 @@ implementation-facing.
 
 ## Status
 
-**GREEN.** `node --test frontend/tests/` passes 44/44 (also `npm run test:frontend`), plus
-`npm run test:frontend:browser` for 10 smoke tests in real Chromium via Puppeteer.
+**GREEN.** `node --test frontend/tests/` passes 70/70 (also `npm run test:frontend`), plus
+`npm run test:frontend:browser` for 14 smoke tests in real Chromium via Puppeteer.
 The module tests are pure logic — no browser, no WebGL, no real WebSocket. The browser
 suite exists because that purity is also a blind spot: it is how a camera that could only
 turn left and right shipped.
@@ -59,6 +59,16 @@ independently discovered) rather than harmful — leave it in place regardless.
 - `viewport.js` never imports `scene-renderer.js`, and vice versa. The only file allowed
   to import both is `main.js` — that is what keeps `viewport.js` testable with a fake
   renderer instead of a real canvas. See README's "Why `viewport.js` has no three.js".
+- **Visibility is a depth buffer, not a sort.** `raster.js` rasterizes each triangle into a
+  colour+depth target and keeps the nearer value per pixel. Do not reintroduce a
+  back-to-front sort: the painter's algorithm has no correct answer when triangles overlap
+  in depth, and which one it picks flips as the camera moves — that shipped as "triangles
+  disappearing and reappearing". Three separate patches (subdividing large triangles,
+  inflating fills to hide the resulting seams, stroking pieces to hide them differently and
+  producing black lines) were each a symptom of the same unsound sort, and all three were
+  deleted when the depth buffer landed.
+- **Depth is stored as `1/w`, not view-space z.** Only `1/w` is linear in screen space under
+  a perspective divide; interpolating z bends surfaces and makes coplanar geometry z-fight.
 - **`camera.js` holds the orbit camera's arithmetic and `scene-renderer.js` holds the
   pixels.** That seam was cut after a user found the view would not tilt or zoom: the
   camera lived inside the one file this module's own docs exempt from `node:test`, so

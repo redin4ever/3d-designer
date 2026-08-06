@@ -18,15 +18,8 @@
 // fallbacks below are CSS color keywords, not hex, for the same reason. That is what
 // lets frontend/tests/tokens.test.js scan this file for a raw hex literal and find none.
 
-import {
-  OrbitCamera,
-  clipTriangleNear,
-  inflateTriangle,
-  shadeFactor,
-  subdivideForDepth,
-  triangleNormal,
-  zUpToYUp,
-} from './camera.js';
+import { OrbitCamera, clipTriangleNear, shadeFactor, triangleNormal, zUpToYUp } from './camera.js';
+import { clearFrame, createFrame, drawTriangle } from './raster.js';
 
 function readColor(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -75,6 +68,10 @@ export class SceneRenderer {
     this._lastPointerX = 0;
     this._lastPointerY = 0;
     this._colors = { ink: 'white', muted: 'gray', accent: 'slateblue', canvas: 'black' };
+    this._frame = null;
+    this._image = null;
+    this._rgbCache = new Map();
+    this._probeCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     this._bindPointer();
     this._resizeObserver = new ResizeObserver(() => this._resize());
     this._resizeObserver.observe(canvas);
@@ -88,6 +85,7 @@ export class SceneRenderer {
       accent: readColor('--accent', this._colors.accent),
       canvas: readColor('--canvas', this._colors.canvas),
     };
+    this._rgbCache.clear(); // the tokens just changed; the resolved bytes are stale
   }
 
   createNode(objectId, geometry, materials, groups) {
@@ -222,15 +220,60 @@ export class SceneRenderer {
     return out;
   }
 
+  /** Resolve a CSS colour string to [r, g, b] without ever naming one in this file.
+
+   * The rasterizer writes bytes, so it needs numbers; `tests/tokens.test.js` scans this file
+   * and forbids a colour literal. Letting the browser resolve the token through a 1x1
+   * canvas keeps both true — the value still comes from `tokens.css`, and nothing here
+   * hard-codes it.
+   */
+  _rgb(cssColor) {
+    const cached = this._rgbCache.get(cssColor);
+    if (cached) return cached;
+    const probe = this._probeCtx;
+    probe.clearRect(0, 0, 1, 1);
+    probe.fillStyle = cssColor;
+    probe.fillRect(0, 0, 1, 1);
+    const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
+    const rgb = [r, g, b];
+    this._rgbCache.set(cssColor, rgb);
+    return rgb;
+  }
+
+  /** Mix `rgb` toward the background by `1 - shade`, the flat-shading composite. */
+  _shaded(rgb, background, shade) {
+    return [
+      rgb[0] * shade + background[0] * (1 - shade),
+      rgb[1] * shade + background[1] * (1 - shade),
+      rgb[2] * shade + background[2] * (1 - shade),
+    ];
+  }
+
   _draw() {
     const { ctx, canvas } = this;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = this._colors.canvas;
-    ctx.fillRect(0, 0, width, height);
+    const width = canvas.width;
+    const height = canvas.height;
+    if (width === 0 || height === 0) return;
 
-    if (this.nodes.size === 0) return;
+    const background = this._rgb(this._colors.canvas);
+    const surface = this._rgb(this._colors.muted);
+    const accent = this._rgb(this._colors.accent);
+
+    if (!this._frame || this._frame.width !== width || this._frame.height !== height) {
+      this._frame = createFrame(width, height);
+      this._image = ctx.createImageData(width, height);
+    }
+    const frame = this._frame;
+    clearFrame(frame, background);
+
+    if (this.nodes.size === 0) {
+      this._image.data.set(frame.color);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.putImageData(this._image, 0, 0);
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return;
+    }
 
     let radius = 1;
     const allWorld = new Map();
@@ -241,105 +284,54 @@ export class SceneRenderer {
         radius = Math.max(radius, Math.hypot(x, y, z));
       }
     }
+
     const camDist = this.camera.distanceFor(radius);
+    // Backing-store pixels, not CSS pixels: the rasterizer writes into the backing store
+    // directly, so a 2x display would otherwise render a half-size image into a full-size
+    // buffer.
     const focal = Math.min(width, height) * 0.9;
 
-    // Anything at or past `camDist` in view depth is level with or behind the eye. The
-    // projection divides by `camDist - z`, so those vertices used to be rescued by clamping
-    // the divisor to 0.001 — which flings them thousands of pixels away and turns their
-    // triangle into a screen-spanning sliver, then snaps it back as the camera moves. That
-    // is what "triangles disappearing and reappearing" was. Zoom makes it reachable: at the
-    // closest zoom the camera sits inside the scene's own bounding radius.
+    // Anything at or past `camDist` in view depth is level with or behind the eye, where
+    // the perspective divide has no answer. Clipped, never clamped.
     const nearPlane = camDist - Math.max(camDist * 0.02, 1e-4);
 
+    // Depth is 1/w, which is what the rasterizer interpolates: 1/w is linear in screen
+    // space under a perspective divide and view-space z is not.
     const project = ([x, y, z]) => {
-      const f = focal / (camDist - z);
-      return [width / 2 + x * f, height / 2 - y * f, z];
+      const invW = 1 / (camDist - z);
+      const f = focal * invW;
+      return [width / 2 + x * f, height / 2 - y * f, invW];
     };
 
-    // How much depth one triangle may span before the painter's sort stops being able to
-    // order it correctly against its neighbours. Scaled to the scene so it means the same
-    // thing for a doorknob and for a city block.
-    const maxDepthSpan = radius * 0.12;
-
-    const triangles = [];
     for (const handle of this.nodes.values()) {
       const world = allWorld.get(handle.handleId);
       const { indices } = handle.geometry;
+      const base = handle.highlighted ? accent : surface;
+
       for (let i = 0; i < indices.length; i += 3) {
         const a = world[indices[i]];
         const b = world[indices[i + 1]];
         const c = world[indices[i + 2]];
         if (!a || !b || !c) continue;
 
-        // Shade from the original triangle, not the pieces: subdivision is a depth-sorting
-        // device and must not change how the surface is lit, or a floor would come out
-        // patchy exactly where it happened to be split.
         const shade = shadeFactor(triangleNormal(a, b, c));
+        const rgb = this._shaded(base, background, shade);
 
-        // Clip first, subdivide second. The other order subdivides geometry that is about
-        // to be thrown away, and leaves the pieces straddling the plane to be clipped
-        // individually — same result, more work, at the moment the camera is closest and
-        // the frame is already most expensive.
+        // No sort, no subdivision, no seam inflation. The depth buffer decides visibility
+        // per pixel, so draw order does not matter and none of those are needed.
         for (const [ca, cb, cc] of clipTriangleNear(a, b, c, nearPlane)) {
-          for (const [pa, pb, pc] of subdivideForDepth(ca, cb, cc, maxDepthSpan)) {
-            triangles.push({
-              a: project(pa),
-              b: project(pb),
-              c: project(pc),
-              avgZ: (pa[2] + pb[2] + pc[2]) / 3,
-              shade,
-              highlighted: handle.highlighted,
-            });
-          }
+          drawTriangle(frame, project(ca), project(cb), project(cc), rgb);
         }
       }
     }
-    triangles.sort((t1, t2) => t1.avgZ - t2.avgZ); // painter's algorithm: far first
 
-    for (const tri of triangles) {
-      // Fills are inflated by half a pixel so neighbours overlap. Canvas antialiases each
-      // fill independently, so abutting triangles each cover about half the boundary pixel
-      // and the background shows through as a hairline — a grid of cracks across a
-      // subdivided floor. Stroking each piece to cover the seam was the first attempt and
-      // is what produced the black lines: a stroke straddles the path, so the shared band
-      // is painted by both neighbours and any colour composited twice comes out darker.
-      const [a, b, c] = inflateTriangle(tri.a, tri.b, tri.c, 0.5);
-      ctx.beginPath();
-      ctx.moveTo(a[0], a[1]);
-      ctx.lineTo(b[0], b[1]);
-      ctx.lineTo(c[0], c[1]);
-      ctx.closePath();
-
-      if (tri.highlighted) {
-        // The one accent-colored thing on screen: the latest change, unmistakably.
-        ctx.fillStyle = this._colors.accent;
-        ctx.globalAlpha = tri.shade;
-        ctx.fill();
-      } else {
-        // Solid, shaded surfaces — not a 6%-alpha wireframe, and no per-triangle outline.
-        //
-        // The old fill was `globalAlpha = 0.06`, so every object was see-through and the
-        // scene read as a tangle of lines with no sense of which surface was in front.
-        //
-        // No stroke at all, either. Outlining every triangle draws the *triangulation* —
-        // the diagonal across each quad face of a stair tread is an artefact of how the
-        // mesh happens to be cut up, not an edge of the object, and there is nothing in a
-        // triangle soup that says which is which. Shading carries the form instead.
-        //
-        // Alpha rather than a computed colour because this file must not contain a colour
-        // literal — `tests/tokens.test.js` scans it, and every colour comes from a CSS
-        // custom property read through `getComputedStyle`. Compositing the token against
-        // the canvas background at the shade factor is how a flat token becomes a lit
-        // surface without ever naming a hex value here.
-        ctx.fillStyle = this._colors.muted;
-        ctx.globalAlpha = 1;
-        ctx.fill();
-        ctx.fillStyle = this._colors.canvas;
-        ctx.globalAlpha = 1 - tri.shade;
-        ctx.fill();
-      }
-    }
-    ctx.globalAlpha = 1;
+    this._image.data.set(frame.color);
+    // putImageData ignores the current transform, so the DPR scale set in _resize would
+    // double-apply. Reset around it and restore afterwards for anything drawing in CSS
+    // pixels later.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.putImageData(this._image, 0, 0);
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }

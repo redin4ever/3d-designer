@@ -11,8 +11,6 @@ import {
   shadeFactor,
   triangleNormal,
   DEFAULT_PITCH,
-  subdivideForDepth,
-  inflateTriangle,
   clipTriangleNear,
 } from '../src/camera.js';
 
@@ -234,81 +232,6 @@ test('the ground plane recedes upward on screen from the default view', () => {
   const near = project([0, -4, 0]);
 
   assert.ok(far.screenUp > near.screenUp, 'the ground is being viewed from below');
-});
-
-// --- depth sorting -----------------------------------------------------------------
-// Reported from a real browser: "when watching in an angle it doesnt render properly" —
-// the deck painted over the staircase standing on it.
-
-test('a small triangle is left alone', () => {
-  const out = subdivideForDepth([0, 0, 0], [1, 0, 0.1], [0, 1, 0.2], 1);
-  assert.equal(out.length, 1, 'subdividing small triangles would cost a lot for nothing');
-});
-
-test('a triangle spanning the whole scene is split until its pieces are shallow', () => {
-  const out = subdivideForDepth([0, 0, -10], [10, 0, 0], [0, 10, 10], 1);
-  assert.ok(out.length > 1, 'the floor is still two scene-spanning triangles');
-  for (const [p, q, r] of out) {
-    const extent = Math.max(p[2], q[2], r[2]) - Math.min(p[2], q[2], r[2]);
-    assert.ok(extent <= 1 + 1e-9, `a piece still spans ${extent}`);
-  }
-});
-
-test('subdivision preserves the triangle — no gaps, no overlap', () => {
-  const a = [0, 0, -8];
-  const b = [8, 0, 0];
-  const c = [0, 8, 8];
-  const out = subdivideForDepth(a, b, c, 1);
-
-  const area = ([p, q, r]) =>
-    Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (r[0] - p[0]) * (q[1] - p[1])) / 2;
-
-  const total = out.reduce((sum, tri) => sum + area(tri), 0);
-  assert.ok(
-    Math.abs(total - area([a, b, c])) < 1e-6,
-    'the pieces do not add up to the original — the floor would have holes in it',
-  );
-});
-
-test('recursion is bounded so an edge-on triangle cannot subdivide forever', () => {
-  const out = subdivideForDepth([0, 0, -1e6], [1, 0, 0], [0, 1, 1e6], 0.001);
-  assert.ok(out.length <= 4 ** 5, `runaway subdivision: ${out.length} pieces`);
-});
-
-// --- seams -------------------------------------------------------------------------
-// "there are some black liens in the deck now" — reported after the first seam fix, which
-// stroked each piece in its own colour and so painted the shared band twice.
-
-test('inflating grows a triangle outward, so neighbours overlap instead of cracking', () => {
-  const [a, b, c] = inflateTriangle([0, 0], [10, 0], [0, 10], 1);
-  const area = (p, q, r) =>
-    Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (r[0] - p[0]) * (q[1] - p[1])) / 2;
-  assert.ok(area(a, b, c) > area([0, 0], [10, 0], [0, 10]), 'the triangle did not grow');
-});
-
-test('inflating moves the triangle by less than it grows it', () => {
-  // Pushing each vertex out by a fixed distance does shift the centroid a little — the
-  // three unit directions do not cancel unless the triangle is equilateral. The shift is
-  // bounded by the inflation itself, so it stays sub-pixel; what must not happen is a
-  // surface sliding somewhere visible.
-  const inflation = 1;
-  const [a, b, c] = inflateTriangle([0, 0], [10, 0], [0, 10], inflation);
-  const dx = (a[0] + b[0] + c[0]) / 3 - 10 / 3;
-  const dy = (a[1] + b[1] + c[1]) / 3 - 10 / 3;
-  assert.ok(Math.hypot(dx, dy) < inflation, `the surface shifted by ${Math.hypot(dx, dy)}px`);
-});
-
-test('inflating is sub-pixel, not a visible fattening', () => {
-  const [a] = inflateTriangle([0, 0], [10, 0], [0, 10], 0.5);
-  const moved = Math.hypot(a[0] - 0, a[1] - 0);
-  assert.ok(moved < 1, `a vertex moved ${moved}px — objects would grow visibly`);
-});
-
-test('a degenerate triangle does not blow up', () => {
-  const out = inflateTriangle([5, 5], [5, 5], [5, 5], 0.5);
-  for (const [x, y] of out) {
-    assert.ok(Number.isFinite(x) && Number.isFinite(y), 'produced NaN');
-  }
 });
 
 // --- near plane --------------------------------------------------------------------
