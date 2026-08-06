@@ -207,6 +207,21 @@ class RecordingOrchestrator:
         self.notes.append(text)
         self.calls.append(("add_operator_note", (text,)))
 
+    # The two operator channels this feature added. Real enough to observe through the same
+    # public `focus` property the real class exposes, rather than only recording calls —
+    # `viewer.greeting()` reads it back, and a double that only recorded would let a greeting
+    # that never asked still pass.
+    def set_focus(self, object_ids) -> None:
+        self._focus = tuple(object_ids)
+        self.calls.append(("set_focus", (self._focus,)))
+
+    @property
+    def focus(self) -> tuple[str, ...]:
+        return getattr(self, "_focus", ())
+
+    def add_annotation(self, annotation) -> None:
+        self.calls.append(("add_annotation", (annotation,)))
+
 
 @pytest.fixture
 def recording_orchestrator() -> RecordingOrchestrator:

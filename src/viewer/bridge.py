@@ -18,6 +18,7 @@ from typing import Callable
 
 from contracts import WIRE_VERSION, ServerMessage, ServerMessageType
 
+from .annotate import AnnotateMixin
 from .client import ClientMixin
 from .report import ReportMixin
 from .translate import TranslateMixin
@@ -29,7 +30,7 @@ transcript's own cap: replaying more than it will keep is work thrown away."""
 __all__ = ["ViewerBridge"]
 
 
-class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
+class ViewerBridge(TranslateMixin, ClientMixin, AnnotateMixin, ReportMixin):
     """Subscribes to one ``scene`` and optionally routes control messages through one
     ``orchestrator``. See ``README.md`` for the full contract.
 
@@ -47,6 +48,9 @@ class ViewerBridge(TranslateMixin, ClientMixin, ReportMixin):
         self._last_highlight: tuple[str, ...] = ()
         self._seen_conflicts: set[str] = set()
         self._transcript: list[ServerMessage] = []
+        # Annotation images, held out of the report and out of the transcript. See annotate.py.
+        self._images: dict[str, str] = {}
+        self._annotation_seq = 0
 
     def set_notifier(self, notifier: Callable[[], None] | None) -> None:
         """Register a zero-argument callback fired whenever a message is queued.
