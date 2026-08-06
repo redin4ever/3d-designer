@@ -37,6 +37,7 @@ frontend/
     tokens.css         GENERATED FROM DESIGN.md — DO NOT EDIT
     app.css            hand-authored layout/components, var(--token) only, no raw hex
     chat.css           the conversation panel's rows and composer
+    connect.css        the Connect button and its client-picker dialog
     main.js             entry — wires socket, viewport, log, transcript, controls to the DOM
     socket.js           WebSocket connection, the two seq rules, reconnect
     viewport.js          pure scene-graph state + payload→buffer translation
@@ -44,9 +45,14 @@ frontend/
     log.js               action log: append + cap
     transcript.js        the conversation: append + cap + optimistic-send reconciliation
     controls.js           client-message builders + DOM wiring
+    connect.js            zero/one/many client routing + the words said afterwards (pure)
+    connect-ui.js         the Connect button, the <dialog>, focus (DOM only)
   tests/
     index.js            works around a Node CLI quirk — see CLAUDE.md
     *.test.js            node:test, one file per src module (no browser, no WebGL)
+  tests-browser/
+    smoke.test.js       the one entry point `test:frontend:browser` names
+    connect.browser.mjs the Connect tests, registered into smoke.test.js's suite
   README.md (this file)
   CLAUDE.md              local conventions, the Node quirk, module boundaries
 ```
@@ -79,8 +85,8 @@ constraints forbid adding a dependency or fetching one over the network. So
 node --test frontend/tests/
 ```
 
-Also runnable as `npm run test:frontend` from the repo root — 89 tests, all pure logic —
-plus `npm run test:frontend:browser` for 16 smoke tests in real Chromium.
+Also runnable as `npm run test:frontend` from the repo root — 112 tests, all pure logic —
+plus `npm run test:frontend:browser` for 22 smoke tests in real Chromium.
 
 | File | Covers |
 |---|---|
@@ -89,6 +95,7 @@ plus `npm run test:frontend:browser` for 16 smoke tests in real Chromium.
 | `log.test.js` | append order, length cap |
 | `transcript.test.js` | append order, cap (array and DOM), the three roles, missing-role default, optimistic send reconciled against the server's echo, unconfirmed lines |
 | `controls.test.js` | rollback (exactly one of steps/checkpoint), redirect (rejects empty), set_cadence (one of three values) |
+| `connect.test.js` | the zero/one/many branch, an already-configured client offered as a re-write, the server's error surfaced verbatim, an unreachable backend told apart from an empty machine |
 | `tokens.test.js` | tokens.css defines the required custom properties; no other file under `src/` contains a raw hex color |
 
 See `CLAUDE.md` for why `tests/index.js` exists — it is not itself a test file.
@@ -120,6 +127,31 @@ region a keyboard cannot reach is a history a keyboard user cannot read. Rows ar
 and updated in place, never rebuilt, so confirming a delivered message does not re-announce
 it — the delivery marker itself is `aria-hidden`, since it is the one part of a row that
 changes after the row has already been read out.
+
+## What "Connect" means
+
+The Connect button in the conversation panel's heading row wires this tool into an AI
+client without anyone opening a JSON file. It asks the page's own origin (`GET
+/api/clients`, `POST /api/connect` — served by `src/app/live.py`, deliberately *not* on the
+wire protocol, since setup is not a scene event) which clients this machine has, and then:
+
+- **none** — says so plainly and names the fallback, `forge3d connect` in a terminal. An
+  empty list is an ordinary machine, not a failure, and is never rendered as one.
+- **exactly one** — writes it. Nobody picks from a list of one.
+- **more than one** — offers a picker, with any client that already has forge3d labelled as
+  a re-write rather than presented as new. Re-running is harmless and is exactly what
+  someone wants after moving the checkout.
+
+All three answers appear in the `<dialog>`, not in the sidebar: a written-config result is
+five lines, and rendered inline it squeezed the transcript to nothing — the operator lost
+the panel they read all day to a step they run once.
+
+The result names the file that was written, passes the client's own note through verbatim,
+and leads with the restart instruction, styled apart from the rest. That line is the whole
+message: every one of these clients reads its MCP config once, at start-up, so a user who
+does not restart sees no tools at all and concludes the button did nothing. The dialog also
+says, before anything is written, what "connect" does *not* mean — nothing connects from
+this page, and the tools appear the next time that client starts.
 
 ## What "sent" means in the composer
 

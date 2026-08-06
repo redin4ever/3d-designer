@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="src/tokens.css" />
   <link rel="stylesheet" href="src/app.css" />
   <link rel="stylesheet" href="src/chat.css" />
+  <link rel="stylesheet" href="src/connect.css" />
 </head>
 <body>
   <header class="topbar">
@@ -81,7 +82,18 @@
 
     <aside class="sidebar" aria-label="Conversation and action log">
       <section class="chat-panel" aria-labelledby="chat-heading">
-        <h2 id="chat-heading" class="panel-heading">Conversation</h2>
+        <!-- Connect sits at the right edge of the conversation panel's heading row, after
+             every run control in source order — so the tab path through the page
+             (canvas → Pause → … → cadence → Connect → transcript → composer) is unchanged
+             for everyone who was already using it. It is dark and only one surface step
+             above the panel behind it: this is setup, done once, and it must not compete
+             with Send for attention on every other visit. -->
+        <div class="panel-header">
+          <h2 id="chat-heading" class="panel-heading">Conversation</h2>
+          <button type="button" id="connect-button" class="connect-button" aria-describedby="connect-dialog-note">
+            Connect
+          </button>
+        </div>
         <!-- aria-live="polite", not "assertive": an agent narrating a long build emits a
              line every few seconds, and assertive interrupts a screen-reader user mid-word
              every single time. Polite queues behind whatever they are already reading.
@@ -114,6 +126,31 @@
       </section>
     </aside>
   </main>
+
+  <!-- Everything the Connect button has to say happens in here rather than in the sidebar,
+       and that is a layout decision with a reason: the conversation panel is ~340px wide and
+       a few hundred tall, and a written-config result is five lines. Inline, it crushed the
+       transcript to nothing — the operator lost the panel they actually use to a setup step
+       they run once. In here it costs the panel no height at all, and the restart line gets
+       the room it needs to be read.
+
+       A native <dialog> because the four things a modal has to get right — focus moves in,
+       Escape dismisses, the page behind goes inert, focus returns to whatever opened it —
+       are all already implemented by the platform, and a hand-rolled one that forgets the
+       last of them strands a keyboard user in a panel that is no longer on screen. -->
+  <dialog id="connect-dialog" class="connect-dialog" aria-labelledby="connect-dialog-title">
+    <h2 id="connect-dialog-title" class="connect-dialog-title">Connect an AI client</h2>
+    <!-- Said before anything is written, because "connect" here does not mean what the word
+         usually means. Also the Connect button's own aria-describedby. -->
+    <p id="connect-dialog-note" class="connect-dialog-note">
+      Connecting writes a config file so your AI client can launch forge3d — nothing connects
+      from this page, and the tools appear the next time that client starts.
+    </p>
+    <div id="connect-dialog-body" class="connect-dialog-body" role="status" aria-live="polite"></div>
+    <div class="connect-dialog-actions">
+      <button type="button" class="btn" data-action="connect-cancel">Close</button>
+    </div>
+  </dialog>
 
   <script type="module" src="src/main.js"></script>
 </body>

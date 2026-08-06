@@ -38,6 +38,7 @@ import {
   complaints,
 } from './harness/open-page.mjs';
 import { probeCanvas, waitForCanvasDrawn } from './harness/canvas-probe.mjs';
+import { registerConnectTests } from './connect.browser.mjs';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NARROW = { width: 360, height: 720 };
@@ -124,6 +125,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         '/src/tokens.css',
         '/src/app.css',
         '/src/chat.css',
+        '/src/connect.css',
         '/src/main.js',
         '/src/socket.js',
         '/src/viewport.js',
@@ -131,6 +133,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         '/src/log.js',
         '/src/transcript.js',
         '/src/controls.js',
+        '/src/connect.js',
+        '/src/connect-ui.js',
       ]) {
         assert.ok(paths.includes(expected), `${expected} was never requested — the module graph did not load`);
       }
@@ -656,4 +660,11 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
       await s.dispose();
     }
   });
+
+  // The Connect button's own tests, registered here rather than written here: they are one
+  // control with its own HTTP backend and its own modal, which is a responsibility seam
+  // (Rule 2) — but `test:frontend:browser` names this file by path, so a sibling *file*
+  // would never run. Registering into this describe gives them the seam and the one
+  // browser and static server this suite already pays for.
+  registerConnectTests({ withScene, waitUntil });
 });

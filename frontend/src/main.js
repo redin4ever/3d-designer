@@ -27,6 +27,7 @@ import {
   renderTranscript,
 } from './transcript.js';
 import { attachControls, buildRequestFullSceneMessage } from './controls.js';
+import { attachConnectButton } from './connect-ui.js';
 
 function resolveSocketUrl() {
   const override = new URLSearchParams(location.search).get('ws');
@@ -193,6 +194,12 @@ function main() {
       controlError.textContent = message;
     },
   });
+
+  // `document`, not `.layout`: the client picker is a <dialog> that renders in the top
+  // layer and lives outside <main>, so a root scoped to the layout cannot see it. Nothing
+  // here touches the socket — connecting an AI client is a one-off setup action against the
+  // page's own HTTP origin, and it is deliberately not on the wire protocol.
+  attachConnectButton(document);
 
   setStatus('connecting');
   socket.connect();

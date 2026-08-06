@@ -16,6 +16,7 @@
 // which is not hypothetical: camera.test.js was written, passed when run directly, and
 // reported nothing at all through `npm run test:frontend` until it was added here.
 import './camera.test.js';
+import './connect.test.js';
 import './controls.test.js';
 import './log.test.js';
 import './raster.test.js';

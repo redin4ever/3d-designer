@@ -77,6 +77,26 @@
   --text-body-sm: 14px;
   --text-caption: 12px;
 
+  /* Elevation 2 — a control raised off the panel behind it (DESIGN.md "Elevation & Depth",
+     level 2: surface-2 lift, 1px hairline-strong), plus that section's "subtle white edge
+     highlight on the top edge of lifted panels".
+
+     EXTENSION, not from the frontmatter: DESIGN.md describes this treatment in prose and
+     has no token for it, so each raised control would otherwise re-derive it and drift.
+     The lift is a surface step and a 1px top highlight rather than a drop shadow because
+     DESIGN.md is explicit that this brand "resists drop shadows on dark almost entirely" —
+     the highlight is what reads as elevation here. Built from --ink via color-mix so the
+     one near-white in the system stays the only near-white in the system. */
+  --surface-raised: var(--surface-2);
+  --surface-raised-hover: var(--surface-3);
+  --hairline-raised: var(--hairline-strong);
+  --elevation-raised: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
+
+  /* Elevation 3 — dropdown menus and dialogs (DESIGN.md "Elevation & Depth", level 3),
+     with the scrim that separates a modal from the page it covers. */
+  --surface-overlay: var(--surface-3);
+  --scrim: color-mix(in srgb, var(--overlay) 62%, transparent);
+
   /* Elevation 4 — focus ring (DESIGN.md "Elevation & Depth") */
   --focus-ring: 2px solid var(--accent-focus);
 }
