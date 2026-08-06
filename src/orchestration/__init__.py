@@ -89,6 +89,7 @@ class Orchestrator(
         # and drain on delivery like notes; focus is standing state and does not (A-013).
         self._annotations: list = []
         self._focus: tuple[str, ...] = ()
+        self._annotation_images: dict[str, str] = {}
         self._state: RunState = RunState.RUNNING
         self._lock_tick = 0
         self._index = None

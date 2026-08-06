@@ -222,6 +222,14 @@ class RecordingOrchestrator:
     def add_annotation(self, annotation) -> None:
         self.calls.append(("add_annotation", (annotation,)))
 
+    def hold_annotation_image(self, annotation_id: str, data_url: str) -> None:
+        self._images = getattr(self, "_images", {})
+        self._images[annotation_id] = data_url
+        self.calls.append(("hold_annotation_image", (annotation_id,)))
+
+    def annotation_image(self, annotation_id: str) -> str:
+        return getattr(self, "_images", {}).get(annotation_id, "")
+
 
 @pytest.fixture
 def recording_orchestrator() -> RecordingOrchestrator:

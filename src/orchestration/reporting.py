@@ -28,6 +28,9 @@ from contracts import (
     WriteLease,
 )
 
+MAX_HELD_IMAGES = 16
+"""How many annotation crops are kept at once. See ``hold_annotation_image``."""
+
 from ._neighbours import NeighbourIndex
 from ._phase_acceptance import VISUAL_GAP_MAX
 from ._summary import Detail, summarise
@@ -277,6 +280,34 @@ class ReportingMixin:
         """
         with self._notes_mutex:
             self._focus = tuple(object_ids)
+
+    def hold_annotation_image(self, annotation_id: str, data_url: str) -> None:
+        """Keep one annotation's crop until an agent asks for it.
+
+        Held here rather than on ``ViewerBridge`` because this is where the tool that returns
+        it can reach: ``mcp_server`` gets the orchestrator through ``context.needs`` and has
+        no route to the transport. It is also simply where the rest of the operator's state
+        already lives — notes, focus, and now this.
+
+        Bounded, and the bound matters more than usual: these are hundreds of kilobytes each
+        (Q-23 chose up to 1024px) and a long session points at a great many things. The oldest
+        is the one nobody is coming back for — an agent reads an image on its next call or not
+        at all.
+        """
+        with self._notes_mutex:
+            self._annotation_images[annotation_id] = data_url
+            while len(self._annotation_images) > MAX_HELD_IMAGES:
+                self._annotation_images.pop(next(iter(self._annotation_images)))
+
+    def annotation_image(self, annotation_id: str) -> str:
+        """One held crop, or ``""`` if it never existed or has aged out."""
+        with self._notes_mutex:
+            return self._annotation_images.get(annotation_id, "")
+
+    def held_annotation_images(self) -> tuple[str, ...]:
+        """Which crops are still available, oldest first. Ids only — never the data."""
+        with self._notes_mutex:
+            return tuple(self._annotation_images)
 
     def add_annotation(self, annotation: OperatorAnnotation) -> None:
         """Queue one annotation for delivery on the next :class:`ActionReport`.

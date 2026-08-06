@@ -37,7 +37,9 @@ TOOL_COUNTS_BY_ROLE: dict[str, int] = {
     "align": 7,
     "detail": 4,
     "polish": 2,
-    "inspect": 9,
+    # +1: get_operator_context (Q-03) — the tool that returns an annotation image,
+    # which an ActionReport is text and cannot carry.
+    "inspect": 10,
     "export": 2,
     "admin": 2,
 }

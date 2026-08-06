@@ -50,6 +50,9 @@ class AnnotateMixin:
         Empty rather than raising: an agent asking for a picture that has expired should be
         told there is nothing there, not handed an exception in the middle of a build.
         """
+        held = getattr(self._orchestrator, "annotation_image", None)
+        if held is not None:
+            return held(annotation_id) or ""
         return self._images.get(annotation_id, "")
 
     def _facts_for(self, object_ids: tuple[str, ...]) -> tuple[str, ...]:
@@ -101,9 +104,17 @@ class AnnotateMixin:
         if payload.image:
             self._annotation_seq += 1
             annotation_id = f"an-{self._annotation_seq}"
-            self._images[annotation_id] = payload.image
-            while len(self._images) > MAX_HELD_IMAGES:
-                self._images.pop(next(iter(self._images)))
+            # Handed to the orchestrator, which is where the MCP tool that returns it can
+            # reach — mcp_server gets the orchestrator through context.needs and has no route
+            # to this transport. The local dict is only the fallback for a bridge attached to
+            # something that does not hold images.
+            hold = getattr(self._orchestrator, "hold_annotation_image", None)
+            if hold is not None:
+                hold(annotation_id, payload.image)
+            else:
+                self._images[annotation_id] = payload.image
+                while len(self._images) > MAX_HELD_IMAGES:
+                    self._images.pop(next(iter(self._images)))
 
         self._orchestrator.add_annotation(
             OperatorAnnotation(
