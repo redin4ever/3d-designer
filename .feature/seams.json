@@ -1,0 +1,262 @@
+{
+  "feature": "Point and edit — point at a part so the model gets context about it, prioritise what matters, and change simple things yourself",
+  "tracedVia": [
+    "d858c06 feat(viewer,orchestration,app,frontend): chat with the agent from the browser — the closest comparable feature and the same browser -> viewer -> orchestrator -> agent shape. Followed end to end: index.html composer -> controls.js buildRedirectMessage -> socket.js -> viewer/server.py -> viewer/client.py::_handle_redirect -> orchestration/reporting.py::add_operator_note -> contracts.ActionReport.operator_notes -> the agent's next tool response.",
+    "766a6d3 fix(frontend,app): placeable primitives — the second comparable: a new capability that had to reach frontend/src, src/app/handlers.py AND src/ops/registry.py together."
+  ],
+  "conventionCounts": [
+    "33 of 33 replayable operation kinds are construction or repair; NONE is a plain move/rotate/scale/delete/duplicate of an existing object. Counted with: python -c \"from app.handlers import build_handlers; print(sorted(build_handlers()))\"",
+    "7 of 7 ClientMessageType members have a handler in src/viewer/client.py::_HANDLER_NAMES; 6 of those 7 do real work and SELECT alone is a defined no-op.",
+    "5 of 5 message builders in frontend/src/controls.js are called from attachControls — except buildSelectMessage, which is exported, tested, and called by nothing."
+  ],
+  "seams": [
+    {
+      "id": "wire-select",
+      "file": "src/contracts/wire.py",
+      "line": 83,
+      "anchor": "    SELECT = \"select\"",
+      "status": "open",
+      "what": "the client->server message type for 'the operator is pointing at these objects'",
+      "evidence": "already in the frozen protocol, ahead of any UI for it. contracts/ is main-agent-only (Rule 5), so widening it is a deliberate act, not a side effect.",
+      "asks": "does pointing at a part just mark it, or does it also carry the operator's own words and a picture with it?"
+    },
+    {
+      "id": "wire-redirect",
+      "file": "src/contracts/wire.py",
+      "line": 107,
+      "anchor": "class RedirectPayload:",
+      "status": "open",
+      "what": "the free-text instruction payload — today text and nothing else",
+      "evidence": "RedirectPayload.text is the only field, and its docstring names ActionReport.operator_notes as the only route into a connected agent. Attaching object ids or an image means this dataclass grows.",
+      "asks": "when you point at a part and type an instruction, should those travel as one message or two?"
+    },
+    {
+      "id": "viewer-select-noop",
+      "file": "src/viewer/client.py",
+      "line": 160,
+      "anchor": "    def _handle_select(self, msg: ClientMessage) -> None:",
+      "status": "open",
+      "what": "where a selection arriving from the browser is currently discarded",
+      "evidence": "the docstring says 'Selection is presentation state with nothing for the server to enforce or record' — this feature is exactly the claim that it now is something to record.",
+      "asks": "should the agent be told the moment you point at something, or only when you say something about it?"
+    },
+    {
+      "id": "viewer-handler-table",
+      "file": "src/viewer/client.py",
+      "line": 26,
+      "anchor": "_HANDLER_NAMES: dict[ClientMessageType, str] = {",
+      "status": "open",
+      "what": "the routing registry every inbound client message goes through",
+      "evidence": "7 of 7 ClientMessageType members are keys here; an unlisted type becomes an ERROR message. A new message type that is not added here is silently unreachable.",
+      "asks": "none — mechanical, but it is the row nobody remembers and the feature is invisible without it"
+    },
+    {
+      "id": "report-operator-notes",
+      "file": "src/contracts/operations.py",
+      "line": 260,
+      "anchor": "    operator_notes: tuple[str, ...] = ()",
+      "status": "open",
+      "what": "the one channel by which anything the human does reaches the agent's context",
+      "evidence": "MCP is call/response; the field's own docstring says a server cannot push into a connected agent uninvited, so everything rides out on the next tool response. A tuple of plain strings today.",
+      "asks": "a pointed-at part is more than a sentence — should the agent get it as prose it reads, or as structured facts it can act on directly?"
+    },
+    {
+      "id": "orchestrator-notes",
+      "file": "src/orchestration/reporting.py",
+      "line": 246,
+      "anchor": "    def add_operator_note(self, text: str) -> None:",
+      "status": "open",
+      "what": "the intake that queues an operator instruction until the agent's next call",
+      "evidence": "the only caller is viewer/client.py::_handle_redirect. Notes are drained and cleared on the next report (reporting.py:187-188), so anything queued is delivered exactly once.",
+      "asks": "if you mark something as important, should that stay important for the whole session, or be spent on the very next thing the agent does?"
+    },
+    {
+      "id": "write-lock",
+      "file": "src/orchestration/locking.py",
+      "line": 34,
+      "anchor": "    def acquire(",
+      "status": "open",
+      "what": "the single write lock — one writer at a time, agents included",
+      "evidence": "every mutating tool goes through a lease. A human dragging an object in the browser is a second writer, which this lock has no concept of today.",
+      "asks": "if you move something while the agent is mid-build, who wins — you, it, or does it wait?"
+    },
+    {
+      "id": "viewer-report-out",
+      "file": "src/viewer/report.py",
+      "line": 62,
+      "anchor": "    def report_action(self, report: ActionReport) -> None:",
+      "status": "open",
+      "what": "how the agent's own actions come back to the browser as HIGHLIGHT / LOG / PROBLEMS",
+      "evidence": "wired in the composition root by d858c06 ('the arrow that was missing'). A change the operator makes by hand has to travel the same way or the other watchers never see it.",
+      "asks": "when you edit something yourself, should everyone watching see it as a line in the conversation, the same way the agent's edits appear?"
+    },
+    {
+      "id": "mcp-describe-object",
+      "file": "src/mcp_server/scene_query.py",
+      "line": 125,
+      "anchor": "def describe_object(*, engine: Any, object_id: str) -> dict[str, Any]:",
+      "status": "open",
+      "what": "the existing tool that returns everything measurable about one object",
+      "evidence": "already returns dimensions, bounds, triangle/vertex/polygon counts, uvs, material slots, transform and every defect measure.inspect finds. This is the text half of 'information about that part' and it already exists — the gap is that nothing connects it to what the human pointed at.",
+      "asks": "when you point at a part, what should the model be told about it — just what it is, or every measurement and defect too?"
+    },
+    {
+      "id": "mcp-images",
+      "file": "src/mcp_server/images.py",
+      "line": 64,
+      "anchor": "def downscale_image(data: bytes, *, max_edge: int = 1024) -> bytes:",
+      "status": "open",
+      "what": "the image cost control (ADR-003) — exported from the barrel and called by nothing",
+      "evidence": "grep for ImageContent across src/ returns zero hits outside this module. There is no render, screenshot or viewport-capture anywhere in the backend: the ONLY pixels that exist in this product are the ones frontend/src/raster.js draws. So an image of a part can only come from the browser's own canvas today. Also PPM-only by design — 'adding a real codec is a gate decision, not a quiet addition' (mcp_server/CLAUDE.md).",
+      "asks": "should the picture the model gets be exactly what you are looking at on screen, or a cleaner render made for the purpose?"
+    },
+    {
+      "id": "mcp-registry",
+      "file": "src/mcp_server/registry.py",
+      "line": 122,
+      "anchor": "def build_registry(*, include_raw: bool = True) -> dict[ToolRole, tuple[ToolSpec, ...]]:",
+      "status": "open",
+      "what": "which tools each agent role can see at all",
+      "evidence": "a tool absent here is a tool no agent can call, with no error anywhere. Nothing may cap or hide a tool (Gate B 3.3) — counts are recorded in registry_test.py and README.md, so adding one means updating a recorded count.",
+      "asks": "none — mechanical, but a new tool that is not registered here is unreachable and nothing says so"
+    },
+    {
+      "id": "ops-registry",
+      "file": "src/ops/registry.py",
+      "line": 68,
+      "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
+      "status": "open",
+      "what": "the construction library's registry — OPS is what scene replays every logged operation through",
+      "evidence": "33 replayable kinds exist and NOT ONE is a plain move/rotate/scale/delete/duplicate. Direct manipulation has no operation to be. Anything not registered here cannot be replayed, undone, or rolled back.",
+      "asks": "which changes should you be able to make yourself without asking the model?"
+    },
+    {
+      "id": "app-handlers",
+      "file": "src/app/handlers.py",
+      "line": 210,
+      "anchor": "def build_handlers(*, include_raw: bool = True) -> HandlerRegistry:",
+      "status": "open",
+      "what": "the composition root's map from Operation.kind to the code that runs it",
+      "evidence": "766a6d3 added placeable primitives and had to touch this file and src/ops/registry.py together — the co-change nothing in the new code points at. src/app/ is main-agent-only (Rule 5).",
+      "asks": "none — mechanical; an op registered in ops/ but missing here fails at replay, not at call time"
+    },
+    {
+      "id": "live-http-api",
+      "file": "src/app/live.py",
+      "line": 107,
+      "anchor": "    def do_POST(self) -> None:  # noqa: N802",
+      "status": "open",
+      "what": "the same-origin HTTP API the browser already uses for setup actions",
+      "evidence": "its class docstring states the rule for what belongs here vs the wire protocol: 'contracts.wire is for what is happening to the scene, and putting setup traffic through it would widen a frozen surface'. An image blob is neither obviously.",
+      "asks": "none — a routing decision; recorded because sending a screenshot down the geometry socket is the kind of choice that is hard to reverse later"
+    },
+    {
+      "id": "frontend-select-builder",
+      "file": "frontend/src/controls.js",
+      "line": 33,
+      "anchor": "export function buildSelectMessage(objectIds) {",
+      "status": "open",
+      "what": "the browser's select-message builder — written, exported, tested, and called by nothing",
+      "evidence": "every other builder in this file is called from attachControls at the bottom. This one is not, in controls.js or main.js. The selection path was built to the edge of the UI and stopped.",
+      "asks": "how do you pick a part — click it, hover it, or draw a circle round several?"
+    },
+    {
+      "id": "frontend-picking",
+      "file": "frontend/src/raster.js",
+      "line": 42,
+      "anchor": "export function createFrame(width, height) {",
+      "status": "open",
+      "what": "the colour+depth frame every triangle is rasterized into",
+      "evidence": "drawTriangle already resolves visibility per pixel and writes depth[idx] in its inner loop (raster.js:113-115). An id channel written in the same loop makes picking exact and free — you get the object under the cursor, not the object a ray guessed at. frontend/CLAUDE.md forbids reintroducing any per-triangle sort here.",
+      "asks": "when parts overlap on screen, should pointing pick the nearest one, or offer you the stack to choose from?"
+    },
+    {
+      "id": "frontend-pointer",
+      "file": "frontend/src/scene-renderer.js",
+      "line": 145,
+      "anchor": "  _bindPointer() {",
+      "status": "open",
+      "what": "the pointer handling that currently owns drag-to-orbit and scroll-to-zoom",
+      "evidence": "one pointerdown handler, and dragging is unconditionally an orbit. Hovering, circling and dragging a part all want the same gestures, so this is where they have to be shared rather than added.",
+      "asks": "should drag stay 'turn the camera' with pointing on a separate mode, or should drag on a part move it and drag on empty space turn the camera?"
+    },
+    {
+      "id": "frontend-viewport-state",
+      "file": "frontend/src/viewport.js",
+      "line": 68,
+      "anchor": "export function createViewportState() {",
+      "status": "open",
+      "what": "the scene-graph bookkeeping and the highlighted set",
+      "evidence": "state.highlighted is documented as 'exactly the object_ids the last HIGHLIGHT message named', and applyHighlight clears every previous one because 'a highlight that accumulates makes what-just-changed useless'. An operator-pinned emphasis cannot reuse that set without destroying it.",
+      "asks": "should the parts you mark as important stay marked while the agent works, or clear each time it changes something?"
+    },
+    {
+      "id": "frontend-main-wiring",
+      "file": "frontend/src/main.js",
+      "line": 172,
+      "anchor": "  attachControls(controlsRoot, {",
+      "status": "open",
+      "what": "the one file allowed to wire the socket, the viewport, the renderer and the controls together",
+      "evidence": "main.js is the only file permitted to import both viewport.js and scene-renderer.js (frontend/CLAUDE.md). Anything needing both picking and sending has to be composed here.",
+      "asks": "none — mechanical, but this is the file where a feature that works in isolation gets connected to the product"
+    },
+    {
+      "id": "frontend-html",
+      "file": "frontend/index.html",
+      "line": 42,
+      "anchor": "    <section class=\"controls-panel\" aria-label=\"Operator controls\">",
+      "status": "open",
+      "what": "where every operator control lives, and the source order that fixes the keyboard tab path",
+      "evidence": "the comment above it pins the ordering: controls before sidebar in source even though the grid paints it below-left, 'which the browser suite asserts'. New controls change the tab order unless they are placed deliberately.",
+      "asks": "where should the editing tools sit — always visible in the controls panel, or appearing beside the part when you pick one?"
+    },
+    {
+      "id": "frontend-tokens",
+      "file": "frontend/src/tokens.css",
+      "line": 14,
+      "anchor": ":root {",
+      "status": "open",
+      "what": "every colour and type value in the product",
+      "evidence": "tests/tokens.test.js scans all of frontend/src for a raw hex literal outside this file and fails on one. A hover outline or a priority marker needs a token here before it can have a colour at all.",
+      "asks": "how should a part you have marked as important look — a coloured outline, a badge, or dimming everything else?"
+    },
+    {
+      "id": "frontend-test-index",
+      "file": "frontend/tests/index.js",
+      "line": 18,
+      "anchor": "import './camera.test.js';",
+      "status": "open",
+      "what": "the manual list of every frontend test file",
+      "evidence": "a Node CLI quirk on this machine means a *.test.js file not imported here passes when run directly and reports nothing at all through npm run test:frontend. It has already happened once (camera.test.js).",
+      "asks": "none — mechanical, and the single most silent failure in this repo"
+    },
+    {
+      "id": "frontend-conventions",
+      "file": "frontend/CLAUDE.md",
+      "line": 62,
+      "anchor": "## Module boundaries",
+      "status": "open",
+      "what": "the module-boundary rules a later agent reads before touching this code",
+      "evidence": "every prior frontend change added its boundary here (the depth buffer, camera.js's split, transcript.js vs log.js). A new one that is not recorded gets undone by the next agent that finds it surprising.",
+      "asks": "none — but an unrecorded boundary is one that will be violated"
+    }
+  ],
+  "dismissed": [
+    {
+      "path": ".feature/candidates.json",
+      "reason": "trace.mjs produced 0 candidates — its co-change heuristic found nothing, because this repo's history is 8 large pipeline commits rather than many small per-feature ones, so 'files that changed together' is very nearly 'every file'. The co-change evidence was recovered by hand instead: git show --stat on d858c06 and 766a6d3, recorded in tracedVia above. Nothing was shortened; the generator simply had no signal to give."
+    },
+    {
+      "path": "src/engine/",
+      "reason": "the only module that may import bpy, and nothing here needs Blender: picking happens in the browser's own rasterizer and direct-manipulation ops go through EngineProtocol like every other operation."
+    },
+    {
+      "path": "src/export/",
+      "reason": "a selection and a priority marker are session state, not geometry — nothing an operator points at changes what a Roblox export contains."
+    },
+    {
+      "path": "docs/PIPELINE-LOG.md",
+      "reason": "build history — co-changes with everything, connects to nothing."
+    }
+  ]
+}

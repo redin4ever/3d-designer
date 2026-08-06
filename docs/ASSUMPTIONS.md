@@ -135,3 +135,90 @@ is what is true from here.
 | A-010 | **Confirmed** | The scene document is still JSON, now at schema version 2. |
 
 **Six confirmed, three amended, one resolved, one still open.** No assumption was overturned.
+
+---
+
+# point-and-edit — 2026-08-06
+
+Taken during the add-feature run for pointing, priority and direct editing. Each was the
+reversible option; each is recorded here rather than asked, because the gate had already closed.
+
+## A-011 — Annotations ride the wire protocol, not the HTTP API
+
+- **Feature:** point-and-edit · **Seam:** `live-http-api`
+- **Assumed:** a pointed-at part, its words and its cropped image all travel as one
+  `ANNOTATE` client message over the existing viewer WebSocket — not as an HTTP POST to
+  `src/app/live.py`'s `/api/*` surface.
+- **Why:** `live.py`'s own class docstring draws the line: the HTTP API is for **setup**
+  actions, and `contracts.wire` is "for what is happening to the scene". An annotation about
+  a part is about the scene. It also keeps every operator action on one ordered channel, so a
+  note cannot arrive before the selection it refers to.
+- **Blast radius:** `src/contracts/wire.py`, `src/viewer/client.py`, `frontend/src/socket.js`.
+- **Reversal cost:** low — the payload is already a dict; moving it to HTTP means changing
+  the transport call, not the shape.
+- **Caveat filed:** `websockets` defaults to a 1 MB frame limit. A 1024px PNG (Q-23) is
+  normally 100–400 KB base64-encoded, but not guaranteed to be. `serve()` must raise
+  `max_size` explicitly, and the browser must refuse to send an oversized crop with a
+  message rather than having the socket closed underneath it.
+
+## A-012 — The crop is encoded and downscaled in the browser
+
+- **Feature:** point-and-edit · **Seam:** `mcp-images`
+- **Assumed:** the browser crops its own canvas, downscales to 1024px on the long edge, and
+  encodes PNG. `mcp_server.downscale_image` is not used on this path.
+- **Why:** `downscale_image` handles binary PPM only, on purpose — "adding a real codec is a
+  gate decision, not a quiet addition" (`mcp_server/CLAUDE.md`). The canvas already produces
+  PNG and already resamples; converting PNG→PPM in the browser to feed a Python downscaler
+  that would re-encode is work with no benefit. The cost control (ADR-003) is honoured at the
+  same 1024px bound, just applied one hop earlier.
+- **Blast radius:** `frontend/src/` capture code only.
+- **Reversal cost:** low — if a server-side codec ever lands, the browser sends full-size and
+  the bound moves back to Python.
+
+## A-013 — Focus is orchestrator state, not an operator note
+
+- **Feature:** point-and-edit · **Seam:** `orchestrator-notes`
+- **Assumed:** parts marked important are held as a standing set on the orchestrator and
+  re-attached to **every** `ActionReport` until cleared, rather than queued through
+  `add_operator_note`.
+- **Why:** Q-10 chose "a standing instruction it re-reads every turn". Operator notes are
+  drained and cleared on delivery (`reporting.py:187-188`) — correct for a one-off redirect,
+  and it would make "focus on this" vanish after one action.
+- **Blast radius:** `src/orchestration/reporting.py`, `src/contracts/operations.py`.
+- **Reversal cost:** medium — it is a new field on a frozen contract type, so removing it
+  means a reconciliation round. Additive and defaulted, so nothing breaks by ignoring it.
+
+## A-014 — Hide/show is browser state, never a scene operation
+
+- **Feature:** point-and-edit · **Seam:** `ops-registry` · **Question:** Q-14
+- **Assumed:** hiding a part affects only your own view. It is not logged, not replayed, not
+  sent to the agent, and another watcher's view is unaffected.
+- **Why:** Q-19 chose one shared history, which makes every logged operation something the
+  agent must reason about. "I temporarily moved that out of my way" is not a fact about the
+  model, and logging it would put noise into a history whose value is that it describes the
+  build.
+- **Blast radius:** `frontend/src/` only.
+- **Reversal cost:** low — becoming a real operation later is additive.
+
+## A-015 — Direct-manipulation operations live in `src/ops/`
+
+- **Feature:** point-and-edit · **Seam:** `ops-registry`
+- **Assumed:** move / rotate / scale / delete / duplicate / rename / set-material are added to
+  `src/ops/` beside the 33 existing kinds, rather than to a new `src/edit/` module.
+- **Why:** `OPS` is what `scene` replays every logged operation through, and `OP_SPECS` is
+  what the registry turns into tool declarations. A second registry would need wiring into
+  both, and Q-19's single shared history is exactly the claim that these are ordinary
+  operations rather than a separate class of thing.
+- **Blast radius:** `src/ops/`, `src/app/handlers.py`, `src/mcp_server/registry.py` counts.
+- **Reversal cost:** low — moving a handler between modules is a re-registration.
+
+## A-016 — The feature is built on `build/pass-1`, not a `feat/` branch
+
+- **Feature:** point-and-edit · **Rule:** 5
+- **Assumed:** no new branch was cut for this feature.
+- **Why:** a second agent is working in this same checkout (its Connect UI is uncommitted in
+  `frontend/`). `git switch` moves the working tree for **both** of us, so branching to
+  isolate this work would have disrupted theirs. `build/pass-1` is already a non-default
+  branch, which is what Rule 5 actually requires.
+- **Blast radius:** git history only.
+- **Reversal cost:** low — `git branch feat/point-and-edit` after the fact keeps every commit.
