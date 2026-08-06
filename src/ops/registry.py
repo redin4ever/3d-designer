@@ -84,6 +84,31 @@ OP_SPECS: tuple[ToolSpec, ...] = (
                     "enum": ["cube", "cylinder", "sphere", "plane", "cone", "torus"],
                 },
                 "size": _VEC3_SCHEMA,
+                # The handler has always accepted this and the schema has never declared
+                # it, so no agent could place a primitive anywhere but the world origin —
+                # every cube arrived at (0,0,0), half-buried in whatever floor was there,
+                # and the only way out was an `align` tool in a later phase. A parameter a
+                # handler supports and a schema hides is invisible: an agent acts on the
+                # schema alone.
+                "transform": {
+                    "type": "object",
+                    "description": (
+                        "Where to place it. Omit to place at the world origin, which will "
+                        "usually intersect anything already there."
+                    ),
+                    "properties": {
+                        "translation": _VEC3_SCHEMA,
+                        "rotation": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 4,
+                            "maxItems": 4,
+                            "description": "Quaternion [w, x, y, z].",
+                        },
+                        "scale": _VEC3_SCHEMA,
+                    },
+                    "additionalProperties": False,
+                },
             },
             "required": ["object_id", "kind", "size"],
             "additionalProperties": False,

@@ -260,6 +260,50 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
     }
   });
 
+  test('geometry does not pop in and out while the camera moves in close', async () => {
+    // Reported: "i can see triangles dissapearing and reaapearing when moving my camera".
+    // The projection divides by (camDist - z), and zoom scales camDist — at the closest
+    // stop the camera sits inside the scene's own bounding radius, so geometry genuinely
+    // passes behind the eye. That divisor used to be clamped rather than the triangle
+    // clipped, which flung vertices thousands of pixels away and back.
+    const s = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s);
+      await waitForCanvasDrawn(s.page, 500);
+
+      const box = await s.page.$eval('#viewport-canvas', (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+      await s.page.mouse.move(box.x, box.y);
+      await s.page.mouse.wheel({ deltaY: -3000 }); // all the way in
+      await new Promise((r) => setTimeout(r, 250));
+
+      // Orbit in small steps. Every frame must stay a plausible render: never blank, and
+      // never a single sliver smeared over the whole canvas.
+      const samples = [];
+      for (let i = 0; i < 8; i += 1) {
+        await s.page.mouse.move(box.x, box.y);
+        await s.page.mouse.down();
+        await s.page.mouse.move(box.x + 18, box.y + 6, { steps: 3 });
+        await s.page.mouse.up();
+        await new Promise((r) => setTimeout(r, 90));
+        const probe = await probeCanvas(s.page);
+        samples.push(probe.nonModalPixels / probe.totalPixels);
+      }
+
+      for (const [i, share] of samples.entries()) {
+        assert.ok(
+          share > 0.01,
+          `frame ${i}: the scene vanished (${(share * 100).toFixed(1)}% drawn) — ${JSON.stringify(samples)}`,
+        );
+      }
+      assert.deepEqual(complaints(s).pageErrors, [], 'moving the camera in close must not throw');
+    } finally {
+      await s.dispose();
+    }
+  });
+
   test('the view holds still when nobody is touching it', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {

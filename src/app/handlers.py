@@ -19,7 +19,7 @@ from typing import Any, Callable
 
 from contracts import EngineProtocol, HandlerRegistry, Operation, OperationResult
 
-from contracts import Vec3
+from contracts import Quat, Transform, Vec3
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +41,23 @@ def _is_path_schema(s: Any) -> bool:
     return isinstance(s, dict) and s.get("type") == "array" and _is_vec3_schema(s.get("items"))
 
 
+def _is_transform_schema(s: Any) -> bool:
+    """A placement: an object whose properties are the fields of ``contracts.Transform``.
+
+    Recognised structurally within the *schema*, never within the value — same rule as the
+    vec3 case, and for the same reason. Requiring at least one of the three fields, rather
+    than an exact match, keeps a schema that declares only ``translation`` working.
+    """
+    if not isinstance(s, dict) or s.get("type") != "object":
+        return False
+    props = s.get("properties")
+    if not isinstance(props, dict) or not props:
+        return False
+    return set(props) <= {"translation", "rotation", "scale"} and bool(
+        {"translation", "rotation", "scale"} & set(props)
+    )
+
+
 def _coercion_map(input_schema: dict) -> dict[str, str]:
     """Which parameters of one tool are points, and which are polylines.
 
@@ -56,6 +73,8 @@ def _coercion_map(input_schema: dict) -> dict[str, str]:
             out[name] = "vec3"
         elif _is_path_schema(spec):
             out[name] = "path"
+        elif _is_transform_schema(spec):
+            out[name] = "transform"
     return out
 
 
@@ -79,6 +98,16 @@ def coerce_params(params: dict[str, Any], coercions: dict[str, str]) -> dict[str
                 out[name] = Vec3(*(float(c) for c in value))
             elif kind == "path":
                 out[name] = [p if isinstance(p, Vec3) else Vec3(*(float(c) for c in p)) for p in value]
+            elif kind == "transform" and not isinstance(value, Transform):
+                # Every field optional and defaulted, so `{"translation": [...]}` is a
+                # complete placement. Rotation is [w, x, y, z], matching the schema and
+                # `contracts.Quat`'s own field order — the other convention would silently
+                # yaw everything an agent placed.
+                out[name] = Transform(
+                    translation=Vec3(*(float(c) for c in value.get("translation", (0.0, 0.0, 0.0)))),
+                    rotation=Quat(*(float(c) for c in value.get("rotation", (1.0, 0.0, 0.0, 0.0)))),
+                    scale=Vec3(*(float(c) for c in value.get("scale", (1.0, 1.0, 1.0)))),
+                )
         except (TypeError, ValueError):
             # Leave it alone; the operation's own validator will reject it by name, which
             # is a far better message than anything that could be produced here.

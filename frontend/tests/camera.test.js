@@ -12,6 +12,8 @@ import {
   triangleNormal,
   DEFAULT_PITCH,
   subdivideForDepth,
+  inflateTriangle,
+  clipTriangleNear,
 } from '../src/camera.js';
 
 // These describe a bug a user hit in a real browser and no test could have caught, because
@@ -271,4 +273,90 @@ test('subdivision preserves the triangle — no gaps, no overlap', () => {
 test('recursion is bounded so an edge-on triangle cannot subdivide forever', () => {
   const out = subdivideForDepth([0, 0, -1e6], [1, 0, 0], [0, 1, 1e6], 0.001);
   assert.ok(out.length <= 4 ** 5, `runaway subdivision: ${out.length} pieces`);
+});
+
+// --- seams -------------------------------------------------------------------------
+// "there are some black liens in the deck now" — reported after the first seam fix, which
+// stroked each piece in its own colour and so painted the shared band twice.
+
+test('inflating grows a triangle outward, so neighbours overlap instead of cracking', () => {
+  const [a, b, c] = inflateTriangle([0, 0], [10, 0], [0, 10], 1);
+  const area = (p, q, r) =>
+    Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (r[0] - p[0]) * (q[1] - p[1])) / 2;
+  assert.ok(area(a, b, c) > area([0, 0], [10, 0], [0, 10]), 'the triangle did not grow');
+});
+
+test('inflating moves the triangle by less than it grows it', () => {
+  // Pushing each vertex out by a fixed distance does shift the centroid a little — the
+  // three unit directions do not cancel unless the triangle is equilateral. The shift is
+  // bounded by the inflation itself, so it stays sub-pixel; what must not happen is a
+  // surface sliding somewhere visible.
+  const inflation = 1;
+  const [a, b, c] = inflateTriangle([0, 0], [10, 0], [0, 10], inflation);
+  const dx = (a[0] + b[0] + c[0]) / 3 - 10 / 3;
+  const dy = (a[1] + b[1] + c[1]) / 3 - 10 / 3;
+  assert.ok(Math.hypot(dx, dy) < inflation, `the surface shifted by ${Math.hypot(dx, dy)}px`);
+});
+
+test('inflating is sub-pixel, not a visible fattening', () => {
+  const [a] = inflateTriangle([0, 0], [10, 0], [0, 10], 0.5);
+  const moved = Math.hypot(a[0] - 0, a[1] - 0);
+  assert.ok(moved < 1, `a vertex moved ${moved}px — objects would grow visibly`);
+});
+
+test('a degenerate triangle does not blow up', () => {
+  const out = inflateTriangle([5, 5], [5, 5], [5, 5], 0.5);
+  for (const [x, y] of out) {
+    assert.ok(Number.isFinite(x) && Number.isFinite(y), 'produced NaN');
+  }
+});
+
+// --- near plane --------------------------------------------------------------------
+// "i can see triangles dissapearing and reaapearing when moving my camera". The projection
+// divides by (camDist - z); a vertex past camDist is behind the eye, and clamping that
+// divisor flung it off screen instead of clipping the triangle.
+
+test('a triangle fully in front of the camera is untouched', () => {
+  const out = clipTriangleNear([0, 0, 0], [1, 0, 0], [0, 1, 0], 5);
+  assert.equal(out.length, 1);
+  assert.deepEqual(out[0], [[0, 0, 0], [1, 0, 0], [0, 1, 0]]);
+});
+
+test('a triangle fully behind the camera is dropped, not flung across the screen', () => {
+  const out = clipTriangleNear([0, 0, 9], [1, 0, 9], [0, 1, 9], 5);
+  assert.deepEqual(out, [], 'geometry behind the eye must not be drawn at all');
+});
+
+test('one vertex behind the camera leaves a quad, which needs two triangles', () => {
+  // Dropping one of them is a hole in the surface at exactly the moment the camera is
+  // closest to it — which reads as a triangle that vanished.
+  const out = clipTriangleNear([0, 0, 0], [10, 0, 0], [0, 0, 10], 5);
+  assert.equal(out.length, 2, `expected a quad split in two, got ${out.length}`);
+});
+
+test('two vertices behind the camera leave a single triangle', () => {
+  const out = clipTriangleNear([0, 0, 0], [10, 0, 10], [0, 10, 10], 5);
+  assert.equal(out.length, 1);
+});
+
+test('every clipped vertex is in front of the near plane', () => {
+  for (const tri of clipTriangleNear([0, 0, 0], [10, 0, 0], [0, 0, 10], 5)) {
+    for (const v of tri) {
+      assert.ok(v[2] <= 5 + 1e-9, `a clipped vertex is still behind the eye at z=${v[2]}`);
+    }
+  }
+});
+
+test('the cut lands exactly on the plane, not somewhere near it', () => {
+  const out = clipTriangleNear([0, 0, 0], [0, 0, 10], [10, 0, 0], 4);
+  const onPlane = out.flat().filter((v) => Math.abs(v[2] - 4) < 1e-9);
+  assert.ok(onPlane.length >= 2, 'the crossing points are not on the near plane');
+});
+
+test('clipping interpolates x and y, not just depth', () => {
+  // A crossing point that keeps the original x/y is not on the edge, so the surface bends.
+  const [tri] = clipTriangleNear([0, 0, 0], [10, 0, 10], [0, 10, 0], 5);
+  const cut = tri.find((v) => Math.abs(v[2] - 5) < 1e-9);
+  assert.ok(cut, 'no crossing point produced');
+  assert.ok(cut[0] > 0 && cut[0] < 10, `x was not interpolated: ${cut[0]}`);
 });

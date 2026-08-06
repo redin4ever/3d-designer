@@ -162,3 +162,77 @@ export function subdivideForDepth(a, b, c, maxExtent, maxDepth = 5) {
     ...subdivideForDepth(ab, bc, ca, maxExtent, maxDepth - 1),
   ];
 }
+
+/**
+ * Grow a projected triangle outward from its centroid by roughly `pixels`.
+ *
+ * Canvas antialiases every fill independently, so two triangles sharing an edge each cover
+ * about half the boundary pixel and the background shows through as a hairline. Across a
+ * subdivided floor that is a visible grid of cracks.
+ *
+ * The obvious fix — stroking each piece in its own colour to cover the seam — is what
+ * produced the black lines a user reported: a stroke straddles the path, so the shared band
+ * gets painted by *both* neighbours, and any colour composited twice comes out darker than
+ * the surface it was meant to match. Overlapping the fills has no such double-count. Where
+ * two triangles genuinely meet at an object's edge the overlap is sub-pixel and invisible.
+ */
+export function inflateTriangle(a, b, c, pixels = 0.5) {
+  const cx = (a[0] + b[0] + c[0]) / 3;
+  const cy = (a[1] + b[1] + c[1]) / 3;
+  const push = (p) => {
+    const dx = p[0] - cx;
+    const dy = p[1] - cy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) return [p[0], p[1]];
+    const k = (len + pixels) / len;
+    return [cx + dx * k, cy + dy * k];
+  };
+  return [push(a), push(b), push(c)];
+}
+
+/**
+ * Clip a triangle against the camera's near plane, returning 0, 1 or 2 triangles.
+ *
+ * `z` here is depth in view space, and the projection divides by `camDist - z`. A vertex at
+ * or past `camDist` is level with or behind the eye: the divisor collapses to zero, and the
+ * old code clamped it to 0.001, which flings that vertex thousands of pixels away and turns
+ * its triangle into a huge sliver. Rotate or zoom a little and the vertex crosses back, and
+ * the triangle snaps to something sane again — which is exactly the reported symptom,
+ * triangles disappearing and reappearing while moving the camera.
+ *
+ * It is reachable because zoom scales the camera distance: at the closest zoom the camera
+ * sits inside the scene's bounding radius, so geometry genuinely does pass behind it.
+ * Clamping hides that; clipping handles it. Keeping the part in front and cutting the rest
+ * at the plane is the whole of it.
+ *
+ * The four-vertex case really does need two triangles — dropping one is a hole in the
+ * surface at exactly the moment the camera is closest to it.
+ */
+export function clipTriangleNear(a, b, c, limit) {
+  const inside = (p) => p[2] < limit;
+  const kept = [a, b, c].filter(inside);
+  if (kept.length === 3) return [[a, b, c]];
+  if (kept.length === 0) return [];
+
+  const cross = (p, q) => {
+    // Interpolate every component, not just z: the crossing point has to be on the edge.
+    const t = (limit - p[2]) / (q[2] - p[2]);
+    return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, limit];
+  };
+
+  const poly = [];
+  const verts = [a, b, c];
+  for (let i = 0; i < 3; i += 1) {
+    const current = verts[i];
+    const next = verts[(i + 1) % 3];
+    if (inside(current)) poly.push(current);
+    if (inside(current) !== inside(next)) poly.push(cross(current, next));
+  }
+
+  if (poly.length < 3) return [];
+  if (poly.length === 3) return [[poly[0], poly[1], poly[2]]];
+  return [
+    [poly[0], poly[1], poly[2]],
+    [poly[0], poly[2], poly[3]],
+  ];
+}

@@ -20,6 +20,8 @@
 
 import {
   OrbitCamera,
+  clipTriangleNear,
+  inflateTriangle,
   shadeFactor,
   subdivideForDepth,
   triangleNormal,
@@ -241,9 +243,17 @@ export class SceneRenderer {
     }
     const camDist = this.camera.distanceFor(radius);
     const focal = Math.min(width, height) * 0.9;
+
+    // Anything at or past `camDist` in view depth is level with or behind the eye. The
+    // projection divides by `camDist - z`, so those vertices used to be rescued by clamping
+    // the divisor to 0.001 — which flings them thousands of pixels away and turns their
+    // triangle into a screen-spanning sliver, then snaps it back as the camera moves. That
+    // is what "triangles disappearing and reappearing" was. Zoom makes it reachable: at the
+    // closest zoom the camera sits inside the scene's own bounding radius.
+    const nearPlane = camDist - Math.max(camDist * 0.02, 1e-4);
+
     const project = ([x, y, z]) => {
-      const denom = camDist - z;
-      const f = focal / (denom > 0.001 ? denom : 0.001);
+      const f = focal / (camDist - z);
       return [width / 2 + x * f, height / 2 - y * f, z];
     };
 
@@ -267,48 +277,55 @@ export class SceneRenderer {
         // patchy exactly where it happened to be split.
         const shade = shadeFactor(triangleNormal(a, b, c));
 
-        const pieces = subdivideForDepth(a, b, c, maxDepthSpan);
-        // Outline only a triangle that was NOT split. Stroking every piece would draw the
-        // subdivision grid across the floor — a wireframe of an implementation detail.
-        const outline = pieces.length === 1;
-
-        for (const [pa, pb, pc] of pieces) {
-          triangles.push({
-            a: project(pa),
-            b: project(pb),
-            c: project(pc),
-            avgZ: (pa[2] + pb[2] + pc[2]) / 3,
-            shade,
-            outline,
-            highlighted: handle.highlighted,
-          });
+        // Clip first, subdivide second. The other order subdivides geometry that is about
+        // to be thrown away, and leaves the pieces straddling the plane to be clipped
+        // individually — same result, more work, at the moment the camera is closest and
+        // the frame is already most expensive.
+        for (const [ca, cb, cc] of clipTriangleNear(a, b, c, nearPlane)) {
+          for (const [pa, pb, pc] of subdivideForDepth(ca, cb, cc, maxDepthSpan)) {
+            triangles.push({
+              a: project(pa),
+              b: project(pb),
+              c: project(pc),
+              avgZ: (pa[2] + pb[2] + pc[2]) / 3,
+              shade,
+              highlighted: handle.highlighted,
+            });
+          }
         }
       }
     }
     triangles.sort((t1, t2) => t1.avgZ - t2.avgZ); // painter's algorithm: far first
 
     for (const tri of triangles) {
+      // Fills are inflated by half a pixel so neighbours overlap. Canvas antialiases each
+      // fill independently, so abutting triangles each cover about half the boundary pixel
+      // and the background shows through as a hairline — a grid of cracks across a
+      // subdivided floor. Stroking each piece to cover the seam was the first attempt and
+      // is what produced the black lines: a stroke straddles the path, so the shared band
+      // is painted by both neighbours and any colour composited twice comes out darker.
+      const [a, b, c] = inflateTriangle(tri.a, tri.b, tri.c, 0.5);
       ctx.beginPath();
-      ctx.moveTo(tri.a[0], tri.a[1]);
-      ctx.lineTo(tri.b[0], tri.b[1]);
-      ctx.lineTo(tri.c[0], tri.c[1]);
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.lineTo(c[0], c[1]);
       ctx.closePath();
+
       if (tri.highlighted) {
         // The one accent-colored thing on screen: the latest change, unmistakably.
         ctx.fillStyle = this._colors.accent;
-        ctx.strokeStyle = this._colors.accent;
-        ctx.lineWidth = 1.5;
         ctx.globalAlpha = tri.shade;
         ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.stroke();
       } else {
-        // Solid, shaded surfaces — not a 6%-alpha wireframe.
+        // Solid, shaded surfaces — not a 6%-alpha wireframe, and no per-triangle outline.
         //
-        // The old fill was `globalAlpha = 0.06`, which meant every object was effectively
-        // see-through: a staircase behind a deck showed straight through it, and the whole
-        // scene read as a tangle of lines with no sense of which surface was in front. The
-        // painter's sort was already doing the work; nothing was using it.
+        // The old fill was `globalAlpha = 0.06`, so every object was see-through and the
+        // scene read as a tangle of lines with no sense of which surface was in front.
+        //
+        // No stroke at all, either. Outlining every triangle draws the *triangulation* —
+        // the diagonal across each quad face of a stair tread is an artefact of how the
+        // mesh happens to be cut up, not an edge of the object, and there is nothing in a
+        // triangle soup that says which is which. Shading carries the form instead.
         //
         // Alpha rather than a computed colour because this file must not contain a colour
         // literal — `tests/tokens.test.js` scans it, and every colour comes from a CSS
@@ -321,25 +338,6 @@ export class SceneRenderer {
         ctx.fillStyle = this._colors.canvas;
         ctx.globalAlpha = 1 - tri.shade;
         ctx.fill();
-
-        if (tri.outline) {
-          ctx.strokeStyle = this._colors.ink;
-          ctx.lineWidth = 1;
-          ctx.globalAlpha = 0.25;
-          ctx.stroke();
-        } else {
-          // A subdivided piece gets no outline, but it does need its own edge painted in
-          // its own colour: canvas antialiases each fill independently, so two abutting
-          // triangles leave a hairline of background between them and a floor comes out
-          // visibly cracked along every split.
-          ctx.strokeStyle = this._colors.muted;
-          ctx.lineWidth = 1;
-          ctx.globalAlpha = 1;
-          ctx.stroke();
-          ctx.strokeStyle = this._colors.canvas;
-          ctx.globalAlpha = 1 - tri.shade;
-          ctx.stroke();
-        }
       }
     }
     ctx.globalAlpha = 1;

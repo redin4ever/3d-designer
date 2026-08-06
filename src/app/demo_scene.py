@@ -59,7 +59,19 @@ DEMO_OPERATIONS: tuple[tuple[str, dict[str, Any]], ...] = (
             "baluster_gap": 0.11,
         },
     ),
-    ("add_primitive", {"object_id": "crate", "kind": "cube", "size": [0.7, 0.7, 0.7]}),
+    (
+        "add_primitive",
+        {
+            "object_id": "crate",
+            "kind": "cube",
+            "size": [0.7, 0.7, 0.7],
+            # Sitting on the deck, not sunk halfway into it. The deck's top is at z=0.1,
+            # so a 0.7 cube's centre goes at 0.1 + 0.35. Without this the crate spawned at
+            # the world origin, half-buried, and the very first thing the live view showed
+            # a new user was a clipping defect the demo had created for itself.
+            "transform": {"translation": [2.2, 1.4, 0.45]},
+        },
+    ),
 )
 """What the seed builds. A tuple so it is inspectable and testable without running it."""
 
