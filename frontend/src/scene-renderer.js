@@ -19,6 +19,7 @@
 // lets frontend/tests/tokens.test.js scan this file for a raw hex literal and find none.
 
 import { OrbitCamera, clipTriangleNear, shadeFactor, triangleNormal, zUpToYUp } from './camera.js';
+import { paintIdOutline } from './point-outline.js';
 import { clearFrame, createFrame, drawTriangle } from './raster.js';
 import { createIdIndex } from './picking.js';
 
@@ -311,6 +312,7 @@ export class SceneRenderer {
     const accent = this._rgb(this._colors.accent);
     const pointed = this._rgb(this._colors.pointed);
     const marked = this._rgb(this._colors.marked);
+    const ink = this._rgb(this._colors.ink);
 
     if (!this._frame || this._frame.width !== width || this._frame.height !== height) {
       this._frame = createFrame(width, height);
@@ -330,6 +332,7 @@ export class SceneRenderer {
 
     let radius = 1;
     const allWorld = new Map();
+    const pointedIds = new Set();
     for (const handle of this.nodes.values()) {
       const world = this._worldVertices(handle);
       allWorld.set(handle.handleId, world);
@@ -366,6 +369,7 @@ export class SceneRenderer {
       const focused = this._focused.has(handle.id);
       const base = isPointed ? pointed : focused ? marked : handle.highlighted ? accent : surface;
       const id = this.ids.idFor(handle.id);
+      if (isPointed) pointedIds.add(id);
 
       for (let i = 0; i < indices.length; i += 3) {
         const a = world[indices[i]];
@@ -385,12 +389,23 @@ export class SceneRenderer {
     }
 
     this._image.data.set(frame.color);
+    // Fill colour alone can disappear into flat shading. Draw an unshaded, DPR-aware halo
+    // around the visible silhouette so hover and committed selection read at a glance.
+    const dpr = window.devicePixelRatio || 1;
+    paintIdOutline(
+      this._image.data,
+      frame.ids,
+      width,
+      height,
+      pointedIds,
+      ink,
+      Math.max(2, Math.round(dpr * 2)),
+    );
     // putImageData ignores the current transform, so the DPR scale set in _resize would
     // double-apply. Reset around it and restore afterwards for anything drawing in CSS
     // pixels later.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.putImageData(this._image, 0, 0);
-    const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }

@@ -23,6 +23,7 @@ import './controls.test.js';
 import './edit-tools.test.js';
 import './log.test.js';
 import './picking.test.js';
+import './point-outline.test.js';
 import './raster.test.js';
 import './socket.test.js';
 import './tokens.test.js';

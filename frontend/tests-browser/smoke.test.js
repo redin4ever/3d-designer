@@ -767,11 +767,35 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
           return [...data].join(',');
         }, sample);
 
+      const inkPixelCount = () =>
+        s2.page.evaluate(() => {
+          const canvas = document.getElementById('viewport-canvas');
+          const context = canvas.getContext('2d');
+          const image = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          const probe = document.createElement('canvas').getContext('2d');
+          probe.canvas.width = 1;
+          probe.canvas.height = 1;
+          probe.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+          probe.fillRect(0, 0, 1, 1);
+          const ink = probe.getImageData(0, 0, 1, 1).data;
+          let count = 0;
+          for (let index = 0; index < image.length; index += 4) {
+            if (image[index] === ink[0] && image[index + 1] === ink[1] && image[index + 2] === ink[2]) count += 1;
+          }
+          return count;
+        });
+
+      const inkBefore = await inkPixelCount();
+
       await s2.page.mouse.move(sample.clientX, sample.clientY);
       await waitUntil(async () => {
         const value = await pixel();
         return value !== sample.before ? value : null;
       }, 'the part under the point cursor to change colour');
+      await waitUntil(async () => {
+        const count = await inkPixelCount();
+        return count >= inkBefore + 24 ? count : null;
+      }, 'hovering a part to draw a high-contrast outline');
 
       await s2.page.mouse.click(sample.clientX, sample.clientY);
       await waitUntil(
@@ -793,9 +817,14 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         sample.before,
         `leaving the part cleared the committed selection highlight: ${JSON.stringify(afterLeave)}`,
       );
+      assert.ok(
+        (await inkPixelCount()) >= inkBefore + 24,
+        'the committed selection needs a high-contrast outline after hover leaves',
+      );
 
       await s2.page.click('[data-action="close-composer"]');
       await waitUntil(async () => (await pixel()) === sample.before, 'clearing selection to restore the prior colour');
+      await waitUntil(async () => (await inkPixelCount()) === inkBefore, 'clearing the selection outline');
       assert.deepEqual(complaints(s2).pageErrors, []);
     } finally {
       await s2.dispose();
