@@ -21,6 +21,7 @@ import './capture.test.js';
 import './connect.test.js';
 import './controls.test.js';
 import './edit-tools.test.js';
+import './gizmo.test.js';
 import './log.test.js';
 import './picking.test.js';
 import './point-outline.test.js';
