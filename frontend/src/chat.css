@@ -65,6 +65,7 @@
 }
 
 .transcript-state:empty { display: none; }
+.transcript-row[data-state='confirmed'] .transcript-state { display: none; }
 .transcript-row[data-role='operator'] .transcript-who { color: var(--accent-hover); }
 .transcript-row[data-role='agent'] .transcript-who { color: var(--success); }
 
