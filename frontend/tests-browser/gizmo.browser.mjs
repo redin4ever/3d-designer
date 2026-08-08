@@ -182,4 +182,38 @@ export function registerGizmoTests({ test, withScene, waitUntil, greeting }) {
       await session.dispose();
     }
   });
+
+  test('Frame Selection, Reset View, and switchable snapping stay within viewport reach', async () => {
+    const session = await withScene(greeting);
+    try {
+      await selectVisiblePart(session.page, waitUntil);
+      session.wire.broadcast(serverMessage('run_state', 6, { text: 'paused' }));
+      const before = await session.page.$eval('#viewport-canvas', (canvas) =>
+        canvas.toDataURL());
+      await session.page.click('[data-action="frame-selection"]');
+      await waitUntil(async () => {
+        const current = await session.page.$eval('#viewport-canvas', (canvas) => canvas.toDataURL());
+        return current !== before ? current : null;
+      }, 'Frame Selection to change the view');
+      await session.page.click('[data-action="reset-view"]');
+
+      const snapBefore = await session.page.$eval('[data-action="snap-toggle"]', (button) => button.getAttribute('aria-pressed'));
+      await session.page.click('[data-action="snap-toggle"]');
+      const snapAfter = await session.page.$eval('[data-action="snap-toggle"]', (button) => button.getAttribute('aria-pressed'));
+      assert.equal(snapBefore, 'true');
+      assert.equal(snapAfter, 'false');
+
+      await session.page.focus('#viewport-canvas');
+      await session.page.keyboard.press('g');
+      await session.page.keyboard.press('x');
+      await session.page.keyboard.press('ArrowRight');
+      await session.page.keyboard.press('Enter');
+      const edit = await waitUntil(() =>
+        session.wire.received.find((message) => message.data?.edit?.kind === 'move_object'),
+      'an unsnapped keyboard move');
+      assert.equal(edit.data.edit.params.snap, 0);
+    } finally {
+      await session.dispose();
+    }
+  });
 }
