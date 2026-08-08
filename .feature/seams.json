@@ -67,6 +67,17 @@
       "what": "the real browser proves one selected outline but not modifier accumulation",
       "evidence": "canvas event modifiers and visible simultaneous outlines require a browser-level journey",
       "asks": "which modifier combinations and visible feedback must be pinned in Chromium?"
+    },
+    {
+      "id": "repeat-drag-browser-journey",
+      "file": "frontend/tests-browser/gizmo.browser.mjs",
+      "line": 107,
+      "anchor": "  test('dragging a move arrow previews locally and sends one final existing move operation', async () => {",
+      "status": "wired",
+      "decision": "Q-04",
+      "what": "the browser gizmo journey proves one drag but never attempts a second axis before a transform echo",
+      "evidence": "the reported lockout occurs only across two pointer lifecycles in the live canvas",
+      "asks": "should X then Y work without an intervening server transform?"
     }
   ],
   "dismissed": [

@@ -832,4 +832,76 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
       await s2.dispose();
     }
   });
+
+  test('Ctrl and Alt clicks visibly toggle multiple selected parts without enabling single-part edits', async () => {
+    const s2 = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s2);
+      await waitForCanvasDrawn(s2.page, 500);
+      await s2.page.click('[data-action="point-mode"]');
+      const points = await s2.page.evaluate(() => {
+        const canvas = document.getElementById('viewport-canvas');
+        const context = canvas.getContext('2d');
+        const image = context.getImageData(0, 0, canvas.width, canvas.height);
+        const rect = canvas.getBoundingClientRect();
+        const at = (x, y) => {
+          const index = (y * canvas.width + x) * 4;
+          return [...image.data.slice(index, index + 4)].join(',');
+        };
+        const background = at(0, 0);
+        const columns = [];
+        for (let x = 2; x < canvas.width - 2; x += 1) {
+          let point = null;
+          for (let y = 2; y < canvas.height - 2; y += 1) {
+            if (at(x, y) !== background && at(x - 1, y) !== background && at(x + 1, y) !== background) {
+              point = [x, y];
+              break;
+            }
+          }
+          columns.push(point);
+        }
+        const runs = [];
+        for (let index = 0; index < columns.length;) {
+          if (!columns[index]) { index += 1; continue; }
+          const run = [];
+          while (index < columns.length && columns[index]) run.push(columns[index++]);
+          if (run.length > 3) runs.push(run);
+        }
+        return runs.slice(0, 2).map((run) => {
+          const [x, y] = run[Math.floor(run.length / 2)];
+          return {
+            clientX: rect.left + ((x + 0.5) * rect.width) / canvas.width,
+            clientY: rect.top + ((y + 0.5) * rect.height) / canvas.height,
+          };
+        });
+      });
+      assert.equal(points.length, 2, 'the fixture did not expose two separately selectable parts');
+
+      await s2.page.mouse.click(points[0].clientX, points[0].clientY);
+      await s2.page.keyboard.down('Control');
+      await s2.page.mouse.click(points[1].clientX, points[1].clientY);
+      await s2.page.keyboard.up('Control');
+      await waitUntil(
+        () => s2.page.$eval('#point-selection', (element) => element.textContent.includes(',')),
+        'Ctrl-click to keep both selected parts',
+      );
+      assert.equal(
+        await s2.page.$eval('#selected-object-name', (element) => element.textContent),
+        '2 parts selected',
+      );
+      assert.equal(await s2.page.$eval('[data-action="edit-delete"]', (button) => button.disabled), true);
+      assert.equal(await s2.page.$eval('[data-action="edit-duplicate"]', (button) => button.disabled), true);
+
+      await s2.page.keyboard.down('Alt');
+      await s2.page.mouse.click(points[0].clientX, points[0].clientY);
+      await s2.page.keyboard.up('Alt');
+      await waitUntil(
+        () => s2.page.$eval('#point-selection', (element) => !element.textContent.includes(',')),
+        'Alt-click to toggle one selected part off',
+      );
+      assert.deepEqual(complaints(s2).pageErrors, []);
+    } finally {
+      await s2.dispose();
+    }
+  });
 });

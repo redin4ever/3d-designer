@@ -150,6 +150,32 @@ export function registerGizmoTests({ test, withScene, waitUntil, greeting }) {
     }
   });
 
+  test('a second axis drag starts immediately without waiting for the first transform echo', async () => {
+    const session = await withScene(greeting);
+    try {
+      await selectVisiblePart(session.page, waitUntil);
+      session.wire.broadcast(serverMessage('run_state', 6, { text: 'paused' }));
+      await session.page.click('[data-action="move-tool"]');
+
+      for (const token of ['--axis-x', '--axis-y']) {
+        const axis = await waitUntil(() => axisStroke(session.page, token), `${token} move arrow`);
+        await session.page.mouse.move(axis.x, axis.y);
+        await session.page.mouse.down();
+        await session.page.mouse.move(axis.x + axis.dx, axis.y + axis.dy, { steps: 4 });
+        await session.page.mouse.up();
+      }
+
+      const edits = await waitUntil(() => {
+        const found = session.wire.received.filter((message) => message.data?.edit?.kind === 'move_object');
+        return found.length === 2 ? found : null;
+      }, 'two consecutive move_object messages');
+      assert.equal(edits.length, 2);
+      assert.notDeepEqual(edits[0].data.edit.params.translation, edits[1].data.edit.params.translation);
+    } finally {
+      await session.dispose();
+    }
+  });
+
   test('G then an axis supports a snapped keyboard move, Enter commit, and Escape cancel', async () => {
     const session = await withScene(greeting);
     try {
