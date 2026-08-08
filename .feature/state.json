@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Add Codex to the Connect button and fix part highlighting while pointing in the live 3D view",
   "slug": "codex-connect-hover",
-  "phase": 3,
+  "phase": 4,
   "baseSha": "b1b6baed7b8753ffa44a260950e90bb27aa376c8",
   "branch": "feat/codex-connect-hover",
   "docsDir": "docs/features/codex-connect-hover",

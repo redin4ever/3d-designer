@@ -1,4 +1,53 @@
 {
   "feature": "Codex Connect support and visible pointing highlight",
-  "units": []
+  "units": [
+    {
+      "id": "codex-connect",
+      "what": "detect Codex, safely merge its global TOML configuration, expose it through the Connect picker, and support the CLI description",
+      "paths": [
+        "src/app/connect.py",
+        "src/app/connect_test.py",
+        "frontend/tests-browser/connect.browser.mjs"
+      ],
+      "publicInterface": "app.connect.CLIENTS, config_for, write_config, describe",
+      "dependsOn": [],
+      "seams": [
+        "codex-client-registry",
+        "codex-config-writer",
+        "codex-cli-description",
+        "connect-browser-reachability"
+      ],
+      "decisions": ["Q-01", "Q-02", "Q-03", "Q-06"],
+      "status": "planned"
+    },
+    {
+      "id": "point-highlight",
+      "what": "highlight the visible part under the pointer and retain highlighting for click, lasso, and keyboard selections without disturbing marks or agent change state",
+      "paths": [
+        "frontend/src/point-ui.js",
+        "frontend/src/scene-renderer.js",
+        "frontend/tests-browser/smoke.test.js"
+      ],
+      "publicInterface": "SceneRenderer.setHovered and SceneRenderer.setSelected",
+      "dependsOn": [],
+      "seams": [
+        "point-selection-wiring",
+        "point-hover-input",
+        "renderer-point-state",
+        "renderer-point-colour",
+        "point-browser-regression"
+      ],
+      "decisions": ["Q-04", "Q-05"],
+      "status": "planned"
+    },
+    {
+      "id": "feature-docs",
+      "what": "document Codex as a local stdio client and explain its shared TOML setup in Connect",
+      "paths": ["README.md", "frontend/README.md"],
+      "dependsOn": ["codex-connect", "point-highlight"],
+      "seams": ["connect-documentation", "quick-start-client-list"],
+      "decisions": ["Q-01", "Q-03", "Q-06"],
+      "status": "planned"
+    }
+  ]
 }
