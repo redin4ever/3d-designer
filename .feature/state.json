@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Ctrl or Alt multi-selection and immediately repeatable axis drags",
   "slug": "multi-selection",
-  "phase": 3,
+  "phase": 4,
   "baseSha": "915ed89bc0ff2444eccaaa89b96c3d43c990d2bc",
   "branch": "feat/multi-selection",
   "docsDir": "docs/features/multi-selection",

@@ -1,10 +1,28 @@
 {
-  "feature": "Blender-style editor tools and move gizmo",
   "units": [
     {
-      "id": "blender-tools-gizmo",
-      "status": "green",
-      "tests": "projection, hit testing, move lifecycle, reconciliation, and browser journeys"
+      "id": "multi-selection",
+      "what": "modifier-toggle selection, honest multi-selection inspector feedback, and immediately repeatable axis drags",
+      "paths": [
+        "frontend/src/annotate.js",
+        "frontend/src/point-ui.js",
+        "frontend/src/move-gizmo.js",
+        "frontend/tests/annotate.test.js",
+        "frontend/tests/move-gizmo.test.js",
+        "frontend/tests-browser/smoke.test.js"
+      ],
+      "publicInterface": "frontend/src/annotate.js",
+      "dependsOn": [],
+      "seams": [
+        "selection-state",
+        "pointer-selection-gesture",
+        "multi-selection-inspector",
+        "move-release-lifecycle",
+        "move-pointer-wiring",
+        "frontend-browser-journey"
+      ],
+      "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-06"],
+      "status": "planned"
     }
   ]
 }
