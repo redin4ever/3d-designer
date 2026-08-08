@@ -137,6 +137,16 @@ test('reset returns to the default view', () => {
   assert.equal(cam.distanceFor(4), 4 * 2.6 + 1);
 });
 
+test('frame selection changes the orbit target and reset returns to the scene origin', () => {
+  const camera = new OrbitCamera();
+
+  camera.focusOn([4, -2, 1]);
+  assert.deepEqual(camera.target, [4, -2, 1]);
+
+  camera.reset();
+  assert.deepEqual(camera.target, [0, 0, 0]);
+});
+
 test('clamp is inclusive of its bounds', () => {
   assert.equal(clamp(5, 0, 5), 5);
   assert.equal(clamp(0, 0, 5), 0);

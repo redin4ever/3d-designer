@@ -60,3 +60,9 @@ test('an edge-on axis cannot create an infinite or invented movement', () => {
     0,
   );
 });
+
+test('a framed object remains at the gizmo centre when the camera target moves to it', () => {
+  const gizmo = projectMoveGizmo({ ...view, position: [4, -2, 1], target: [4, -2, 1] });
+
+  assert.deepEqual(gizmo.origin, [100, 50]);
+});
