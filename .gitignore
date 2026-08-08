@@ -29,6 +29,7 @@ venv/
 # Generated artefacts
 artifacts/
 .tmp/
+.superdesign/tmp/
 
 # add-feature internals — only the record of what was decided is tracked
 .feature/*
