@@ -25,7 +25,7 @@
     {
       "id": "editor-responsive-layout",
       "file": "frontend/src/app.css",
-      "line": 118,
+      "line": 109,
       "anchor": ".layout {",
       "status": "wired",
       "what": "the two-column viewport/sidebar and bottom controls geometry controls every editor surface",
@@ -35,7 +35,7 @@
     {
       "id": "viewport-tool-styles",
       "file": "frontend/src/app.css",
-      "line": 198,
+      "line": 169,
       "anchor": ".viewport-panel {",
       "status": "wired",
       "what": "the viewport surface owns the positioning context for floating editor chrome",

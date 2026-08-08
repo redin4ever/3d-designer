@@ -102,13 +102,15 @@
   --leading-body: 1.35;
   --tracking-body: 0.01em;
   --tracking-controls: 0.5px;
+  --tracking-editor: 0.2px;
+  --text-hidden: 0px;
 
   /* Editor geometry derived from the 4px spacing rhythm. */
-  --topbar-size: 48px;
-  --global-strip-size: 40px;
-  --viewport-header-size: 36px;
+  --topbar-size: 40px;
+  --global-strip-size: 32px;
+  --viewport-header-size: 32px;
   --viewport-footer-size: 28px;
-  --tool-rail-size: 52px;
+  --tool-rail-size: 40px;
   --sidebar-size: 340px;
   --sidebar-compact-size: 300px;
   --canvas-min-size: 240px;
@@ -121,6 +123,10 @@
   --field-min-size: 3.5rem;
   --topbar-actions-inset: 108px;
   --tool-content-inset: 64px;
+  --inspector-transform-size: 152px;
+  --inspector-log-size: 112px;
+  --annotation-panel-size: 288px;
+  --tool-icon-size: 16px;
 
   /* Elevation 2 — a control raised off the panel behind it (DESIGN.md "Elevation & Depth",
      level 2: surface-2 lift, 1px hairline-strong), plus that section's "subtle white edge

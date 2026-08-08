@@ -255,6 +255,38 @@ components:
     padding: 64px 32px
 ---
 
+## Editor reference override — approved Branch B
+
+For the live 3D editor, the user-provided Branch B screenshot is the controlling visual
+reference. It specializes the broader Linear analysis below. When the editor reference and
+the marketing-oriented guidance differ, this section wins.
+
+- Full-bleed desktop tool: no page padding, cards, floating chrome, or decorative shadows.
+- One 40px top application bar. Brand, connection, Pause, and Resume align at the inline
+  start; Connect Viewer and Settings align at the inline end.
+- Beneath it, one 32px viewport toolbar spans from the 40px tool rail to the 340px inspector.
+  It contains Object Mode, Frame Selection, Reset View, snap, layers, and view controls.
+- A 40px edge-mounted vertical icon rail begins below the top bar. Tools are icon-only,
+  separated by subtle dividers; the active tool is an indigo 32px square.
+- The viewport is the uninterrupted near-black canvas between rail, toolbar, and inspector.
+  No footer/status row consumes viewport height. Contextual keyboard hints sit at the canvas
+  edge and the move gizmo sits on the selected object.
+- The fixed 340px right inspector starts below the top bar and is divided only by hairlines:
+  Selected Object, Conversation, command composer, and Action Log. Corners remain square.
+- Selected Object is compact: uppercase panel heading, object name, Duplicate/Delete actions,
+  then three single-row X/Y/Z position fields.
+- Conversation occupies the flexible middle. Messages are full-width rows with a 2px role
+  stripe, uppercase role label, and compact body text. The composer is pinned immediately
+  above Action Log.
+- The annotation composer is a compact 288px panel attached near the viewport's block-end and
+  inline-start, offset beyond the tool rail. It uses an amber uppercase heading and a close
+  icon, matching the reference.
+- Desktop density is 11–12px text, 28–32px controls, 8–12px panel padding, 1px dividers, and
+  4–6px control radii. Container/panel radii are zero.
+- The familiar X/Y/Z colors are functional exceptions to the single-accent rule. Tool icons
+  use one consistent 16px outline family; text labels are supplied through accessible names
+  and tooltips rather than permanently displayed under icons.
+
 ## Overview
 
 Linear's marketing canvas is the deepest dark surface in this collection — `{colors.canvas}` is #010102, essentially pure black with a faint blue tint. On top sits a four-step surface ladder (`{colors.surface-1}` through `{colors.surface-4}`) for cards, panels, and lifted tiles, with hairline borders running from `{colors.hairline}` (#23252a) up through `{colors.hairline-strong}` and `{colors.hairline-tertiary}`. Light gray text (`{colors.ink}` #f7f8f8) carries the body and headlines.

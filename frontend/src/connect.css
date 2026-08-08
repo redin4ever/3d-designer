@@ -5,61 +5,69 @@
   justify-content: space-between;
   gap: var(--space-xs);
   border-block-end: var(--hairline-size) solid var(--hairline);
-  background: var(--surface-3);
+  background: var(--surface-1);
 }
 
 .connect-button {
   position: fixed;
-  inset-block-start: var(--space-xs);
-  inset-inline-end: var(--space-sm);
-  z-index: 30;
+  inset-block-start: var(--space-xxs);
+  inset-inline-end: calc(var(--control-size) + var(--space-xs));
+  z-index: 46;
   min-block-size: var(--control-size);
-  padding-inline: var(--space-sm);
-  border: var(--hairline-size) solid var(--hairline-raised);
+  padding-inline: var(--space-md);
+  border: var(--hairline-size) solid var(--hairline-strong);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--surface-2);
   color: var(--ink-muted);
   box-shadow: var(--elevation-raised);
   cursor: pointer;
-  font-family: var(--font-display);
   font-size: var(--text-caption);
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.connect-button:hover {
-  background: var(--surface-raised-hover);
-  color: var(--ink);
-}
+.connect-button::after { content: ' Viewer'; }
+.connect-button:hover { background: var(--surface-2); color: var(--ink); }
 
 .viewport-actions {
   position: fixed;
-  inset-block-start: calc(var(--topbar-size) + var(--global-strip-size) + var(--space-xxs));
-  inset-inline-end: calc(var(--sidebar-size) + var(--space-sm));
-  z-index: 12;
+  inset-block-start: var(--topbar-size);
+  inset-inline-end: calc(var(--sidebar-size) + var(--space-xs));
+  z-index: 20;
+  block-size: var(--viewport-header-size);
   display: flex;
-  gap: var(--space-xs);
+  align-items: center;
+  gap: var(--space-xxs);
 }
+
+.viewport-actions .btn {
+  min-block-size: calc(var(--viewport-header-size) - var(--space-xxs));
+  padding-inline: var(--space-xxs);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.viewport-actions .btn:hover:not(:disabled) { background: transparent; color: var(--ink); }
+.viewport-actions [data-action='snap-toggle']::before { margin-inline-end: var(--space-xxs); color: var(--accent-hover); content: '⌁'; }
 
 .connect-dialog {
   inline-size: min(var(--dialog-size), calc(100% - var(--space-xl)));
   max-block-size: calc(100vh - var(--space-xl));
   overflow: auto;
+  padding: var(--space-lg);
   border: var(--hairline-size) solid var(--hairline-strong);
   border-radius: var(--radius-lg);
-  padding: var(--space-lg);
   background: var(--surface-overlay);
   color: var(--ink);
   box-shadow: var(--elevation-raised);
 }
 
 .connect-dialog::backdrop { background: var(--scrim); }
-
-.connect-dialog-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-body-sm);
-  font-weight: 600;
-}
+.connect-dialog-title { margin: 0; font-size: var(--text-body-sm); font-weight: 600; }
 
 .connect-dialog-note,
 .connect-result-note {
@@ -68,19 +76,8 @@
   font-size: var(--text-caption);
 }
 
-.connect-dialog-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.connect-client-list {
-  display: grid;
-  gap: var(--space-xs);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+.connect-dialog-body { display: flex; flex-direction: column; gap: var(--space-xs); }
+.connect-client-list { display: grid; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
 
 .connect-client-button {
   inline-size: 100%;
@@ -98,29 +95,20 @@
 }
 
 .connect-client-button:hover { background: var(--surface-2); }
-
 .connect-client-name { font-weight: 600; }
 .connect-client-note,
 .connect-result-line { color: var(--muted); font-size: var(--text-caption); }
 .connect-result-line { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
 .connect-result-critical { color: var(--ink); font-weight: 600; }
-.connect-result[data-tone='error'] .connect-result-line:first-child { color: var(--accent-hover); }
-
-.connect-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-block-start: var(--space-lg);
-}
+.connect-result[data-tone='error'] .connect-result-line:first-child { color: var(--axis-x); }
+.connect-dialog-actions { display: flex; justify-content: flex-end; margin-block-start: var(--space-lg); }
 
 @media (max-width: 1024px) {
   .viewport-actions { inset-inline-end: calc(var(--sidebar-compact-size) + var(--space-xs)); }
 }
 
 @media (max-width: 768px) {
-  .viewport-actions {
-    inset-block-start: calc(var(--topbar-size) + var(--global-strip-size) + var(--space-xxs));
-    inset-inline: auto var(--space-xs);
-  }
-
-  .viewport-actions .btn { padding-inline: var(--space-xs); }
+  .connect-button { padding-inline: var(--space-xs); }
+  .connect-button::after { content: ''; }
+  .viewport-actions { inset-inline-end: var(--space-xs); }
 }

@@ -39,7 +39,7 @@
             aria-label="Live 3D view of the current build. Drag to orbit and scroll to zoom. Press G for Move, X, Y or Z to constrain, Enter to confirm, Escape to cancel, arrow keys to adjust, and 0 to reset the view."></canvas>
 
         <p class="control-hint tool-hint" id="point-mode-hint">
-          Point: click a part or drag a loop. Move: drag a labelled axis.
+          Drag axis to move | G, X/Y/Z to lock
         </p>
         <ul id="focus-list" class="focus-list" aria-live="polite" aria-label="Parts marked as important"></ul>
 
@@ -86,41 +86,48 @@
         </div>
       </div>
 
-      <div class="control-group rollback-group">
-        <form data-action="rollback-form">
-          <label for="rollback-steps">Roll back</label>
-          <div class="control-row">
-            <input id="rollback-steps" data-field="rollback-steps" type="number" min="1" step="1"
-                inputmode="numeric" placeholder="1" aria-label="Steps to roll back" required />
-            <button type="submit" class="btn">steps</button>
+      <div class="settings-menu">
+        <button type="button" class="settings-button" aria-label="Editor settings" title="Editor settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8 3.5-2.1-1.1.1-2.4-2.5-1.5-2 1.3L11.4 5H8.6L7.5 8.3l-2-1.3L3 8.5l.1 2.4L1 12l2.1 1.1-.1 2.4L5.5 17l2-1.3 1.1 3.3h2.8l1.1-3.3 2 1.3 2.5-1.5-.1-2.4L20 12Z" /></svg>
+        </button>
+        <div class="settings-popover">
+          <div class="control-group rollback-group">
+            <form data-action="rollback-form">
+              <label for="rollback-steps">Roll back</label>
+              <div class="control-row">
+                <input id="rollback-steps" data-field="rollback-steps" type="number" min="1" step="1"
+                    inputmode="numeric" placeholder="1" aria-label="Steps to roll back" required />
+                <button type="submit" class="btn">steps</button>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
 
-      <div class="control-group cadence-group">
-        <label for="cadence-select">Check cadence</label>
-        <select id="cadence-select" data-field="cadence">
-          <option value="every_geometry_change">Every geometry change</option>
-          <option value="phase_boundaries">Phase boundaries</option>
-          <option value="on_request">On request</option>
-        </select>
+          <div class="control-group cadence-group">
+            <label for="cadence-select">Check cadence</label>
+            <select id="cadence-select" data-field="cadence">
+              <option value="every_geometry_change">Every geometry change</option>
+              <option value="phase_boundaries">Phase boundaries</option>
+              <option value="on_request">On request</option>
+            </select>
+          </div>
+        </div>
       </div>
     </section>
 
     <nav class="tool-shelf" aria-label="Viewport tools">
-      <span class="tool-shelf-label">Tools</span>
+      <span class="tool-shelf-label">Viewport tools</span>
       <button type="button" class="tool-button" data-action="point-mode" aria-pressed="false"
           title="Select or annotate a part">
-        <span class="tool-glyph" aria-hidden="true">⌁</span>
+        <span class="tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 3 13 8-6 2-3 6L5 3Z" /></svg></span>
         <span class="tool-name">Point</span>
       </button>
       <button type="button" class="tool-button" data-action="move-tool" aria-pressed="false"
           title="Move selected part (G)">
-        <span class="tool-glyph" aria-hidden="true">↗</span>
+        <span class="tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18m-9-9-2.5 2.5M12 3l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5" /></svg></span>
         <span class="tool-name">Move</span>
       </button>
       <button type="button" class="tool-button" data-action="clear-focus" title="Clear important marks">
-        <span class="tool-glyph" aria-hidden="true">×</span>
+        <span class="tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5zM8 8l8 8m0-8-8 8" /></svg></span>
         <span class="tool-name">Clear</span>
       </button>
     </nav>
@@ -153,19 +160,23 @@
 
       <section class="transform-panel" id="edit-group" aria-labelledby="edit-controls-label">
         <div class="section-header">
-          <div>
-            <span class="section-kicker">Transform</span>
-            <h2 id="edit-controls-label">Selected object</h2>
-          </div>
-          <span class="selection-state">One part</span>
+          <span class="section-kicker">Selected object</span>
+          <svg class="section-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 0v9m8-4.5-8 4.5-8-4.5m8 4.5v9" /></svg>
         </div>
         <div class="transform-body">
+          <div class="selected-object-row">
+            <h2 id="edit-controls-label"><span id="selected-object-name">No object selected</span></h2>
+            <div class="object-actions">
+              <button type="button" class="btn" data-action="edit-duplicate">Duplicate</button>
+              <button type="button" class="btn danger" data-action="edit-delete">Delete</button>
+            </div>
+          </div>
           <div class="edit-fields">
-            <label for="edit-x"><span class="axis-label axis-x">X</span> position</label>
+            <label for="edit-x"><span class="axis-label axis-x">X</span> pos</label>
             <input id="edit-x" data-field="edit-x" type="number" step="0.1" placeholder="x" inputmode="decimal" />
-            <label for="edit-y"><span class="axis-label axis-y">Y</span> position</label>
+            <label for="edit-y"><span class="axis-label axis-y">Y</span> pos</label>
             <input id="edit-y" data-field="edit-y" type="number" step="0.1" placeholder="y" inputmode="decimal" />
-            <label for="edit-z"><span class="axis-label axis-z">Z</span> position</label>
+            <label for="edit-z"><span class="axis-label axis-z">Z</span> pos</label>
             <input id="edit-z" data-field="edit-z" type="number" step="0.1" placeholder="z" inputmode="decimal" />
           </div>
           <div class="move-axis-controls" role="group" aria-label="Move selected part by axis">
@@ -178,8 +189,6 @@
           </div>
           <div class="transform-actions">
             <button type="button" class="btn primary" data-action="edit-move">Apply position</button>
-            <button type="button" class="btn" data-action="edit-duplicate">Duplicate</button>
-            <button type="button" class="btn danger" data-action="edit-delete">Delete</button>
           </div>
           <button type="button" class="btn pause-to-edit" data-action="pause-to-edit" hidden>Pause the build to edit</button>
         </div>

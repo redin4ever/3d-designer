@@ -59,6 +59,7 @@ export function attachPointing(root, io) {
   const focusList = root.querySelector('#focus-list');
   const modeButton = root.querySelector('[data-action="point-mode"]');
   const editGroup = root.querySelector('#edit-group');
+  const selectedObjectName = root.querySelector('#selected-object-name');
   const editBlocked = root.querySelector('#edit-blocked');
   const pauseToEdit = root.querySelector('[data-action="pause-to-edit"]');
   const moveButton = root.querySelector('[data-action="move-tool"]');
@@ -116,6 +117,7 @@ export function attachPointing(root, io) {
   const renderSelection = () => {
     io.renderer.setSelected(state.selection);
     selectionLabel.textContent = describeSelection(state);
+    if (selectedObjectName) selectedObjectName.textContent = only() || 'No object selected';
     composer.hidden = state.selection.size === 0;
     if (!composer.hidden) textInput.focus();
     syncPositionFields(io.renderer.objectPosition?.(only()));
