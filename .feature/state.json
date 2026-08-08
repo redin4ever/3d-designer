@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Point at parts in the live view and edit them: hover/lasso a part so the model gets text+image context about it, mark parts to raise their priority, and direct manipulation tools so simple changes need no model round-trip",
-  "slug": "point-and-edit",
-  "phase": 4,
-  "baseSha": "49f3f8f8f3f80d1461831f189bf060acd2a1b98b",
-  "branch": "build/pass-1",
-  "docsDir": "docs/features/point-and-edit",
-  "startedAt": "2026-08-06",
+  "feature": "Add Codex to the Connect button and fix part highlighting while pointing in the live 3D view",
+  "slug": "codex-connect-hover",
+  "phase": 2,
+  "baseSha": "b1b6baed7b8753ffa44a260950e90bb27aa376c8",
+  "branch": "feat/codex-connect-hover",
+  "docsDir": "docs/features/codex-connect-hover",
+  "startedAt": "2026-08-08",
   "status": "running"
 }

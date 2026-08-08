@@ -1,307 +1,127 @@
 {
-  "feature": "Point and edit \u2014 point at a part so the model gets context about it, prioritise what matters, and change simple things yourself",
-  "tracedVia": [
-    "d858c06 feat(viewer,orchestration,app,frontend): chat with the agent from the browser \u2014 the closest comparable feature and the same browser -> viewer -> orchestrator -> agent shape. Followed end to end: index.html composer -> controls.js buildRedirectMessage -> socket.js -> viewer/server.py -> viewer/client.py::_handle_redirect -> orchestration/reporting.py::add_operator_note -> contracts.ActionReport.operator_notes -> the agent's next tool response.",
-    "766a6d3 fix(frontend,app): placeable primitives \u2014 the second comparable: a new capability that had to reach frontend/src, src/app/handlers.py AND src/ops/registry.py together."
-  ],
-  "conventionCounts": [
-    "33 of 33 replayable operation kinds are construction or repair; NONE is a plain move/rotate/scale/delete/duplicate of an existing object. Counted with: python -c \"from app.handlers import build_handlers; print(sorted(build_handlers()))\"",
-    "7 of 7 ClientMessageType members have a handler in src/viewer/client.py::_HANDLER_NAMES; 6 of those 7 do real work and SELECT alone is a defined no-op.",
-    "5 of 5 message builders in frontend/src/controls.js are called from attachControls \u2014 except buildSelectMessage, which is exported, tested, and called by nothing."
-  ],
+  "version": 1,
+  "feature": "Codex Connect support and visible pointing highlight",
   "seams": [
     {
-      "id": "wire-select",
-      "file": "src/contracts/wire.py",
-      "line": 104,
-      "anchor": "    SELECT = \"select\"",
-      "status": "wired",
-      "what": "the client->server message type for 'the operator is pointing at these objects'",
-      "evidence": "already in the frozen protocol, ahead of any UI for it. contracts/ is main-agent-only (Rule 5), so widening it is a deliberate act, not a side effect.",
-      "asks": "does pointing at a part just mark it, or does it also carry the operator's own words and a picture with it?",
-      "decision": "Q-12"
+      "id": "codex-client-registry",
+      "file": "src/app/connect.py",
+      "line": 58,
+      "anchor": "CLIENTS: dict[str, dict] = {",
+      "status": "open",
+      "what": "the registry that controls which installed clients appear behind the Connect button",
+      "evidence": "detect_clients iterates only CLIENTS, and live.py rejects every POST /api/connect id outside this same registry",
+      "asks": "should Codex be configured globally for every project or only for this forge3d checkout?"
     },
     {
-      "id": "wire-redirect",
-      "file": "src/contracts/wire.py",
-      "line": 192,
-      "anchor": "class RedirectPayload:",
-      "status": "wired",
-      "what": "the free-text instruction payload \u2014 today text and nothing else",
-      "evidence": "RedirectPayload.text is the only field, and its docstring names ActionReport.operator_notes as the only route into a connected agent. Attaching object ids or an image means this dataclass grows.",
-      "asks": "when you point at a part and type an instruction, should those travel as one message or two?",
-      "decision": "Q-03"
+      "id": "codex-config-writer",
+      "file": "src/app/connect.py",
+      "line": 150,
+      "anchor": "def write_config(client: str) -> Path:",
+      "status": "open",
+      "what": "the writer that currently assumes every client stores a JSON mcpServers object",
+      "evidence": "official Codex documentation instead uses ~/.codex/config.toml with [mcp_servers.<name>] tables, so adding a registry row alone would write the wrong format",
+      "asks": "should Connect merge a forge3d table into config.toml automatically or invoke the official codex mcp add command?"
     },
     {
-      "id": "viewer-select-noop",
-      "file": "src/viewer/client.py",
-      "line": 160,
-      "anchor": "    def _handle_select(self, msg: ClientMessage) -> None:",
-      "status": "declined",
-      "what": "where a selection arriving from the browser is currently discarded",
-      "evidence": "the docstring says 'Selection is presentation state with nothing for the server to enforce or record' \u2014 this feature is exactly the claim that it now is something to record.",
-      "asks": "should the agent be told the moment you point at something, or only when you say something about it?",
-      "reason": "SELECT stays a defined no-op. Q-01's 'queue it as context' is what ANNOTATE does \u2014 the deliberate send. Selection on its own is presentation state, and Q-07 put an in-place composer in front of it, so a bare selection reaching the agent would tell it about every stray click. Superseded rather than skipped."
+      "id": "codex-cli-description",
+      "file": "src/app/connect.py",
+      "line": 177,
+      "anchor": "def describe(client: str | None = None, *, http_port: int = 8765) -> str:",
+      "status": "open",
+      "what": "the terminal fallback and config preview shared with the browser's no-client path",
+      "evidence": "it renders every CLIENTS entry as JSON today; Codex needs TOML or the official codex mcp add command instead",
+      "asks": "should forge3d connect codex show the exact command as well as supporting the button?"
     },
     {
-      "id": "viewer-handler-table",
-      "file": "src/viewer/client.py",
-      "line": 26,
-      "anchor": "_HANDLER_NAMES: dict[ClientMessageType, str] = {",
-      "status": "wired",
-      "what": "the routing registry every inbound client message goes through",
-      "evidence": "7 of 7 ClientMessageType members are keys here; an unlisted type becomes an ERROR message. A new message type that is not added here is silently unreachable.",
-      "asks": "none \u2014 mechanical, but it is the row nobody remembers and the feature is invisible without it",
-      "decision": "mechanical"
+      "id": "connect-browser-reachability",
+      "file": "frontend/tests-browser/connect.browser.mjs",
+      "line": 284,
+      "anchor": "  test('with several AI clients, Connect opens a picker that Escape closes and returns focus', async () => {",
+      "status": "open",
+      "what": "the real-browser check that every detected client is visible and selectable from the Connect picker",
+      "evidence": "the picker is generic, so a Codex registry entry should flow through without UI-specific code; only a browser assertion can prove it is actually offered and posted",
+      "asks": "should the picker label the shared Codex configuration simply as Codex, or distinguish CLI, IDE extension, and ChatGPT desktop?"
     },
     {
-      "id": "report-operator-notes",
-      "file": "src/contracts/operations.py",
-      "line": 306,
-      "anchor": "    operator_notes: tuple[str, ...] = ()",
-      "status": "wired",
-      "what": "the one channel by which anything the human does reaches the agent's context",
-      "evidence": "MCP is call/response; the field's own docstring says a server cannot push into a connected agent uninvited, so everything rides out on the next tool response. A tuple of plain strings today.",
-      "asks": "a pointed-at part is more than a sentence \u2014 should the agent get it as prose it reads, or as structured facts it can act on directly?",
-      "decision": "Q-02/Q-10/Q-18"
+      "id": "point-selection-wiring",
+      "file": "frontend/src/point-ui.js",
+      "line": 84,
+      "anchor": "  const renderSelection = () => {",
+      "status": "open",
+      "what": "the point-selection render path that updates text and controls but never tells the 3D renderer what was selected",
+      "evidence": "setSelection reaches renderSelection after click or lasso, but renderSelection has no renderer call, which reproduces the reported invisible selection",
+      "asks": "should a clicked or lassoed selection stay highlighted until it is cleared?"
     },
     {
-      "id": "orchestrator-notes",
-      "file": "src/orchestration/reporting.py",
-      "line": 381,
-      "anchor": "    def add_operator_note(self, text: str) -> None:",
-      "status": "wired",
-      "what": "the intake that queues an operator instruction until the agent's next call",
-      "evidence": "the only caller is viewer/client.py::_handle_redirect. Notes are drained and cleared on the next report (reporting.py:187-188), so anything queued is delivered exactly once.",
-      "asks": "if you mark something as important, should that stay important for the whole session, or be spent on the very next thing the agent does?",
-      "decision": "Q-10/Q-11"
+      "id": "point-hover-input",
+      "file": "frontend/src/point-ui.js",
+      "line": 156,
+      "anchor": "    'pointermove',",
+      "status": "open",
+      "what": "the pointer-move path that currently does work only while a lasso drag is active",
+      "evidence": "the previous point-and-edit decision says hover finds a part without committing, but this handler returns whenever drag is null and never picks or highlights the object under the pointer",
+      "asks": "should highlighting begin on hover before the click, or only after selection?"
     },
     {
-      "id": "write-lock",
-      "file": "src/orchestration/locking.py",
-      "line": 34,
-      "anchor": "    def acquire(",
-      "status": "declined",
-      "what": "the single write lock \u2014 one writer at a time, agents included",
-      "evidence": "every mutating tool goes through a lease. A human dragging an object in the browser is a second writer, which this lock has no concept of today.",
-      "asks": "if you move something while the agent is mid-build, who wins \u2014 you, it, or does it wait?",
-      "reason": "Not touched, and that is Q-17's whole consequence. Choosing 'you have to press Pause first' means the manual path is unreachable while a lease can be live, so it never contends for the lock and the lock needed no concept of a second writer. The work landed in orchestration/reporting.py::apply_operator_edit instead, which takes its own short-lived lease."
-    },
-    {
-      "id": "viewer-report-out",
-      "file": "src/viewer/report.py",
-      "line": 62,
-      "anchor": "    def report_action(self, report: ActionReport) -> None:",
-      "status": "declined",
-      "what": "how the agent's own actions come back to the browser as HIGHLIGHT / LOG / PROBLEMS",
-      "evidence": "wired in the composition root by d858c06 ('the arrow that was missing'). A change the operator makes by hand has to travel the same way or the other watchers never see it.",
-      "asks": "when you edit something yourself, should everyone watching see it as a line in the conversation, the same way the agent's edits appear?",
-      "reason": "Not touched. An operator's edit reports through viewer/annotate.py::_apply_operator_edit, which enqueues the outcome as a LOG directly. report.py translates an agent's ActionReport into HIGHLIGHT/LOG/PROBLEMS and still does exactly that \u2014 apply_operator_edit also publishes to the same listeners, so the existing path carries it with no edit."
-    },
-    {
-      "id": "mcp-describe-object",
-      "file": "src/mcp_server/scene_query.py",
-      "line": 125,
-      "anchor": "def describe_object(*, engine: Any, object_id: str) -> dict[str, Any]:",
-      "status": "declined",
-      "what": "the existing tool that returns everything measurable about one object",
-      "evidence": "already returns dimensions, bounds, triangle/vertex/polygon counts, uvs, material slots, transform and every defect measure.inspect finds. This is the text half of 'information about that part' and it already exists \u2014 the gap is that nothing connects it to what the human pointed at.",
-      "asks": "when you point at a part, what should the model be told about it \u2014 just what it is, or every measurement and defect too?",
-      "reason": "Not edited. Q-02's 'everything already measured' is met by gathering the facts in viewer/annotate.py at the moment of pointing, which is what makes them describe what the operator was looking at rather than what the object became. describe_object stays the agent's own on-demand call and needed no change."
-    },
-    {
-      "id": "mcp-images",
-      "file": "src/mcp_server/images.py",
-      "line": 64,
-      "anchor": "def downscale_image(data: bytes, *, max_edge: int = 1024) -> bytes:",
-      "status": "declined",
-      "what": "the image cost control (ADR-003) \u2014 exported from the barrel and called by nothing",
-      "evidence": "grep for ImageContent across src/ returns zero hits outside this module. There is no render, screenshot or viewport-capture anywhere in the backend: the ONLY pixels that exist in this product are the ones frontend/src/raster.js draws. So an image of a part can only come from the browser's own canvas today. Also PPM-only by design \u2014 'adding a real codec is a gate decision, not a quiet addition' (mcp_server/CLAUDE.md).",
-      "asks": "should the picture the model gets be exactly what you are looking at on screen, or a cleaner render made for the purpose?",
-      "reason": "Not touched, per A-012. downscale_image handles binary PPM only, on purpose \u2014 'adding a real codec is a gate decision, not a quiet addition'. The browser crops, downscales to the same 1024 bound and encodes PNG itself, so ADR-003's cost control is honoured one hop earlier rather than by converting PNG to PPM to feed a Python downscaler that would re-encode."
-    },
-    {
-      "id": "mcp-registry",
-      "file": "src/mcp_server/registry.py",
-      "line": 122,
-      "anchor": "def build_registry(*, include_raw: bool = True) -> dict[ToolRole, tuple[ToolSpec, ...]]:",
-      "status": "declined",
-      "what": "which tools each agent role can see at all",
-      "evidence": "a tool absent here is a tool no agent can call, with no error anywhere. Nothing may cap or hide a tool (Gate B 3.3) \u2014 counts are recorded in registry_test.py and README.md, so adding one means updating a recorded count.",
-      "asks": "none \u2014 mechanical, but a new tool that is not registered here is unreachable and nothing says so",
-      "reason": "Not touched, and verified rather than assumed: build_registry collects SESSION_SPECS generically, so declaring get_operator_context in session_specs.py was enough. Checked by registry_test.py's recorded count moving 9 -> 10 for inspect, which is the evidence the tool is actually visible."
-    },
-    {
-      "id": "ops-registry",
-      "file": "src/ops/registry.py",
-      "line": 221,
-      "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
-      "status": "wired",
-      "what": "the construction library's registry \u2014 OPS is what scene replays every logged operation through",
-      "evidence": "33 replayable kinds exist and NOT ONE is a plain move/rotate/scale/delete/duplicate. Direct manipulation has no operation to be. Anything not registered here cannot be replayed, undone, or rolled back.",
-      "asks": "which changes should you be able to make yourself without asking the model?",
-      "decision": "Q-14/Q-16/Q-19"
-    },
-    {
-      "id": "app-handlers",
-      "file": "src/app/handlers.py",
-      "line": 210,
-      "anchor": "def build_handlers(*, include_raw: bool = True) -> HandlerRegistry:",
-      "status": "declined",
-      "what": "the composition root's map from Operation.kind to the code that runs it",
-      "evidence": "766a6d3 added placeable primitives and had to touch this file and src/ops/registry.py together \u2014 the co-change nothing in the new code points at. src/app/ is main-agent-only (Rule 5).",
-      "asks": "none \u2014 mechanical; an op registered in ops/ but missing here fails at replay, not at call time",
-      "reason": "No change needed, and verified rather than assumed: build_handlers registers every kind in ops.OPS generically, so all seven new operations were picked up with no edit. Checked at 40 kinds, all seven present and visible as tools."
-    },
-    {
-      "id": "live-http-api",
-      "file": "src/app/live.py",
-      "line": 107,
-      "anchor": "    def do_POST(self) -> None:  # noqa: N802",
-      "status": "declined",
-      "what": "the same-origin HTTP API the browser already uses for setup actions",
-      "evidence": "its class docstring states the rule for what belongs here vs the wire protocol: 'contracts.wire is for what is happening to the scene, and putting setup traffic through it would widen a frozen surface'. An image blob is neither obviously.",
-      "asks": "none \u2014 a routing decision; recorded because sending a screenshot down the geometry socket is the kind of choice that is hard to reverse later",
-      "reason": "Declined per A-011. Annotations ride the viewer WebSocket instead, following live.py's own stated rule that its HTTP surface is for setup and contracts.wire is for what is happening to the scene. It also keeps every operator action on one ordered channel, so a note cannot arrive before the selection it refers to. viewer/server.py raises max_size instead."
-    },
-    {
-      "id": "frontend-select-builder",
-      "file": "frontend/src/controls.js",
-      "line": 33,
-      "anchor": "export function buildSelectMessage(objectIds) {",
-      "status": "declined",
-      "what": "the browser's select-message builder \u2014 written, exported, tested, and called by nothing",
-      "evidence": "every other builder in this file is called from attachControls at the bottom. This one is not, in controls.js or main.js. The selection path was built to the edge of the UI and stopped.",
-      "asks": "how do you pick a part \u2014 click it, hover it, or draw a circle round several?",
-      "reason": "Not touched. buildSelectMessage stays as it was, because SELECT stays a no-op (see viewer-select-noop) and annotate.js supersedes it with buildAnnotateMessage. Editing it would have meant changing a tested, working function to no purpose."
-    },
-    {
-      "id": "frontend-picking",
-      "file": "frontend/src/raster.js",
-      "line": 49,
-      "anchor": "export function createFrame(width, height) {",
-      "status": "wired",
-      "what": "the colour+depth frame every triangle is rasterized into",
-      "evidence": "drawTriangle already resolves visibility per pixel and writes depth[idx] in its inner loop (raster.js:113-115). An id channel written in the same loop makes picking exact and free \u2014 you get the object under the cursor, not the object a ray guessed at. frontend/CLAUDE.md forbids reintroducing any per-triangle sort here.",
-      "asks": "when parts overlap on screen, should pointing pick the nearest one, or offer you the stack to choose from?",
-      "decision": "Q-04/Q-06/Q-25"
-    },
-    {
-      "id": "frontend-pointer",
+      "id": "renderer-point-state",
       "file": "frontend/src/scene-renderer.js",
       "line": 136,
       "anchor": "  setFocused(objectIds) {",
-      "status": "wired",
-      "what": "the renderer's pointer handling and the per-node draw loop the picking id is written from",
-      "evidence": "one pointerdown handler, and dragging is unconditionally an orbit. Hovering, circling and dragging a part all want the same gestures, so this is where they have to be shared rather than added.",
-      "asks": "should drag stay 'turn the camera' with pointing on a separate mode, or should drag on a part move it and drag on empty space turn the camera?",
-      "decision": "Q-05"
+      "status": "open",
+      "what": "the renderer state boundary for operator emphasis, currently limited to persistent marks",
+      "evidence": "selection cannot reuse setHighlighted because server HIGHLIGHT messages clear it, and cannot reuse setFocused because that is persistent agent context",
+      "asks": "should hover and selected state be independent from both persistent marks and agent change highlights?"
     },
     {
-      "id": "frontend-viewport-state",
-      "file": "frontend/src/viewport.js",
-      "line": 68,
-      "anchor": "export function createViewportState() {",
-      "status": "declined",
-      "what": "the scene-graph bookkeeping and the highlighted set",
-      "evidence": "state.highlighted is documented as 'exactly the object_ids the last HIGHLIGHT message named', and applyHighlight clears every previous one because 'a highlight that accumulates makes what-just-changed useless'. An operator-pinned emphasis cannot reuse that set without destroying it.",
-      "asks": "should the parts you mark as important stay marked while the agent works, or clear each time it changes something?",
-      "reason": "Not touched, deliberately, and this is Q-13's central constraint. applyHighlight clears every previously highlighted id on each HIGHLIGHT message \u2014 correct for 'what just changed', fatal for a standing mark. Focus lives in SceneRenderer.setFocused and annotate.js instead, precisely so the operator's marks cannot be wiped every time the agent touches anything."
+      "id": "renderer-point-colour",
+      "file": "frontend/src/scene-renderer.js",
+      "line": 341,
+      "anchor": "      const base = focused ? marked : handle.highlighted ? accent : surface;",
+      "status": "open",
+      "what": "the final colour priority for normal, changed, and marked parts",
+      "evidence": "there is no selected or hovered branch, so even correctly picked ids cannot look different in the canvas",
+      "asks": "when states overlap, should temporary pointing feedback visually take priority and then reveal the previous state when it clears?"
     },
     {
-      "id": "frontend-main-wiring",
-      "file": "frontend/src/main.js",
-      "line": 200,
-      "anchor": "  attachControls(controlsRoot, {",
-      "status": "wired",
-      "what": "the one file allowed to wire the socket, the viewport, the renderer and the controls together",
-      "evidence": "main.js is the only file permitted to import both viewport.js and scene-renderer.js (frontend/CLAUDE.md). Anything needing both picking and sending has to be composed here.",
-      "asks": "none \u2014 mechanical, but this is the file where a feature that works in isolation gets connected to the product",
-      "decision": "Q-22"
-    },
-    {
-      "id": "frontend-html",
-      "file": "frontend/index.html",
-      "line": 73,
-      "anchor": "    <section class=\"controls-panel\" aria-label=\"Operator controls\">",
-      "status": "wired",
-      "what": "where every operator control lives, and the source order that fixes the keyboard tab path",
-      "evidence": "the comment above it pins the ordering: controls before sidebar in source even though the grid paints it below-left, 'which the browser suite asserts'. New controls change the tab order unless they are placed deliberately.",
-      "asks": "where should the editing tools sit \u2014 always visible in the controls panel, or appearing beside the part when you pick one?",
-      "decision": "Q-05/Q-07/Q-15/Q-20"
-    },
-    {
-      "id": "frontend-tokens",
+      "id": "point-colour-token",
       "file": "frontend/src/tokens.css",
       "line": 54,
       "anchor": "  --marked: #d9a441;",
-      "status": "wired",
-      "what": "the colour a marked part is drawn in, and the rule that no other file may hold a hex literal",
-      "evidence": "tests/tokens.test.js scans all of frontend/src for a raw hex literal outside this file and fails on one. A hover outline or a priority marker needs a token here before it can have a colour at all.",
-      "asks": "how should a part you have marked as important look \u2014 a coloured outline, a badge, or dimming everything else?",
-      "decision": "Q-13"
+      "status": "open",
+      "what": "the only allowed source of renderer colours",
+      "evidence": "frontend tests forbid raw colour literals outside tokens.css; pointing needs a token or an intentional alias to the existing accent-hover token",
+      "asks": "should pointing use the existing brighter accent-hover colour or get a separate selection colour?"
     },
     {
-      "id": "frontend-test-index",
-      "file": "frontend/tests/index.js",
-      "line": 18,
-      "anchor": "import './camera.test.js';",
-      "status": "wired",
-      "what": "the manual list of every frontend test file",
-      "evidence": "a Node CLI quirk on this machine means a *.test.js file not imported here passes when run directly and reports nothing at all through npm run test:frontend. It has already happened once (camera.test.js).",
-      "asks": "none \u2014 mechanical, and the single most silent failure in this repo",
-      "decision": "mechanical"
+      "id": "point-browser-regression",
+      "file": "frontend/tests-browser/smoke.test.js",
+      "line": 678,
+      "anchor": "  test('pointing and the edit tools are wired into the real page', async () => {",
+      "status": "open",
+      "what": "the only real-canvas coverage for point mode",
+      "evidence": "the current test checks mode state and tokens but never points at a rendered pixel, so the missing visual feedback shipped green",
+      "asks": "should the regression cover both mouse hover and click/lasso persistence?"
     },
     {
-      "id": "frontend-conventions",
-      "file": "frontend/CLAUDE.md",
-      "line": 135,
-      "anchor": "- **Picking reads the rasterizer's id channel; it is never a ray cast.** `raster.js` writes",
-      "status": "wired",
-      "what": "the module-boundary rules a later agent reads before touching this code",
-      "evidence": "every prior frontend change added its boundary here (the depth buffer, camera.js's split, transcript.js vs log.js). A new one that is not recorded gets undone by the next agent that finds it surprising.",
-      "asks": "none \u2014 but an unrecorded boundary is one that will be violated",
-      "decision": "mechanical"
+      "id": "connect-documentation",
+      "file": "frontend/README.md",
+      "line": 133,
+      "anchor": "The Connect button in the conversation panel's heading row wires this tool into an AI",
+      "status": "open",
+      "what": "the user-facing explanation that currently says Connect avoids opening a JSON file",
+      "evidence": "Codex stores MCP configuration in TOML, so the existing description becomes factually incomplete once Codex is offered",
+      "asks": "should the documentation call out that one Codex config is shared by Codex CLI, the IDE extension, and ChatGPT desktop?"
+    },
+    {
+      "id": "quick-start-client-list",
+      "file": "README.md",
+      "line": 33,
+      "anchor": "python src/forge3d_cli.py serve         # stdio — Claude Desktop / Claude Code / Cursor",
+      "status": "open",
+      "what": "the top-level list of local stdio clients forge3d supports",
+      "evidence": "Codex speaks the same local stdio transport and would remain undiscoverable in the quick start if this list stayed unchanged",
+      "asks": "should Codex be named in the quick-start client list?"
     }
   ],
-  "dismissed": [
-    {
-      "path": ".feature/candidates.json",
-      "reason": "trace.mjs produced 0 candidates \u2014 its co-change heuristic found nothing, because this repo's history is 8 large pipeline commits rather than many small per-feature ones, so 'files that changed together' is very nearly 'every file'. The co-change evidence was recovered by hand instead: git show --stat on d858c06 and 766a6d3, recorded in tracedVia above. Nothing was shortened; the generator simply had no signal to give."
-    },
-    {
-      "path": "src/engine/",
-      "reason": "the only module that may import bpy, and nothing here needs Blender: picking happens in the browser's own rasterizer and direct-manipulation ops go through EngineProtocol like every other operation."
-    },
-    {
-      "path": "src/export/",
-      "reason": "a selection and a priority marker are session state, not geometry \u2014 nothing an operator points at changes what a Roblox export contains."
-    },
-    {
-      "path": "docs/PIPELINE-LOG.md",
-      "reason": "build history \u2014 co-changes with everything, connects to nothing."
-    }
-  ],
-  "found_during_build": [
-    {
-      "id": "wire-contract-mirror",
-      "file": "frontend/src/socket.js",
-      "line": 17,
-      "anchor": "export const ServerMessageType = Object.freeze({",
-      "status": "wired",
-      "what": "the JavaScript mirror of the wire enums",
-      "evidence": "src/app/wire_contract_test.py asserts the two languages agree and broke on the new message types. The trace missed it; the suite did not.",
-      "asks": "none \u2014 found by a passing test failing, which is the test doing its job"
-    },
-    {
-      "id": "operator-edit-path",
-      "file": "src/orchestration/reporting.py",
-      "line": 175,
-      "anchor": "        if self.state is RunState.PAUSED:",
-      "status": "wired",
-      "what": "perform() refuses while paused, and Q-17 made pausing the precondition for editing",
-      "evidence": "found while wiring the edit messages: without apply_operator_edit the manual tools could never work, because the precondition for using them was also the thing refusing them.",
-      "asks": "none \u2014 taken as the only reading that makes Q-17 coherent"
-    }
-  ]
+  "dismissed": []
 }
