@@ -7,120 +7,132 @@
       "file": "src/app/connect.py",
       "line": 58,
       "anchor": "CLIENTS: dict[str, dict] = {",
-      "status": "open",
+      "status": "wired",
       "what": "the registry that controls which installed clients appear behind the Connect button",
       "evidence": "detect_clients iterates only CLIENTS, and live.py rejects every POST /api/connect id outside this same registry",
-      "asks": "should Codex be configured globally for every project or only for this forge3d checkout?"
+      "asks": "should Codex be configured globally for every project or only for this forge3d checkout?",
+      "decision": "Q-01, Q-03"
     },
     {
       "id": "codex-config-writer",
       "file": "src/app/connect.py",
       "line": 150,
       "anchor": "def write_config(client: str) -> Path:",
-      "status": "open",
+      "status": "wired",
       "what": "the writer that currently assumes every client stores a JSON mcpServers object",
       "evidence": "official Codex documentation instead uses ~/.codex/config.toml with [mcp_servers.<name>] tables, so adding a registry row alone would write the wrong format",
-      "asks": "should Connect merge a forge3d table into config.toml automatically or invoke the official codex mcp add command?"
+      "asks": "should Connect merge a forge3d table into config.toml automatically or invoke the official codex mcp add command?",
+      "decision": "Q-01, Q-02"
     },
     {
       "id": "codex-cli-description",
       "file": "src/app/connect.py",
       "line": 177,
       "anchor": "def describe(client: str | None = None, *, http_port: int = 8765) -> str:",
-      "status": "open",
+      "status": "wired",
       "what": "the terminal fallback and config preview shared with the browser's no-client path",
       "evidence": "it renders every CLIENTS entry as JSON today; Codex needs TOML or the official codex mcp add command instead",
-      "asks": "should forge3d connect codex show the exact command as well as supporting the button?"
+      "asks": "should forge3d connect codex show the exact command as well as supporting the button?",
+      "decision": "Q-06"
     },
     {
       "id": "connect-browser-reachability",
       "file": "frontend/tests-browser/connect.browser.mjs",
       "line": 284,
       "anchor": "  test('with several AI clients, Connect opens a picker that Escape closes and returns focus', async () => {",
-      "status": "open",
+      "status": "wired",
       "what": "the real-browser check that every detected client is visible and selectable from the Connect picker",
       "evidence": "the picker is generic, so a Codex registry entry should flow through without UI-specific code; only a browser assertion can prove it is actually offered and posted",
-      "asks": "should the picker label the shared Codex configuration simply as Codex, or distinguish CLI, IDE extension, and ChatGPT desktop?"
+      "asks": "should the picker label the shared Codex configuration simply as Codex, or distinguish CLI, IDE extension, and ChatGPT desktop?",
+      "decision": "Q-03"
     },
     {
       "id": "point-selection-wiring",
       "file": "frontend/src/point-ui.js",
       "line": 84,
       "anchor": "  const renderSelection = () => {",
-      "status": "open",
+      "status": "wired",
       "what": "the point-selection render path that updates text and controls but never tells the 3D renderer what was selected",
       "evidence": "setSelection reaches renderSelection after click or lasso, but renderSelection has no renderer call, which reproduces the reported invisible selection",
-      "asks": "should a clicked or lassoed selection stay highlighted until it is cleared?"
+      "asks": "should a clicked or lassoed selection stay highlighted until it is cleared?",
+      "decision": "Q-04"
     },
     {
       "id": "point-hover-input",
       "file": "frontend/src/point-ui.js",
       "line": 156,
       "anchor": "    'pointermove',",
-      "status": "open",
+      "status": "wired",
       "what": "the pointer-move path that currently does work only while a lasso drag is active",
       "evidence": "the previous point-and-edit decision says hover finds a part without committing, but this handler returns whenever drag is null and never picks or highlights the object under the pointer",
-      "asks": "should highlighting begin on hover before the click, or only after selection?"
+      "asks": "should highlighting begin on hover before the click, or only after selection?",
+      "decision": "Q-04"
     },
     {
       "id": "renderer-point-state",
       "file": "frontend/src/scene-renderer.js",
       "line": 136,
       "anchor": "  setFocused(objectIds) {",
-      "status": "open",
+      "status": "wired",
       "what": "the renderer state boundary for operator emphasis, currently limited to persistent marks",
       "evidence": "selection cannot reuse setHighlighted because server HIGHLIGHT messages clear it, and cannot reuse setFocused because that is persistent agent context",
-      "asks": "should hover and selected state be independent from both persistent marks and agent change highlights?"
+      "asks": "should hover and selected state be independent from both persistent marks and agent change highlights?",
+      "decision": "Q-04, Q-05"
     },
     {
       "id": "renderer-point-colour",
       "file": "frontend/src/scene-renderer.js",
       "line": 341,
       "anchor": "      const base = focused ? marked : handle.highlighted ? accent : surface;",
-      "status": "open",
+      "status": "wired",
       "what": "the final colour priority for normal, changed, and marked parts",
       "evidence": "there is no selected or hovered branch, so even correctly picked ids cannot look different in the canvas",
-      "asks": "when states overlap, should temporary pointing feedback visually take priority and then reveal the previous state when it clears?"
+      "asks": "when states overlap, should temporary pointing feedback visually take priority and then reveal the previous state when it clears?",
+      "decision": "Q-05"
     },
     {
       "id": "point-colour-token",
       "file": "frontend/src/tokens.css",
       "line": 54,
       "anchor": "  --marked: #d9a441;",
-      "status": "open",
+      "status": "declined",
       "what": "the only allowed source of renderer colours",
       "evidence": "frontend tests forbid raw colour literals outside tokens.css; pointing needs a token or an intentional alias to the existing accent-hover token",
-      "asks": "should pointing use the existing brighter accent-hover colour or get a separate selection colour?"
+      "asks": "should pointing use the existing brighter accent-hover colour or get a separate selection colour?",
+      "reason": "Q-05 chose the existing --accent-hover token, so tokens.css needs no new colour or alias."
     },
     {
       "id": "point-browser-regression",
       "file": "frontend/tests-browser/smoke.test.js",
       "line": 678,
       "anchor": "  test('pointing and the edit tools are wired into the real page', async () => {",
-      "status": "open",
+      "status": "wired",
       "what": "the only real-canvas coverage for point mode",
       "evidence": "the current test checks mode state and tokens but never points at a rendered pixel, so the missing visual feedback shipped green",
-      "asks": "should the regression cover both mouse hover and click/lasso persistence?"
+      "asks": "should the regression cover both mouse hover and click/lasso persistence?",
+      "decision": "Q-04, Q-05"
     },
     {
       "id": "connect-documentation",
       "file": "frontend/README.md",
       "line": 133,
       "anchor": "The Connect button in the conversation panel's heading row wires this tool into an AI",
-      "status": "open",
+      "status": "wired",
       "what": "the user-facing explanation that currently says Connect avoids opening a JSON file",
       "evidence": "Codex stores MCP configuration in TOML, so the existing description becomes factually incomplete once Codex is offered",
-      "asks": "should the documentation call out that one Codex config is shared by Codex CLI, the IDE extension, and ChatGPT desktop?"
+      "asks": "should the documentation call out that one Codex config is shared by Codex CLI, the IDE extension, and ChatGPT desktop?",
+      "decision": "Q-01, Q-03, Q-06"
     },
     {
       "id": "quick-start-client-list",
       "file": "README.md",
       "line": 33,
       "anchor": "python src/forge3d_cli.py serve         # stdio — Claude Desktop / Claude Code / Cursor",
-      "status": "open",
+      "status": "wired",
       "what": "the top-level list of local stdio clients forge3d supports",
       "evidence": "Codex speaks the same local stdio transport and would remain undiscoverable in the quick start if this list stayed unchanged",
-      "asks": "should Codex be named in the quick-start client list?"
+      "asks": "should Codex be named in the quick-start client list?",
+      "decision": "Q-06"
     }
   ],
   "dismissed": []
