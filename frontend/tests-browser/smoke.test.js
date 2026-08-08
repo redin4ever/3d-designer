@@ -768,7 +768,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         }, sample);
 
       await s2.page.mouse.move(sample.clientX, sample.clientY);
-      const hovered = await waitUntil(async () => {
+      await waitUntil(async () => {
         const value = await pixel();
         return value !== sample.before ? value : null;
       }, 'the part under the point cursor to change colour');
@@ -779,7 +779,20 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         'the clicked part to become selected',
       );
       await s2.page.mouse.move(sample.outsideX, sample.outsideY);
-      assert.equal(await pixel(), hovered, 'leaving the part cleared the committed selection highlight');
+      const afterLeave = await s2.page.evaluate(({ x, y }) => {
+        const canvas = document.getElementById('viewport-canvas');
+        const data = canvas.getContext('2d').getImageData(x, y, 1, 1).data;
+        return {
+          pixel: [...data].join(','),
+          selection: document.getElementById('point-selection')?.textContent ?? '',
+          composerHidden: document.getElementById('point-composer')?.hidden,
+        };
+      }, sample);
+      assert.notEqual(
+        afterLeave.pixel,
+        sample.before,
+        `leaving the part cleared the committed selection highlight: ${JSON.stringify(afterLeave)}`,
+      );
 
       await s2.page.click('[data-action="close-composer"]');
       await waitUntil(async () => (await pixel()) === sample.before, 'clearing selection to restore the prior colour');

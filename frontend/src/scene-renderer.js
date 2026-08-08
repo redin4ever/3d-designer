@@ -1,8 +1,8 @@
 // The real renderer-like object, implemented on Canvas2D — no three.js, no network
 // fetch, no dependency (see frontend/CLAUDE.md "Why no three.js"). Implements the exact
 // four-method shape frontend/src/viewport.js drives against a fake in tests:
-// createNode / updateTransform / removeNode / setHighlighted, plus start()/stop() for
-// its own render loop.
+// createNode / updateTransform / removeNode / setHighlighted, plus the operator's
+// hovered/selected/focused emphasis and start()/stop() for its own render loop.
 //
 // Most of this file is a browser adapter and is exercised by eye. The camera is NOT: it
 // lives in ./camera.js and is covered by frontend/tests/camera.test.js. That split exists
@@ -70,7 +70,14 @@ export class SceneRenderer {
     this._lastPointerY = 0;
     // Named CSS colours as the pre-theme fallback, never hex: tests/tokens.test.js scans
     // every source file for a hex literal outside tokens.css and fails on one.
-    this._colors = { ink: 'white', muted: 'gray', accent: 'slateblue', canvas: 'black', marked: 'gold' };
+    this._colors = {
+      ink: 'white',
+      muted: 'gray',
+      accent: 'slateblue',
+      pointed: 'mediumslateblue',
+      canvas: 'black',
+      marked: 'gold',
+    };
     this._frame = null;
     this._image = null;
     this._rgbCache = new Map();
@@ -78,6 +85,8 @@ export class SceneRenderer {
     // can assign these — see picking.js for why this is not a ray cast.
     this.ids = createIdIndex();
     this._focused = new Set();
+    this._hovered = new Set();
+    this._selected = new Set();
     this._probeCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     this._bindPointer();
     this._resizeObserver = new ResizeObserver(() => this._resize());
@@ -90,6 +99,7 @@ export class SceneRenderer {
       ink: readColor('--ink', this._colors.ink),
       muted: readColor('--muted', this._colors.muted),
       accent: readColor('--accent', this._colors.accent),
+      pointed: readColor('--accent-hover', this._colors.pointed),
       marked: readColor('--marked', this._colors.marked),
       canvas: readColor('--canvas', this._colors.canvas),
     };
@@ -119,6 +129,9 @@ export class SceneRenderer {
     // Retire the picking id with the node. Reusing it would let a pick that was in
     // flight when the object was deleted resolve to whatever took its place.
     this.ids.forget(handle.id);
+    this._hovered.delete(handle.id);
+    this._selected.delete(handle.id);
+    this._focused.delete(handle.id);
   }
 
   setHighlighted(handle, on) {
@@ -135,6 +148,16 @@ export class SceneRenderer {
    */
   setFocused(objectIds) {
     this._focused = new Set(objectIds ?? []);
+  }
+
+  /** The visible part currently under the point cursor; cleared as soon as it leaves. */
+  setHovered(objectIds) {
+    this._hovered = new Set(objectIds ?? []);
+  }
+
+  /** Click, lasso and keyboard selections that stay visible until explicitly cleared. */
+  setSelected(objectIds) {
+    this._selected = new Set(objectIds ?? []);
   }
 
   /** The current colour+depth+id frame, for picking. Null before the first draw. */
@@ -286,6 +309,7 @@ export class SceneRenderer {
     const background = this._rgb(this._colors.canvas);
     const surface = this._rgb(this._colors.muted);
     const accent = this._rgb(this._colors.accent);
+    const pointed = this._rgb(this._colors.pointed);
     const marked = this._rgb(this._colors.marked);
 
     if (!this._frame || this._frame.width !== width || this._frame.height !== height) {
@@ -335,10 +359,12 @@ export class SceneRenderer {
     for (const handle of this.nodes.values()) {
       const world = allWorld.get(handle.handleId);
       const { indices } = handle.geometry;
-      // A part the operator marked reads as focus first: it is standing state they put up
-      // deliberately, where a change-highlight is a moment that fades (Q-13).
+      // Point feedback reads first while it is active, then reveals the exact standing
+      // state underneath when cleared. Focus is persistent operator intent; a change
+      // highlight is the last thing the agent touched and may be replaced at any moment.
+      const isPointed = this._selected.has(handle.id) || this._hovered.has(handle.id);
       const focused = this._focused.has(handle.id);
-      const base = focused ? marked : handle.highlighted ? accent : surface;
+      const base = isPointed ? pointed : focused ? marked : handle.highlighted ? accent : surface;
       const id = this.ids.idFor(handle.id);
 
       for (let i = 0; i < indices.length; i += 3) {

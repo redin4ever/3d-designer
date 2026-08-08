@@ -82,6 +82,7 @@ export function attachPointing(root, io) {
   };
 
   const renderSelection = () => {
+    io.renderer.setSelected(state.selection);
     selectionLabel.textContent = describeSelection(state);
     composer.hidden = state.selection.size === 0;
     if (!composer.hidden) textInput.focus();
@@ -128,6 +129,17 @@ export function attachPointing(root, io) {
     renderSelection();
   };
 
+  const hoverFrom = (event) => {
+    const frame = io.renderer.frame;
+    if (!frame) return;
+    const point = cssToFrame(frame, canvas.getBoundingClientRect(), event.clientX, event.clientY);
+    const picked = pickAt(frame, point[0], point[1]);
+    const objectId = picked === NOTHING ? null : io.renderer.ids.objectFor(picked);
+    io.renderer.setHovered(objectId ? [objectId] : []);
+  };
+
+  const clearHover = () => io.renderer.setHovered([]);
+
   // ---- point mode -----------------------------------------------------------------
   // Q-05 chose a mode you switch into, so nothing an operator already does changes
   // behaviour and a camera angle can never be lost by trying to circle something.
@@ -136,6 +148,7 @@ export function attachPointing(root, io) {
     modeButton.setAttribute('aria-pressed', String(pointMode));
     panel.dataset.pointMode = pointMode ? 'on' : 'off';
     if (!pointMode) {
+      clearHover();
       clearSelection(state);
       renderSelection();
     }
@@ -147,6 +160,7 @@ export function attachPointing(root, io) {
       if (!pointMode) return;
       // Stop the orbit camera seeing this one. Point mode means drag draws a loop.
       event.stopPropagation();
+      clearHover();
       drag = { path: [cssToFrame(io.renderer.frame ?? { width: 0, height: 0 }, canvas.getBoundingClientRect(), event.clientX, event.clientY)], startX: event.clientX, startY: event.clientY };
     },
     true,
@@ -155,7 +169,11 @@ export function attachPointing(root, io) {
   canvas?.addEventListener(
     'pointermove',
     (event) => {
-      if (!pointMode || !drag) return;
+      if (!pointMode) return;
+      if (!drag) {
+        hoverFrom(event);
+        return;
+      }
       event.stopPropagation();
       drag.path.push(
         cssToFrame(io.renderer.frame ?? { width: 0, height: 0 }, canvas.getBoundingClientRect(), event.clientX, event.clientY),
@@ -175,6 +193,7 @@ export function attachPointing(root, io) {
   };
   canvas?.addEventListener('pointerup', endDrag, true);
   canvas?.addEventListener('pointercancel', endDrag, true);
+  canvas?.addEventListener('pointerleave', clearHover, true);
 
   // Q-24: the canvas is already keyboard-operable for orbit and zoom, so pointing not being
   // would make this the one thing on the page needing a mouse.
