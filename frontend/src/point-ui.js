@@ -64,6 +64,9 @@ export function attachPointing(root, io) {
   const moveButton = root.querySelector('[data-action="move-tool"]');
   const moveStatus = root.querySelector('#move-status');
   const axisButtons = [...root.querySelectorAll('[data-action="move-axis"]')];
+  const frameButton = root.querySelector('[data-action="frame-selection"]');
+  const resetButton = root.querySelector('[data-action="reset-view"]');
+  const snapButton = root.querySelector('[data-action="snap-toggle"]');
 
   let pointMode = false;
   let attachView = false;
@@ -72,6 +75,7 @@ export function attachPointing(root, io) {
   let moveMode = false;
   let moveSession = createMoveSession();
   let keyboardMove = null;
+  let snap = DEFAULT_SNAP_M;
 
   const only = () => [...state.selection][0] ?? '';
 
@@ -129,6 +133,7 @@ export function attachPointing(root, io) {
     pauseToEdit.hidden = !(reason && run.connected && state.selection.size > 0);
     if (moveButton) moveButton.disabled = !allowed;
     for (const button of axisButtons) button.disabled = !allowed;
+    if (frameButton) frameButton.disabled = !hasOne;
     io.renderer.setMoveEnabled?.(allowed);
   };
 
@@ -251,7 +256,7 @@ export function attachPointing(root, io) {
     moveSession = updateMove(moveSession, {
       pointerId: event.pointerId,
       point,
-      snap: DEFAULT_SNAP_M,
+      snap,
       threshold: 3 * (window.devicePixelRatio || 1),
     });
     if (moveSession.phase === 'dragging') {
@@ -274,7 +279,7 @@ export function attachPointing(root, io) {
       setMoveStatus('Move unchanged.');
       return;
     }
-    if (io.send(buildMoveMessage(objectId, result.translation)) === false) {
+    if (io.send(buildMoveMessage(objectId, result.translation, { snap })) === false) {
       cancelPointerMove('Move reverted because the build is not connected.');
       return;
     }
@@ -297,6 +302,22 @@ export function attachPointing(root, io) {
       canvas.focus();
     });
   }
+
+  frameButton?.addEventListener('click', () => {
+    if (io.renderer.frameSelection?.(only())) setMoveStatus(`Framed ${only()}.`);
+  });
+
+  resetButton?.addEventListener('click', () => {
+    io.renderer.resetView?.();
+    setMoveStatus('View reset.');
+  });
+
+  snapButton?.addEventListener('click', () => {
+    snap = snap > 0 ? 0 : DEFAULT_SNAP_M;
+    snapButton.setAttribute('aria-pressed', String(snap > 0));
+    snapButton.textContent = snap > 0 ? `Snap ${DEFAULT_SNAP_M} m` : 'Snap off';
+    setMoveStatus(snap > 0 ? `Translation snap ${DEFAULT_SNAP_M} m.` : 'Translation snap off.');
+  });
 
   // ---- point mode -----------------------------------------------------------------
   // Q-05 chose a mode you switch into, so nothing an operator already does changes
@@ -396,7 +417,7 @@ export function attachPointing(root, io) {
       const pending = keyboardMove;
       keyboardMove = null;
       io.renderer.setActiveMoveAxis?.(null);
-      if (io.send(buildMoveMessage(pending.objectId, pending.previewPosition)) === false) {
+      if (io.send(buildMoveMessage(pending.objectId, pending.previewPosition, { snap })) === false) {
         io.renderer.previewTranslation?.(pending.objectId, pending.startPosition);
         syncPositionFields(pending.startPosition);
         setMoveStatus('Move reverted because the build is not connected.');
@@ -414,7 +435,7 @@ export function attachPointing(root, io) {
       keyboardMove.previewPosition,
       keyboardMove.axis,
       sign * DEFAULT_SNAP_M,
-      DEFAULT_SNAP_M,
+      snap,
     );
     io.renderer.previewTranslation?.(keyboardMove.objectId, keyboardMove.previewPosition);
     syncPositionFields(keyboardMove.previewPosition);
@@ -523,7 +544,7 @@ export function attachPointing(root, io) {
       io.onError('Enter an x, y and z to move to.');
       return;
     }
-    sendEdit((objectId) => buildMoveMessage(objectId, to));
+    sendEdit((objectId) => buildMoveMessage(objectId, to, { snap }));
   });
 
   root.querySelector('[data-action="edit-duplicate"]')?.addEventListener('click', () => {

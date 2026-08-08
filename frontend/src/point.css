@@ -106,6 +106,10 @@
   flex-wrap: wrap;
 }
 
+.controls-panel .control-row {
+  flex-wrap: wrap;
+}
+
 .edit-fields input {
   min-width: 3.5rem;
   width: 0;

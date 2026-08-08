@@ -207,6 +207,17 @@ export class SceneRenderer {
     return true;
   }
 
+  frameSelection(objectId) {
+    const position = this.objectPosition(objectId);
+    if (!position) return false;
+    this.camera.focusOn(position);
+    return true;
+  }
+
+  resetView() {
+    this.camera.reset();
+  }
+
   /** The current colour+depth+id frame, for picking. Null before the first draw. */
   get frame() {
     return this._frame;
@@ -310,7 +321,7 @@ export class SceneRenderer {
       // the projection, the painter's sort — assumes Y-up. Without the conversion an 8x8m
       // deck rendered as a wall standing on its edge, which is what the live view showed
       // the first time it had geometry in it.
-      v = zUpToYUp(v);
+      v = zUpToYUp(v.map((component, index) => component - this.camera.target[index]));
       v = rotateY(v, orbit);
       v = rotateX(v, this.camera.pitch);
       out[i / 3] = v;
@@ -357,6 +368,7 @@ export class SceneRenderer {
 
     const gizmo = projectMoveGizmo({
       position: handle.transform.position,
+      target: this.camera.target,
       yaw: this.camera.yaw,
       pitch: this.camera.pitch,
       cameraDistance,

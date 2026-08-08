@@ -42,6 +42,7 @@ export class OrbitCamera {
     this.yaw = 0;
     this.pitch = clamp(pitch, -MAX_PITCH, MAX_PITCH);
     this.zoom = 1;
+    this.target = [0, 0, 0];
   }
 
   /** Apply a drag in pixels. `dy` is the half that did not work at all. */
@@ -71,6 +72,13 @@ export class OrbitCamera {
   reset() {
     this.yaw = 0;
     this.pitch = DEFAULT_PITCH;
+    this.zoom = 1;
+    this.target = [0, 0, 0];
+  }
+
+  /** Orbit around a selected world-space point without changing the current view angle. */
+  focusOn(position) {
+    this.target = [...position];
     this.zoom = 1;
   }
 

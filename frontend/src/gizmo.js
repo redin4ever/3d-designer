@@ -22,8 +22,9 @@ function rotateX([x, y, z], angle) {
   return [x, y * c - z * s, y * s + z * c];
 }
 
-function toView(point, yaw, pitch) {
-  return rotateX(rotateY(zUpToYUp(point), yaw), pitch);
+function toView(point, target, yaw, pitch) {
+  const relative = point.map((component, index) => component - target[index]);
+  return rotateX(rotateY(zUpToYUp(relative), yaw), pitch);
 }
 
 function project([x, y, z], cameraDistance, focalLength, width, height) {
@@ -39,6 +40,7 @@ function project([x, y, z], cameraDistance, focalLength, width, height) {
  */
 export function projectMoveGizmo({
   position,
+  target = [0, 0, 0],
   yaw,
   pitch,
   cameraDistance,
@@ -47,14 +49,14 @@ export function projectMoveGizmo({
   height,
   arrowLength = 72,
 }) {
-  const originView = toView(position, yaw, pitch);
+  const originView = toView(position, target, yaw, pitch);
   const origin = project(originView, cameraDistance, focalLength, width, height);
   if (!origin) return null;
 
   const axes = {};
   for (const axis of MOVE_AXES) {
     const tipWorld = position.map((component, index) => component + WORLD_AXES[axis][index]);
-    const tip = project(toView(tipWorld, yaw, pitch), cameraDistance, focalLength, width, height);
+    const tip = project(toView(tipWorld, target, yaw, pitch), cameraDistance, focalLength, width, height);
     const dx = (tip?.[0] ?? origin[0]) - origin[0];
     const dy = (tip?.[1] ?? origin[1]) - origin[1];
     const pixelsPerWorld = Math.hypot(dx, dy);
