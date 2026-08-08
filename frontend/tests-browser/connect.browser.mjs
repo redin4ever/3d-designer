@@ -289,6 +289,7 @@ export function registerConnectTests({ withScene, waitUntil }) {
         clientRow({ id: 'claude-desktop', label: 'Claude Desktop', configured: true }),
         clientRow(),
         clientRow({ id: 'cursor', label: 'Cursor', config_path: 'C:\\Users\\someone\\.cursor\\mcp.json' }),
+        clientRow({ id: 'codex', label: 'Codex', config_path: 'C:\\Users\\someone\\.codex\\config.toml' }),
       ];
       await stubConnectApi(s.page, {
         clients: { status: 200, payload: { clients: rows } },
@@ -317,7 +318,11 @@ export function registerConnectTests({ withScene, waitUntil }) {
         'the picker to open with focus inside it',
       );
 
-      assert.equal(dialog.choices.length, 3, 'every client found must be offered');
+      assert.equal(dialog.choices.length, 4, 'every client found must be offered');
+      assert.ok(
+        dialog.choices.some((choice) => choice.id === 'codex' && /Codex/.test(choice.text)),
+        `Codex never reached the picker: ${JSON.stringify(dialog.choices)}`,
+      );
       assert.ok(dialog.name.length > 0, 'a dialog with no reachable name is unannounceable');
       assert.ok(dialog.focusInside, 'a modal that leaves focus behind it is a keyboard trap in reverse');
       const already = dialog.choices.find((c) => c.id === 'claude-desktop');
