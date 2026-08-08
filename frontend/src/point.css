@@ -66,23 +66,6 @@
   clip-path: inset(50%);
 }
 
-.tool-hint {
-  position: absolute;
-  inset-inline-start: 50%;
-  inset-block-start: 58%;
-  z-index: 4;
-  max-inline-size: var(--annotation-panel-size);
-  margin: 0;
-  padding: var(--space-xxs) var(--space-xs);
-  translate: -50% 0;
-  border-radius: var(--radius-xs);
-  background: var(--scrim);
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  text-align: center;
-}
-
 .point-composer {
   position: absolute;
   inset-block-end: var(--space-sm);
@@ -292,6 +275,5 @@
 }
 
 @media (max-width: 768px) {
-  .tool-hint { display: none; }
   .point-composer { inline-size: calc(100% - var(--space-xl)); }
 }
