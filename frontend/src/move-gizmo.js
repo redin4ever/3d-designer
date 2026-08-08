@@ -52,9 +52,14 @@ export function finishMove(session, pointerId) {
     return { session: createMoveSession(), translation: null, restore: session.startPosition };
   }
   return {
-    session: { ...session, phase: 'pending', pointerId: null },
+    session: createMoveSession(),
     translation: [...session.previewPosition],
     restore: null,
+    pending: {
+      objectId: session.objectId,
+      restorePosition: [...session.startPosition],
+      previewPosition: [...session.previewPosition],
+    },
   };
 }
 
@@ -64,7 +69,7 @@ export function cancelMove(session) {
 }
 
 export function reconcileMove(session, objectId) {
-  return session.phase !== 'idle' && session.objectId === objectId
+  return session.phase === 'pending' && session.objectId === objectId
     ? createMoveSession()
     : session;
 }

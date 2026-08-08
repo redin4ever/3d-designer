@@ -27,14 +27,21 @@ export function createPointState() {
 }
 
 /**
- * Replace what is selected.
+ * Replace what is selected, or toggle a modifier gesture into the current set.
  *
- * Replaces rather than adds: Q-04's click picks one part, and if clicks accumulated the
- * second one would annotate two objects with the operator having no idea which they were
- * talking about. Circling several is a single gesture that arrives here as one call.
+ * Plain gestures replace, preserving Q-04's predictable one-click behavior. Ctrl/Alt
+ * gestures toggle explicitly, so accumulation only happens while the operator is visibly
+ * holding the modifier that means “keep the rest”.
  */
-export function setSelection(state, objectIds) {
-  state.selection = new Set(objectIds);
+export function setSelection(state, objectIds, { toggle = false } = {}) {
+  if (!toggle) {
+    state.selection = new Set(objectIds);
+    return;
+  }
+  for (const objectId of objectIds) {
+    if (state.selection.has(objectId)) state.selection.delete(objectId);
+    else state.selection.add(objectId);
+  }
 }
 
 /**

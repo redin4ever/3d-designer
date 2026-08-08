@@ -32,7 +32,6 @@ import {
   cancelMove,
   createMoveSession,
   finishMove,
-  reconcileMove,
   updateMove,
 } from './move-gizmo.js';
 import { NOTHING, cssToFrame, pickAt, pickInPath } from './picking.js';
@@ -68,6 +67,11 @@ export function attachPointing(root, io) {
   const frameButton = root.querySelector('[data-action="frame-selection"]');
   const resetButton = root.querySelector('[data-action="reset-view"]');
   const snapButton = root.querySelector('[data-action="snap-toggle"]');
+  const duplicateButton = root.querySelector('[data-action="edit-duplicate"]');
+  const deleteButton = root.querySelector('[data-action="edit-delete"]');
+  const positionInputs = ['x', 'y', 'z']
+    .map((axis) => root.querySelector(`[data-field="edit-${axis}"]`))
+    .filter(Boolean);
 
   let pointMode = false;
   let attachView = false;
@@ -75,6 +79,7 @@ export function attachPointing(root, io) {
   let drag = null;
   let moveMode = false;
   let moveSession = createMoveSession();
+  let pendingPointerMove = null;
   let keyboardMove = null;
   let snap = DEFAULT_SNAP_M;
 
@@ -117,7 +122,11 @@ export function attachPointing(root, io) {
   const renderSelection = () => {
     io.renderer.setSelected(state.selection);
     selectionLabel.textContent = describeSelection(state);
-    if (selectedObjectName) selectedObjectName.textContent = only() || 'No object selected';
+    if (selectedObjectName) {
+      selectedObjectName.textContent = state.selection.size > 1
+        ? `${state.selection.size} parts selected`
+        : only() || 'No object selected';
+    }
     composer.hidden = state.selection.size === 0;
     if (!composer.hidden) textInput.focus();
     syncPositionFields(io.renderer.objectPosition?.(only()));
@@ -127,15 +136,19 @@ export function attachPointing(root, io) {
   // Q-20: the reason, not just the fact. A disabled control with nothing said about it is
   // indistinguishable from a broken one, and the Pause that unblocks it is right here.
   const renderEditability = () => {
-    const reason = editingAllowed(run, { explain: true });
+    const runReason = editingAllowed(run, { explain: true });
     const hasOne = state.selection.size === 1;
-    const allowed = hasOne && !reason;
+    const reason = state.selection.size > 1 ? 'Select one part to edit.' : runReason;
+    const allowed = hasOne && !runReason;
     editGroup.dataset.blocked = reason ? 'true' : 'false';
     editBlocked.textContent = state.selection.size === 0 ? '' : reason;
-    pauseToEdit.hidden = !(reason && run.connected && state.selection.size > 0);
+    pauseToEdit.hidden = !(runReason && run.connected && hasOne);
     if (moveButton) moveButton.disabled = !allowed;
     for (const button of axisButtons) button.disabled = !allowed;
     if (frameButton) frameButton.disabled = !hasOne;
+    if (duplicateButton) duplicateButton.disabled = !allowed;
+    if (deleteButton) deleteButton.disabled = !allowed;
+    for (const input of positionInputs) input.disabled = !allowed;
     io.renderer.setMoveEnabled?.(allowed);
   };
 
@@ -156,7 +169,7 @@ export function attachPointing(root, io) {
 
   let lastPath = [];
 
-  const pickFrom = (path) => {
+  const pickFrom = (path, toggle = false) => {
     const frame = io.renderer.frame;
     if (!frame) return;
     lastPath = path;
@@ -166,7 +179,7 @@ export function attachPointing(root, io) {
       .filter((id) => id !== NOTHING)
       .map((id) => io.renderer.ids.objectFor(id))
       .filter(Boolean);
-    setSelection(state, names);
+    setSelection(state, names, { toggle });
     renderSelection();
   };
 
@@ -182,7 +195,7 @@ export function attachPointing(root, io) {
   const clearHover = () => io.renderer.setHovered([]);
 
   const activateMoveMode = () => {
-    if (!only() || !editingAllowed(run)) return false;
+    if (state.selection.size !== 1 || !editingAllowed(run)) return false;
     pointMode = false;
     moveMode = true;
     modeButton?.setAttribute('aria-pressed', 'false');
@@ -281,8 +294,23 @@ export function attachPointing(root, io) {
       setMoveStatus('Move unchanged.');
       return;
     }
+    if (result.pending) {
+      pendingPointerMove = pendingPointerMove?.objectId === result.pending.objectId
+        ? {
+            ...pendingPointerMove,
+            count: pendingPointerMove.count + 1,
+            previewPosition: [...result.pending.previewPosition],
+          }
+        : { ...result.pending, count: 1 };
+    }
     if (io.send(buildMoveMessage(objectId, result.translation, { snap })) === false) {
-      cancelPointerMove('Move reverted because the build is not connected.');
+      const restore = pendingPointerMove?.restorePosition;
+      if (restore) {
+        io.renderer.previewTranslation?.(objectId, restore);
+        syncPositionFields(restore);
+      }
+      pendingPointerMove = null;
+      setMoveStatus('Move reverted because the build is not connected.');
       return;
     }
     setMoveStatus('Saving move… awaiting the build.');
@@ -371,7 +399,10 @@ export function attachPointing(root, io) {
     const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
     // A click is a one-point path. Treating a stray click as a loop would select the whole
     // scene, which picking.js refuses anyway — this is what makes the click a click.
-    pickFrom(moved < DRAG_THRESHOLD ? [drag.path[0]] : drag.path);
+    pickFrom(
+      moved < DRAG_THRESHOLD ? [drag.path[0]] : drag.path,
+      event.ctrlKey || event.altKey,
+    );
     drag = null;
   };
   canvas?.addEventListener('pointerup', endDrag, true);
@@ -530,7 +561,7 @@ export function attachPointing(root, io) {
 
   // ---- the edit tools -------------------------------------------------------------
   const sendEdit = (build) => {
-    if (!only()) return;
+    if (state.selection.size !== 1) return;
     try {
       io.send(build(only()));
     } catch (err) {
@@ -549,15 +580,29 @@ export function attachPointing(root, io) {
     sendEdit((objectId) => buildMoveMessage(objectId, to, { snap }));
   });
 
-  root.querySelector('[data-action="edit-duplicate"]')?.addEventListener('click', () => {
+  duplicateButton?.addEventListener('click', () => {
     sendEdit((objectId) => buildDuplicateMessage(objectId, `${objectId}_copy`));
   });
 
-  root.querySelector('[data-action="edit-delete"]')?.addEventListener('click', () => {
+  deleteButton?.addEventListener('click', () => {
     sendEdit(buildDeleteMessage);
   });
 
   pauseToEdit?.addEventListener('click', () => io.send({ type: 'pause', data: {} }));
+
+  const rejectPendingMove = (message = 'Move rejected by the build.') => {
+    if (moveSession.phase !== 'idle') cancelPointerMove(message);
+    if (pendingPointerMove) {
+      io.renderer.previewTranslation?.(
+        pendingPointerMove.objectId,
+        pendingPointerMove.restorePosition,
+      );
+      syncPositionFields(pendingPointerMove.restorePosition);
+      pendingPointerMove = null;
+      setMoveStatus(message);
+    }
+    if (keyboardMove) cancelKeyboardMove(message);
+  };
 
   renderFocus();
   renderSelection();
@@ -571,22 +616,35 @@ export function attachPointing(root, io) {
     /** The server transform replaces any optimistic preview and closes its pending state. */
     reconcileTransforms(transforms) {
       for (const transform of transforms ?? []) {
-        const matchedPointer = moveSession.objectId === transform.object_id;
-        const next = reconcileMove(moveSession, transform.object_id);
-        if (next !== moveSession) moveSession = next;
+        const matchedPointer = pendingPointerMove?.objectId === transform.object_id;
+        if (matchedPointer) {
+          pendingPointerMove = pendingPointerMove.count <= 1
+            ? null
+            : {
+                ...pendingPointerMove,
+                count: pendingPointerMove.count - 1,
+                restorePosition: [...transform.position],
+              };
+        }
         const matchedKeyboard = keyboardMove?.pending && keyboardMove.objectId === transform.object_id;
         if (matchedKeyboard) keyboardMove = null;
         if (matchedPointer || matchedKeyboard) {
-          syncPositionFields(transform.position);
-          io.renderer.setActiveMoveAxis?.(null);
-          setMoveStatus('Move saved.');
+          const activePointer = ['armed', 'dragging'].includes(moveSession.phase)
+            && moveSession.objectId === transform.object_id;
+          if (activePointer) {
+            io.renderer.previewTranslation?.(moveSession.objectId, moveSession.previewPosition);
+            syncPositionFields(moveSession.previewPosition);
+          } else {
+            syncPositionFields(transform.position);
+            io.renderer.setActiveMoveAxis?.(null);
+            setMoveStatus('Move saved.');
+          }
         }
       }
     },
     /** A rejected edit restores the position captured before the local preview. */
     rejectMove(message = 'Move rejected by the build.') {
-      if (moveSession.phase !== 'idle') cancelPointerMove(message);
-      if (keyboardMove) cancelKeyboardMove(message);
+      rejectPendingMove(message);
     },
     /**
      * Q-22: a disconnect reverts and says so. The selection is dropped because the ids it
@@ -596,7 +654,9 @@ export function attachPointing(root, io) {
     setRun(next) {
       run = { ...run, ...next };
       if (!editingAllowed(run)) {
-        if (moveSession.phase !== 'idle') cancelPointerMove('Move cancelled because editing is unavailable.');
+        if (moveSession.phase !== 'idle' || pendingPointerMove) {
+          rejectPendingMove('Move cancelled because editing is unavailable.');
+        }
         if (keyboardMove) cancelKeyboardMove('Move cancelled because editing is unavailable.');
       }
       if (!run.connected) {
