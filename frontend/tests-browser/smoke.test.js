@@ -714,4 +714,78 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
       await s2.dispose();
     }
   });
+
+  test('point mode visibly highlights hover and keeps a clicked part selected', async () => {
+    const s2 = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s2);
+      await waitForCanvasDrawn(s2.page, 500);
+      await s2.page.click('[data-action="point-mode"]');
+
+      // Find a stable interior scene pixel instead of assuming where the orbit projection
+      // put a cube. Requiring a same-colour 3x3 neighbourhood keeps the probe off an edge.
+      const sample = await s2.page.evaluate(() => {
+        const canvas = document.getElementById('viewport-canvas');
+        const ctx = canvas.getContext('2d');
+        const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const rect = canvas.getBoundingClientRect();
+        const keyAt = (x, y) => {
+          const i = (y * canvas.width + x) * 4;
+          return [...image.data.slice(i, i + 4)].join(',');
+        };
+        const background = keyAt(0, 0);
+        for (let y = 1; y < canvas.height - 1; y += 1) {
+          for (let x = 1; x < canvas.width - 1; x += 1) {
+            const key = keyAt(x, y);
+            if (key === background) continue;
+            let solid = true;
+            for (let dy = -1; dy <= 1; dy += 1) {
+              for (let dx = -1; dx <= 1; dx += 1) {
+                if (keyAt(x + dx, y + dy) !== key) solid = false;
+              }
+            }
+            if (!solid) continue;
+            return {
+              x,
+              y,
+              before: key,
+              clientX: rect.left + ((x + 0.5) * rect.width) / canvas.width,
+              clientY: rect.top + ((y + 0.5) * rect.height) / canvas.height,
+              outsideX: rect.right + 8,
+              outsideY: rect.top + 8,
+            };
+          }
+        }
+        return null;
+      });
+      assert.ok(sample, 'could not find an interior object pixel to point at');
+
+      const pixel = () =>
+        s2.page.evaluate(({ x, y }) => {
+          const canvas = document.getElementById('viewport-canvas');
+          const data = canvas.getContext('2d').getImageData(x, y, 1, 1).data;
+          return [...data].join(',');
+        }, sample);
+
+      await s2.page.mouse.move(sample.clientX, sample.clientY);
+      const hovered = await waitUntil(async () => {
+        const value = await pixel();
+        return value !== sample.before ? value : null;
+      }, 'the part under the point cursor to change colour');
+
+      await s2.page.mouse.click(sample.clientX, sample.clientY);
+      await waitUntil(
+        () => s2.page.$eval('#point-composer', (element) => element.hidden === false),
+        'the clicked part to become selected',
+      );
+      await s2.page.mouse.move(sample.outsideX, sample.outsideY);
+      assert.equal(await pixel(), hovered, 'leaving the part cleared the committed selection highlight');
+
+      await s2.page.click('[data-action="close-composer"]');
+      await waitUntil(async () => (await pixel()) === sample.before, 'clearing selection to restore the prior colour');
+      assert.deepEqual(complaints(s2).pageErrors, []);
+    } finally {
+      await s2.dispose();
+    }
+  });
 });
