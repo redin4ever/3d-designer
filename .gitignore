@@ -29,7 +29,7 @@ venv/
 # Generated artefacts
 artifacts/
 .tmp/
-.superdesign/tmp/
+.superdesign/
 .redesign/baseline/
 .redesign/after/
 

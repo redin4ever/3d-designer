@@ -39,6 +39,7 @@
      against white ink, below the 4.5:1 WCAG AA floor for body text. A filled
      primary button needs a hover that darkens rather than lightens. 6.40:1. */
   --accent-pressed: #4a55b8;
+  --accent-soft: rgba(94, 106, 210, 0.14);
   --on-accent: #ffffff;
   --brand-secure: #7a7fad;
 
@@ -63,6 +64,7 @@
 
   /* Semantic (DESIGN.md "Semantic") */
   --success: #27a644;
+  --success-soft: color-mix(in srgb, var(--success) 12%, transparent);
   --overlay: #000000;
 
   /* Radius scale (DESIGN.md "Shapes") */
@@ -94,7 +96,31 @@
      `typography` block. Only the two rungs this console actually uses are mapped; add the
      rest here rather than writing a px literal into a stylesheet. */
   --text-body-sm: 14px;
+  --text-body: 13px;
   --text-caption: 12px;
+  --text-micro: 10px;
+  --leading-body: 1.35;
+  --tracking-body: 0.01em;
+  --tracking-controls: 0.5px;
+
+  /* Editor geometry derived from the 4px spacing rhythm. */
+  --topbar-size: 48px;
+  --global-strip-size: 40px;
+  --viewport-header-size: 36px;
+  --viewport-footer-size: 28px;
+  --tool-rail-size: 52px;
+  --sidebar-size: 340px;
+  --sidebar-compact-size: 300px;
+  --canvas-min-size: 240px;
+  --touch-target: 44px;
+  --control-size: 32px;
+  --hairline-size: 1px;
+  --focus-ring-size: 2px;
+  --composer-size: 28rem;
+  --dialog-size: 32rem;
+  --field-min-size: 3.5rem;
+  --topbar-actions-inset: 108px;
+  --tool-content-inset: 64px;
 
   /* Elevation 2 — a control raised off the panel behind it (DESIGN.md "Elevation & Depth",
      level 2: surface-2 lift, 1px hairline-strong), plus that section's "subtle white edge
@@ -114,7 +140,7 @@
   /* Elevation 3 — dropdown menus and dialogs (DESIGN.md "Elevation & Depth", level 3),
      with the scrim that separates a modal from the page it covers. */
   --surface-overlay: var(--surface-3);
-  --scrim: color-mix(in srgb, var(--overlay) 62%, transparent);
+  --scrim: rgba(0, 0, 0, 0.62);
 
   /* Elevation 4 — focus ring (DESIGN.md "Elevation & Depth") */
   --focus-ring: 2px solid var(--accent-focus);

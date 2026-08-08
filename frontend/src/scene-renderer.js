@@ -15,7 +15,7 @@
 // `--token` custom property defined in tokens.css, read once per resize/theme change and
 // cached as opaque CSS color strings — translucency is done with ctx.globalAlpha rather
 // than hand-parsed rgba(), so no hex digit ever appears as a literal in this file. The
-// fallbacks below are CSS color keywords, not hex, for the same reason. That is what
+// fallbacks below are CSS system colours, not literals, for the same reason. That is what
 // lets frontend/tests/tokens.test.js scan this file for a raw hex literal and find none.
 
 import { OrbitCamera, clipTriangleNear, shadeFactor, triangleNormal, zUpToYUp } from './camera.js';
@@ -70,18 +70,18 @@ export class SceneRenderer {
     this._dragging = false;
     this._lastPointerX = 0;
     this._lastPointerY = 0;
-    // Named CSS colours as the pre-theme fallback, never hex: tests/tokens.test.js scans
-    // every source file for a hex literal outside tokens.css and fails on one.
+    // CSS system colours are the pre-theme fallback. The authored palette still lives
+    // exclusively in tokens.css; these values only matter before styles are available.
     this._colors = {
-      ink: 'white',
-      muted: 'gray',
-      accent: 'slateblue',
-      pointed: 'mediumslateblue',
-      canvas: 'black',
-      marked: 'gold',
-      axisX: 'crimson',
-      axisY: 'seagreen',
-      axisZ: 'royalblue',
+      ink: 'CanvasText',
+      muted: 'GrayText',
+      accent: 'Highlight',
+      pointed: 'Highlight',
+      canvas: 'Canvas',
+      marked: 'Mark',
+      axisX: 'LinkText',
+      axisY: 'VisitedText',
+      axisZ: 'ActiveText',
     };
     this._frame = null;
     this._image = null;

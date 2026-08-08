@@ -3,13 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gate A Console</title>
+  <title>forge3d editor</title>
   <meta name="description" content="Live 3D view, action log and operator controls for a running build." />
-  <!-- Without a declared icon the browser auto-requests /favicon.ico, which this static
-       origin does not serve, and every single page load logs a 404 to the console. An
-       empty data: URI satisfies the request without shipping an asset or a network fetch.
-       Not an image file, because an SVG icon would have to hardcode a hex colour and
-       every colour in this frontend comes from src/tokens.css. -->
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="src/tokens.css" />
   <link rel="stylesheet" href="src/app.css" />
@@ -19,138 +14,90 @@
 </head>
 <body>
   <header class="topbar">
-    <h1 class="topbar-title">forge3d</h1>
+    <div class="brand-lockup">
+      <h1 class="topbar-title">forge3d</h1>
+      <span class="workspace-label">Live editor</span>
+    </div>
     <span id="connection-status" class="status-pill" data-status="connecting" role="status" aria-live="polite">
       Connecting…
     </span>
   </header>
 
   <main class="layout">
-    <section class="viewport-panel" aria-label="Live 3D view">
-      <canvas id="viewport-canvas" tabindex="0" role="img"
-          aria-label="Live 3D view of the current build. Drag to orbit, scroll to zoom. With the keyboard: arrow keys orbit, plus and minus zoom, 0 resets."></canvas>
-      <!-- The in-place annotation composer (Q-07). Positioned over the canvas beside
-           whatever was picked, and hidden until something is. It sits inside the viewport
-           panel rather than in the sidebar because the operator chose to type where they
-           are looking; `hidden` keeps it out of the tab order entirely while closed, so
-           the keyboard path through the page is unchanged when nothing is selected. -->
-      <form id="point-composer" class="point-composer" data-action="annotate-form" hidden>
-        <p class="point-selection" id="point-selection" aria-live="polite">nothing selected</p>
-        <div class="control-row">
-          <label class="visually-hidden" for="annotate-text">What should the agent know about this?</label>
-          <input
-            id="annotate-text"
-            data-field="annotate-text"
-            type="text"
-            autocomplete="off"
-            placeholder="e.g. this one clips the tread"
-            aria-describedby="point-selection"
-          />
-          <button type="submit" class="btn primary">Send</button>
+    <section class="viewport-workspace" aria-label="3D editor workspace">
+      <header class="viewport-header">
+        <div class="viewport-mode">
+          <span class="viewport-eyebrow">Object mode</span>
+          <span class="viewport-separator" aria-hidden="true"></span>
+          <span class="viewport-guidance">Select a part, then use Move</span>
         </div>
-        <div class="control-row point-actions">
-          <button type="button" class="btn" data-action="toggle-focus">Mark important</button>
-          <button type="button" class="btn" data-action="attach-image" aria-pressed="false">
-            Attach view
-          </button>
-          <button type="button" class="btn" data-action="close-composer">Close</button>
-        </div>
-        <p class="point-note" id="point-note"></p>
-      </form>
+        <a class="viewport-shortcuts" href="#move-status" tabindex="-1" aria-label="Move keyboard shortcuts">G · X Y Z · Enter · Esc</a>
+      </header>
 
-      <div id="connection-banner" class="connection-banner">
-        <p class="connection-banner-title">Not connected</p>
-        <p class="connection-banner-detail" id="connection-banner-detail">
-          Waiting for a build to connect. Start the viewer server and this page will pick it up
-          automatically — no reload needed.
+      <section class="viewport-panel" aria-label="Live 3D view">
+        <canvas id="viewport-canvas" tabindex="0" role="img"
+            aria-label="Live 3D view of the current build. Drag to orbit and scroll to zoom. Press G for Move, X, Y or Z to constrain, Enter to confirm, Escape to cancel, arrow keys to adjust, and 0 to reset the view."></canvas>
+
+        <p class="control-hint tool-hint" id="point-mode-hint">
+          Point: click a part or drag a loop. Move: drag a labelled axis.
         </p>
-      </div>
+        <ul id="focus-list" class="focus-list" aria-live="polite" aria-label="Parts marked as important"></ul>
+
+        <form id="point-composer" class="point-composer" data-action="annotate-form" hidden>
+          <div class="point-composer-header">
+            <p class="point-selection" id="point-selection" aria-live="polite">nothing selected</p>
+            <button type="button" class="icon-button" data-action="close-composer" aria-label="Close annotation">×</button>
+          </div>
+          <label for="annotate-text">Annotation for the selected part</label>
+          <div class="control-row">
+            <input id="annotate-text" data-field="annotate-text" type="text" autocomplete="off"
+                placeholder="e.g. this one clips the tread" aria-describedby="point-selection" />
+            <button type="submit" class="btn primary">Send</button>
+          </div>
+          <div class="control-row point-actions">
+            <button type="button" class="btn" data-action="toggle-focus">Mark important</button>
+            <button type="button" class="btn" data-action="attach-image" aria-pressed="false">Attach view</button>
+          </div>
+          <p class="point-note" id="point-note"></p>
+        </form>
+
+        <div id="connection-banner" class="connection-banner">
+          <span class="connection-icon" aria-hidden="true">◇</span>
+          <p class="connection-banner-title">Not connected</p>
+          <p class="connection-banner-detail" id="connection-banner-detail">
+            Waiting for a build to connect. Start the viewer server and this page will pick it up automatically—no reload needed.
+          </p>
+        </div>
+      </section>
+
+      <footer class="viewport-footer">
+        <p id="move-status" role="status" aria-live="polite">Select one part, then choose Move or press G.</p>
+        <p id="edit-blocked" role="status"></p>
+        <p id="control-error" class="control-error" role="alert"></p>
+      </footer>
     </section>
 
-    <!-- The controls panel sits before the sidebar in source order even though the grid
-         paints it below-left: it keeps the tab order canvas → run controls → conversation,
-         so the keyboard path through the page did not change when the chat panel landed. -->
     <section class="controls-panel" aria-label="Operator controls">
-      <div class="control-group">
-        <span id="run-controls-label">Run</span>
+      <div class="control-group run-group">
+        <span id="run-controls-label" class="control-label">Run</span>
         <div class="control-row" role="group" aria-labelledby="run-controls-label">
           <button type="button" class="btn" data-action="pause">Pause</button>
           <button type="button" class="btn primary" data-action="resume">Resume</button>
         </div>
       </div>
 
-      <div class="control-group">
+      <div class="control-group rollback-group">
         <form data-action="rollback-form">
-          <label for="rollback-steps">Roll back N steps</label>
+          <label for="rollback-steps">Roll back</label>
           <div class="control-row">
-            <input
-              id="rollback-steps"
-              data-field="rollback-steps"
-              type="number"
-              min="1"
-              step="1"
-              inputmode="numeric"
-              placeholder="1"
-              required
-            />
-            <button type="submit" class="btn">Roll back</button>
+            <input id="rollback-steps" data-field="rollback-steps" type="number" min="1" step="1"
+                inputmode="numeric" placeholder="1" aria-label="Steps to roll back" required />
+            <button type="submit" class="btn">steps</button>
           </div>
         </form>
       </div>
 
-      <!-- Pointing and editing. Placed after Run and before Check cadence so the tab order
-           runs canvas → pause/resume → point → edit → cadence → conversation: the controls
-           you reach for while watching come before the setting you change once. -->
-      <div class="control-group">
-        <span id="point-controls-label">Pointing</span>
-        <div class="control-row" role="group" aria-labelledby="point-controls-label">
-          <button type="button" class="btn" data-action="point-mode" aria-pressed="false">
-            Point mode
-          </button>
-          <button type="button" class="btn" data-action="clear-focus">Clear marks</button>
-        </div>
-        <p class="control-hint" id="point-mode-hint">
-          Off: drag turns the camera. On: click a part, or drag a loop round several.
-        </p>
-        <ul id="focus-list" class="focus-list" aria-live="polite" aria-label="Parts marked as important"></ul>
-      </div>
-
-      <div class="control-group" id="edit-group">
-        <span id="edit-controls-label">Edit the selected part</span>
-        <div class="control-row" role="group" aria-labelledby="edit-controls-label">
-          <button type="button" class="btn" data-action="move-tool" aria-pressed="false">
-            Move tool
-          </button>
-          <button type="button" class="btn" data-action="edit-move">Move…</button>
-          <button type="button" class="btn" data-action="edit-duplicate">Duplicate</button>
-          <button type="button" class="btn" data-action="edit-delete">Delete</button>
-        </div>
-        <div class="control-row edit-fields">
-          <label class="visually-hidden" for="edit-x">X, metres</label>
-          <input id="edit-x" data-field="edit-x" type="number" step="0.1" placeholder="x" inputmode="decimal" />
-          <label class="visually-hidden" for="edit-y">Y, metres</label>
-          <input id="edit-y" data-field="edit-y" type="number" step="0.1" placeholder="y" inputmode="decimal" />
-          <label class="visually-hidden" for="edit-z">Z, metres</label>
-          <input id="edit-z" data-field="edit-z" type="number" step="0.1" placeholder="z" inputmode="decimal" />
-        </div>
-        <div class="control-row move-axis-controls" role="group" aria-label="Move selected part by axis">
-          <button type="button" class="btn axis-control" data-action="move-axis" data-axis="x"
-              aria-label="Move selected part along X axis">X</button>
-          <button type="button" class="btn axis-control" data-action="move-axis" data-axis="y"
-              aria-label="Move selected part along Y axis">Y</button>
-          <button type="button" class="btn axis-control" data-action="move-axis" data-axis="z"
-              aria-label="Move selected part along Z axis">Z</button>
-        </div>
-        <p class="control-hint" id="move-status" role="status" aria-live="polite">
-          Select one part, then choose Move or press G.
-        </p>
-        <!-- Q-20: the reason is stated, and the Pause that fixes it is right here. A
-             disabled control with no reason is indistinguishable from a broken one. -->
-        <p class="control-hint" id="edit-blocked" role="status"></p>
-        <button type="button" class="btn" data-action="pause-to-edit" hidden>Pause the build</button>
-      </div>
-
-      <div class="control-group">
+      <div class="control-group cadence-group">
         <label for="cadence-select">Check cadence</label>
         <select id="cadence-select" data-field="cadence">
           <option value="every_geometry_change">Every geometry change</option>
@@ -158,53 +105,84 @@
           <option value="on_request">On request</option>
         </select>
       </div>
-
-      <p id="control-error" class="control-error" role="alert"></p>
     </section>
 
-    <aside class="sidebar" aria-label="Conversation and action log">
+    <nav class="tool-shelf" aria-label="Viewport tools">
+      <span class="tool-shelf-label">Tools</span>
+      <button type="button" class="tool-button" data-action="point-mode" aria-pressed="false"
+          title="Select or annotate a part">
+        <span class="tool-glyph" aria-hidden="true">⌁</span>
+        <span class="tool-name">Point</span>
+      </button>
+      <button type="button" class="tool-button" data-action="move-tool" aria-pressed="false"
+          title="Move selected part (G)">
+        <span class="tool-glyph" aria-hidden="true">↗</span>
+        <span class="tool-name">Move</span>
+      </button>
+      <button type="button" class="tool-button" data-action="clear-focus" title="Clear important marks">
+        <span class="tool-glyph" aria-hidden="true">×</span>
+        <span class="tool-name">Clear</span>
+      </button>
+    </nav>
+
+    <aside class="sidebar" aria-label="Transform, conversation and action log">
       <section class="chat-panel" aria-labelledby="chat-heading">
-        <!-- Connect sits at the right edge of the conversation panel's heading row, after
-             every run control in source order — so the tab path through the page
-             (canvas → Pause → … → cadence → Connect → transcript → composer) is unchanged
-             for everyone who was already using it. It is dark and only one surface step
-             above the panel behind it: this is setup, done once, and it must not compete
-             with Send for attention on every other visit. -->
         <div class="panel-header">
           <h2 id="chat-heading" class="panel-heading">Conversation</h2>
-          <button type="button" id="connect-button" class="connect-button" aria-describedby="connect-dialog-note">
-            Connect
-          </button>
-          <button type="button" class="btn" data-action="frame-selection">Frame selection</button>
-          <button type="button" class="btn" data-action="reset-view">Reset view</button>
-          <button type="button" class="btn" data-action="snap-toggle" aria-pressed="true">
-            Snap 0.1 m
-          </button>
+          <button type="button" id="connect-button" class="connect-button" aria-describedby="connect-dialog-note">Connect</button>
+          <div class="viewport-actions" aria-label="Viewport actions">
+            <button type="button" class="btn quiet" data-action="frame-selection">Frame selection</button>
+            <button type="button" class="btn quiet" data-action="reset-view">Reset view</button>
+            <button type="button" class="btn quiet" data-action="snap-toggle" aria-pressed="true">Snap 0.1 m</button>
+          </div>
         </div>
-        <!-- aria-live="polite", not "assertive": an agent narrating a long build emits a
-             line every few seconds, and assertive interrupts a screen-reader user mid-word
-             every single time. Polite queues behind whatever they are already reading.
-             tabindex="0" because this scrolls, and a scrollable region a keyboard cannot
-             reach is a region a keyboard user cannot read the history of. -->
-        <ol id="chat-transcript" class="transcript" tabindex="0" aria-live="polite" aria-label="Conversation with the agent"></ol>
+        <ol id="chat-transcript" class="transcript" tabindex="0" aria-live="polite"
+            aria-label="Conversation with the agent"></ol>
         <form class="composer" data-action="redirect-form">
-          <label for="redirect-text">Redirect the build, in words</label>
+          <label for="redirect-text">Guide the build</label>
           <div class="control-row">
-            <input
-              id="redirect-text"
-              data-field="redirect-text"
-              type="text"
-              autocomplete="off"
-              aria-describedby="composer-note"
-              placeholder="e.g. add a garage door on the east wall"
-            />
+            <input id="redirect-text" data-field="redirect-text" type="text" autocomplete="off"
+                aria-describedby="composer-note" placeholder="e.g. add a garage door on the east wall" />
             <button type="submit" class="btn primary">Send</button>
           </div>
           <p id="composer-note" class="composer-note">
-            Sending queues your message. The agent picks it up on its next tool call — not the
-            moment you press Enter — so if it is idle right now, nothing happens until it acts again.
+            Queues for the agent’s next tool call.
           </p>
         </form>
+      </section>
+
+      <section class="transform-panel" id="edit-group" aria-labelledby="edit-controls-label">
+        <div class="section-header">
+          <div>
+            <span class="section-kicker">Transform</span>
+            <h2 id="edit-controls-label">Selected object</h2>
+          </div>
+          <span class="selection-state">One part</span>
+        </div>
+        <div class="transform-body">
+          <div class="edit-fields">
+            <label for="edit-x"><span class="axis-label axis-x">X</span> position</label>
+            <input id="edit-x" data-field="edit-x" type="number" step="0.1" placeholder="x" inputmode="decimal" />
+            <label for="edit-y"><span class="axis-label axis-y">Y</span> position</label>
+            <input id="edit-y" data-field="edit-y" type="number" step="0.1" placeholder="y" inputmode="decimal" />
+            <label for="edit-z"><span class="axis-label axis-z">Z</span> position</label>
+            <input id="edit-z" data-field="edit-z" type="number" step="0.1" placeholder="z" inputmode="decimal" />
+          </div>
+          <div class="move-axis-controls" role="group" aria-label="Move selected part by axis">
+            <button type="button" class="axis-control" data-action="move-axis" data-axis="x"
+                aria-label="Move selected part along X axis">X</button>
+            <button type="button" class="axis-control" data-action="move-axis" data-axis="y"
+                aria-label="Move selected part along Y axis">Y</button>
+            <button type="button" class="axis-control" data-action="move-axis" data-axis="z"
+                aria-label="Move selected part along Z axis">Z</button>
+          </div>
+          <div class="transform-actions">
+            <button type="button" class="btn primary" data-action="edit-move">Apply position</button>
+            <button type="button" class="btn" data-action="edit-duplicate">Duplicate</button>
+            <button type="button" class="btn danger" data-action="edit-delete">Delete</button>
+          </div>
+          <button type="button" class="btn pause-to-edit" data-action="pause-to-edit" hidden>Pause the build to edit</button>
+        </div>
       </section>
 
       <section class="log-panel" aria-labelledby="action-log-heading">
@@ -214,24 +192,10 @@
     </aside>
   </main>
 
-  <!-- Everything the Connect button has to say happens in here rather than in the sidebar,
-       and that is a layout decision with a reason: the conversation panel is ~340px wide and
-       a few hundred tall, and a written-config result is five lines. Inline, it crushed the
-       transcript to nothing — the operator lost the panel they actually use to a setup step
-       they run once. In here it costs the panel no height at all, and the restart line gets
-       the room it needs to be read.
-
-       A native <dialog> because the four things a modal has to get right — focus moves in,
-       Escape dismisses, the page behind goes inert, focus returns to whatever opened it —
-       are all already implemented by the platform, and a hand-rolled one that forgets the
-       last of them strands a keyboard user in a panel that is no longer on screen. -->
   <dialog id="connect-dialog" class="connect-dialog" aria-labelledby="connect-dialog-title">
     <h2 id="connect-dialog-title" class="connect-dialog-title">Connect an AI client</h2>
-    <!-- Said before anything is written, because "connect" here does not mean what the word
-         usually means. Also the Connect button's own aria-describedby. -->
     <p id="connect-dialog-note" class="connect-dialog-note">
-      Connecting writes a config file so your AI client can launch forge3d — nothing connects
-      from this page, and the tools appear the next time that client starts.
+      Connecting writes a config file so your AI client can launch forge3d—nothing connects from this page, and the tools appear the next time that client starts.
     </p>
     <div id="connect-dialog-body" class="connect-dialog-body" role="status" aria-live="polite"></div>
     <div class="connect-dialog-actions">

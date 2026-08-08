@@ -1,0 +1,11 @@
+{
+  "ids": [
+    "route-editor",
+    "layout-viewport-workspace",
+    "component-transform-tools",
+    "component-conversation-log",
+    "component-connect-dialog",
+    "component-point-composer"
+  ],
+  "note": "ids seen by the gate; rows may be added, never removed"
+}

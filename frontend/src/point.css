@@ -1,170 +1,254 @@
-/* Pointing, priority and the edit tools (Q-05, Q-07, Q-13, Q-15, Q-20).
-   Every colour and size comes from tokens.css — tests/tokens.test.js fails on a hex
-   literal anywhere under src/ except that file. */
+.tool-shelf {
+  position: absolute;
+  inset-block-start: calc(var(--global-strip-size) + var(--viewport-header-size) + var(--space-xs));
+  inset-inline-start: var(--space-xs);
+  z-index: 4;
+  inline-size: calc(var(--tool-rail-size) - var(--space-sm));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-xxs);
+  border: var(--hairline-size) solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
 
-/* The in-place annotation composer (Q-07). Absolute inside .viewport-panel, which is the
-   positioning context; anchored bottom-left rather than following the cursor, because a
-   panel that moves to wherever you clicked covers the thing you clicked about half the
-   time, and you cannot predict where to look for it. */
+.tool-shelf-label {
+  color: var(--ink-tertiary);
+  font-size: var(--text-micro);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tool-button {
+  min-inline-size: var(--control-size);
+  display: grid;
+  place-items: center;
+  padding: var(--space-xxs);
+}
+
+.tool-glyph {
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm);
+  line-height: 1;
+}
+
+.tool-name {
+  color: inherit;
+  font-size: var(--text-micro);
+}
+
+.tool-hint {
+  position: absolute;
+  inset-block-end: var(--space-sm);
+  inset-inline-start: calc(var(--tool-rail-size) + var(--space-sm));
+  z-index: 3;
+  max-inline-size: var(--composer-size);
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--radius-xs);
+  background: var(--scrim);
+}
+
 .point-composer {
   position: absolute;
-  left: var(--space-sm);
-  bottom: var(--space-sm);
-  z-index: 2;
-  max-width: min(28rem, calc(100% - var(--space-lg)));
-  box-sizing: border-box;
+  inset-block-end: var(--space-xxl);
+  inset-inline-start: calc(var(--tool-rail-size) + var(--space-sm));
+  z-index: 5;
+  inline-size: min(var(--composer-size), calc(100% - var(--space-section)));
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
   padding: var(--space-sm);
-  border: 1px solid var(--hairline);
+  border: var(--hairline-size) solid var(--hairline-strong);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
   box-shadow: var(--elevation-raised);
 }
 
-.point-composer[hidden] {
-  display: none;
+.point-composer[hidden] { display: none; }
+
+.point-composer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
 }
 
-.point-selection {
+.point-composer label {
+  color: var(--ink-muted);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.point-composer input { inline-size: 0; flex: 1 1 auto; }
+
+.point-selection,
+.point-note,
+.control-hint {
   margin: 0;
-  font-size: var(--text-caption);
-  color: var(--marked);
-}
-
-.point-actions {
-  flex-wrap: wrap;
-}
-
-.point-note {
-  margin: 0;
-  font-size: var(--text-caption);
   color: var(--muted);
+  font-size: var(--text-micro);
 }
 
-.point-note:empty {
-  display: none;
-}
+.point-selection { color: var(--marked); font-weight: 600; }
+.point-note:empty,
+.control-hint:empty { display: none; }
 
-/* A part the operator marked. Distinct from the agent's change-highlight in both colour
-   and behaviour: this stays lit until taken down, that one flashes and fades (Q-13). */
-.focus-list {
-  list-style: none;
-  margin: var(--space-xs) 0 0;
+.point-actions { flex-wrap: wrap; }
+
+.icon-button {
+  inline-size: var(--control-size);
   padding: 0;
+}
+
+.focus-list {
+  position: absolute;
+  inset-block-start: var(--space-xs);
+  inset-inline-start: calc(var(--tool-rail-size) + var(--space-sm));
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.focus-list:empty {
-  display: none;
-}
+.focus-list:empty { display: none; }
 
 .focus-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xxs);
-  padding: 0 var(--space-xs);
-  border: 1px solid var(--marked);
+  padding-inline: var(--space-xs);
+  border: var(--hairline-size) solid var(--marked);
   border-radius: var(--radius-sm);
   background: var(--marked-soft);
   color: var(--ink);
-  font-size: var(--text-caption);
-  line-height: 1.8;
+  font-size: var(--text-micro);
 }
 
 .focus-chip button {
   border: 0;
-  background: none;
+  padding: 0;
+  background: transparent;
   color: inherit;
   cursor: pointer;
-  font: inherit;
-  padding: 0;
 }
 
-.control-hint {
-  margin: var(--space-xxs) 0 0;
+.viewport-panel[data-point-mode='on'] canvas { cursor: crosshair; }
+.viewport-panel[data-tool='move'] canvas { cursor: default; }
+
+.transform-panel {
+  min-inline-size: 0;
+  background: var(--surface-1);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-block-end: var(--hairline-size) solid var(--hairline);
+  background: var(--surface-3);
+}
+
+.section-header h2 {
+  margin: 0;
+  font-family: var(--font-mono);
   font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+.section-kicker,
+.selection-state {
   color: var(--muted);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-.control-hint:empty {
-  display: none;
+.transform-body {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
 }
 
-/* A number input carries an intrinsic width from its default `size`, which no amount of
-   `flex: 1` overrides — `min-width: 0` is what lets three of them share a narrow panel
-   instead of forcing the whole grid wider than the viewport. Wrapping is the backstop at
-   the narrowest sizes. */
 .edit-fields {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs);
 }
 
-#edit-group .control-row {
-  flex-wrap: wrap;
-}
-
-.controls-panel .control-row {
-  flex-wrap: wrap;
+.edit-fields label {
+  color: var(--muted);
+  font-size: var(--text-micro);
 }
 
 .edit-fields input {
-  min-width: 3.5rem;
-  width: 0;
-  flex: 1 1 3.5rem;
+  inline-size: 100%;
+  min-inline-size: 0;
+  font-family: var(--font-mono);
+}
+
+.axis-label { font-family: var(--font-mono); font-weight: 600; }
+.axis-x { color: var(--axis-x); }
+.axis-y { color: var(--axis-y); }
+.axis-z { color: var(--axis-z); }
+
+.move-axis-controls,
+.transform-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
 }
 
 .axis-control {
-  min-inline-size: calc(var(--space-xl) + var(--space-xs));
-  min-block-size: calc(var(--space-xl) + var(--space-xs));
+  min-inline-size: var(--touch-target);
+  min-block-size: var(--touch-target);
   padding: 0;
   font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: 600;
 }
 
 .axis-control[data-axis='x'] { color: var(--axis-x); }
 .axis-control[data-axis='y'] { color: var(--axis-y); }
 .axis-control[data-axis='z'] { color: var(--axis-z); }
 
-/* Same intrinsic-width problem, same fix: the composer's text input would otherwise hold
-   the viewport panel open at its own preferred width. */
-.point-composer input[type='text'] {
-  min-width: 0;
-  flex: 1 1 6rem;
-}
-
-/* Q-20: greyed out with the reason beside them, never hidden. A control you cannot see is
-   a feature you do not know exists; one you can see and cannot use teaches you the rule. */
-#edit-group[data-blocked='true'] .btn,
-#edit-group[data-blocked='true'] input {
-  opacity: 0.45;
+#edit-group[data-blocked='true'] .transform-body .btn,
+#edit-group[data-blocked='true'] .transform-body input,
+#edit-group[data-blocked='true'] .axis-control {
+  opacity: 0.42;
   pointer-events: none;
 }
 
-/* Point mode changes what dragging means, so it changes the cursor — the only always-
-   visible signal of which mode you are in (Q-05). */
-.viewport-panel[data-point-mode='on'] canvas {
-  cursor: crosshair;
-}
+.pause-to-edit { justify-self: start; }
 
-/* The lasso, drawn as an overlay rather than into the frame: the rasterizer's output is
-   what picking reads, and painting a loop into it would make the loop itself pickable. */
 .lasso {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
 }
 
 .visually-hidden {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
+  inline-size: var(--hairline-size);
+  block-size: var(--hairline-size);
+  margin: calc(var(--hairline-size) * -1);
   padding: 0;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+@media (max-width: 768px) {
+  .tool-shelf { inset-block-start: calc(var(--global-strip-size) + var(--viewport-header-size) + var(--space-xs)); }
+  .tool-hint { display: none; }
+  .point-composer { inline-size: calc(100% - var(--space-section)); }
 }

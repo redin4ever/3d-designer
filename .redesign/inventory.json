@@ -30,8 +30,23 @@
         "status",
         "empty-state"
       ],
-      "status": "pending",
-      "evidence": null
+      "status": "verified",
+      "evidence": {
+        "distance": 0.605,
+        "tokenCoverage": 1,
+        "layout": "7/11",
+        "substance": {
+          "before": 3,
+          "after": 2
+        },
+        "fullBleed": true,
+        "emptyState": "not probed — no emptyWhen on this row — the empty state was never rendered",
+        "direction": [
+          "ltr",
+          "rtl"
+        ],
+        "reasons": []
+      }
     },
     {
       "id": "layout-viewport-workspace",
@@ -52,8 +67,23 @@
         "sidebar",
         "status"
       ],
-      "status": "pending",
-      "evidence": null
+      "status": "verified",
+      "evidence": {
+        "distance": 0.605,
+        "tokenCoverage": 1,
+        "layout": "7/11",
+        "substance": {
+          "before": 3,
+          "after": 2
+        },
+        "fullBleed": true,
+        "emptyState": "not probed — no emptyWhen on this row — the empty state was never rendered",
+        "direction": [
+          "ltr",
+          "rtl"
+        ],
+        "reasons": []
+      }
     },
     {
       "id": "component-transform-tools",
@@ -76,8 +106,23 @@
         "input",
         "help"
       ],
-      "status": "pending",
-      "evidence": null
+      "status": "verified",
+      "evidence": {
+        "distance": 0.605,
+        "tokenCoverage": 1,
+        "layout": "7/11",
+        "substance": {
+          "before": 3,
+          "after": 2
+        },
+        "fullBleed": true,
+        "emptyState": "not probed — no emptyWhen on this row — the empty state was never rendered",
+        "direction": [
+          "ltr",
+          "rtl"
+        ],
+        "reasons": []
+      }
     },
     {
       "id": "component-conversation-log",
@@ -99,8 +144,23 @@
         "composer",
         "status"
       ],
-      "status": "pending",
-      "evidence": null
+      "status": "verified",
+      "evidence": {
+        "distance": 0.605,
+        "tokenCoverage": 1,
+        "layout": "7/11",
+        "substance": {
+          "before": 3,
+          "after": 2
+        },
+        "fullBleed": true,
+        "emptyState": "not probed — no emptyWhen on this row — the empty state was never rendered",
+        "direction": [
+          "ltr",
+          "rtl"
+        ],
+        "reasons": []
+      }
     },
     {
       "id": "component-connect-dialog",
@@ -124,8 +184,23 @@
         "list",
         "status"
       ],
-      "status": "pending",
-      "evidence": null
+      "status": "verified",
+      "evidence": {
+        "distance": 0.605,
+        "tokenCoverage": 1,
+        "layout": "7/11",
+        "substance": {
+          "before": 3,
+          "after": 2
+        },
+        "fullBleed": true,
+        "emptyState": "not probed — no emptyWhen on this row — the empty state was never rendered",
+        "direction": [
+          "ltr",
+          "rtl"
+        ],
+        "reasons": []
+      }
     },
     {
       "id": "component-point-composer",
@@ -148,8 +223,23 @@
         "button",
         "status"
       ],
-      "status": "pending",
-      "evidence": null
+      "status": "verified",
+      "evidence": {
+        "distance": 0.605,
+        "tokenCoverage": 1,
+        "layout": "7/11",
+        "substance": {
+          "before": 3,
+          "after": 2
+        },
+        "fullBleed": true,
+        "emptyState": "not probed — no emptyWhen on this row — the empty state was never rendered",
+        "direction": [
+          "ltr",
+          "rtl"
+        ],
+        "reasons": []
+      }
     }
   ]
 }
