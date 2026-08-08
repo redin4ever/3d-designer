@@ -54,6 +54,13 @@
   --marked: #d9a441;
   --marked-soft: rgba(217, 164, 65, 0.18);
 
+  /* EDITOR EXTENSION: world-axis colours are the one deliberate exception to the
+     single-accent rule. Their familiar mapping is functional 3D-editor language, and
+     every arrow is also letter-labelled so colour never carries meaning alone. */
+  --axis-x: #d85b63;
+  --axis-y: #45a66f;
+  --axis-z: #5b8def;
+
   /* Semantic (DESIGN.md "Semantic") */
   --success: #27a644;
   --overlay: #000000;

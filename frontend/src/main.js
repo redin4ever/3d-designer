@@ -111,6 +111,7 @@ function main() {
         pushLog(`hello — wire v${message.data?.wire_version ?? '?'}`, 'status');
         break;
       case ServerMessageType.FULL_SCENE:
+        pointing.rejectMove('Move cancelled because the scene was refreshed.');
         clearViewportState(viewportState, renderer);
         applyMeshUpsert(viewportState, { meshes: message.meshes }, renderer);
         applyTransformUpdate(viewportState, { transforms: message.transforms }, renderer);
@@ -126,9 +127,11 @@ function main() {
         // moment its topology changed — silently, with nothing logged. FULL_SCENE above
         // always did both; this case did not.
         applyTransformUpdate(viewportState, { transforms: message.transforms }, renderer);
+        pointing.reconcileTransforms(message.transforms);
         break;
       case ServerMessageType.TRANSFORM_UPDATE:
         applyTransformUpdate(viewportState, message, renderer);
+        pointing.reconcileTransforms(message.transforms);
         break;
       case ServerMessageType.OBJECTS_REMOVED:
         applyObjectsRemoved(viewportState, message, renderer);
@@ -175,6 +178,7 @@ function main() {
         pushLog('resync required — requesting full scene', 'status');
         break;
       case ServerMessageType.ERROR:
+        pointing.rejectMove(message.text || 'Move rejected by the build.');
         pushLog(`error: ${message.text}`, 'error');
         break;
       default:

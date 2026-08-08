@@ -118,6 +118,9 @@
       <div class="control-group" id="edit-group">
         <span id="edit-controls-label">Edit the selected part</span>
         <div class="control-row" role="group" aria-labelledby="edit-controls-label">
+          <button type="button" class="btn" data-action="move-tool" aria-pressed="false">
+            Move tool
+          </button>
           <button type="button" class="btn" data-action="edit-move">Move…</button>
           <button type="button" class="btn" data-action="edit-duplicate">Duplicate</button>
           <button type="button" class="btn" data-action="edit-delete">Delete</button>
@@ -130,6 +133,17 @@
           <label class="visually-hidden" for="edit-z">Z, metres</label>
           <input id="edit-z" data-field="edit-z" type="number" step="0.1" placeholder="z" inputmode="decimal" />
         </div>
+        <div class="control-row move-axis-controls" role="group" aria-label="Move selected part by axis">
+          <button type="button" class="btn axis-control" data-action="move-axis" data-axis="x"
+              aria-label="Move selected part along X axis">X</button>
+          <button type="button" class="btn axis-control" data-action="move-axis" data-axis="y"
+              aria-label="Move selected part along Y axis">Y</button>
+          <button type="button" class="btn axis-control" data-action="move-axis" data-axis="z"
+              aria-label="Move selected part along Z axis">Z</button>
+        </div>
+        <p class="control-hint" id="move-status" role="status" aria-live="polite">
+          Select one part, then choose Move or press G.
+        </p>
         <!-- Q-20: the reason is stated, and the Pause that fixes it is right here. A
              disabled control with no reason is indistinguishable from a broken one. -->
         <p class="control-hint" id="edit-blocked" role="status"></p>

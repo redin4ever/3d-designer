@@ -19,6 +19,7 @@
 // lets frontend/tests/tokens.test.js scan this file for a raw hex literal and find none.
 
 import { OrbitCamera, clipTriangleNear, shadeFactor, triangleNormal, zUpToYUp } from './camera.js';
+import { hitTestMoveAxis, projectMoveGizmo } from './gizmo.js';
 import { paintIdOutline } from './point-outline.js';
 import { clearFrame, createFrame, drawTriangle } from './raster.js';
 import { createIdIndex } from './picking.js';
@@ -78,6 +79,9 @@ export class SceneRenderer {
       pointed: 'mediumslateblue',
       canvas: 'black',
       marked: 'gold',
+      axisX: 'crimson',
+      axisY: 'seagreen',
+      axisZ: 'royalblue',
     };
     this._frame = null;
     this._image = null;
@@ -88,6 +92,10 @@ export class SceneRenderer {
     this._focused = new Set();
     this._hovered = new Set();
     this._selected = new Set();
+    this._toolMode = 'orbit';
+    this._moveEnabled = false;
+    this._activeMoveAxis = null;
+    this._moveGizmo = null;
     this._probeCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     this._bindPointer();
     this._resizeObserver = new ResizeObserver(() => this._resize());
@@ -102,6 +110,9 @@ export class SceneRenderer {
       accent: readColor('--accent', this._colors.accent),
       pointed: readColor('--accent-hover', this._colors.pointed),
       marked: readColor('--marked', this._colors.marked),
+      axisX: readColor('--axis-x', this._colors.axisX),
+      axisY: readColor('--axis-y', this._colors.axisY),
+      axisZ: readColor('--axis-z', this._colors.axisZ),
       canvas: readColor('--canvas', this._colors.canvas),
     };
     this._rgbCache.clear(); // the tokens just changed; the resolved bytes are stale
@@ -159,6 +170,41 @@ export class SceneRenderer {
   /** Click, lasso and keyboard selections that stay visible until explicitly cleared. */
   setSelected(objectIds) {
     this._selected = new Set(objectIds ?? []);
+  }
+
+  /** Keep transform interaction state separate from selection and presentation highlights. */
+  setToolMode(mode) {
+    this._toolMode = mode;
+    if (mode !== 'move') this._activeMoveAxis = null;
+  }
+
+  setMoveEnabled(enabled) {
+    this._moveEnabled = Boolean(enabled);
+    if (!this._moveEnabled) this._activeMoveAxis = null;
+  }
+
+  setActiveMoveAxis(axis) {
+    this._activeMoveAxis = axis;
+  }
+
+  get moveGizmo() {
+    return this._moveGizmo;
+  }
+
+  hitMoveAxis(point, radius) {
+    return hitTestMoveAxis(point, this._moveGizmo, radius);
+  }
+
+  objectPosition(objectId) {
+    const handle = [...this.nodes.values()].find((node) => node.id === objectId);
+    return handle ? [...handle.transform.position] : null;
+  }
+
+  previewTranslation(objectId, position) {
+    const handle = [...this.nodes.values()].find((node) => node.id === objectId);
+    if (!handle) return false;
+    handle.transform = { ...handle.transform, position: [...position] };
+    return true;
   }
 
   /** The current colour+depth+id frame, for picking. Null before the first draw. */
@@ -301,6 +347,70 @@ export class SceneRenderer {
     ];
   }
 
+  /** Draw after putImageData so arrows never write depth or object ids. */
+  _drawMoveOverlay({ cameraDistance, focalLength, width, height, dpr }) {
+    this._moveGizmo = null;
+    if (this._toolMode !== 'move' || this._selected.size !== 1) return;
+    const selectedId = [...this._selected][0];
+    const handle = [...this.nodes.values()].find((node) => node.id === selectedId);
+    if (!handle) return;
+
+    const gizmo = projectMoveGizmo({
+      position: handle.transform.position,
+      yaw: this.camera.yaw,
+      pitch: this.camera.pitch,
+      cameraDistance,
+      focalLength,
+      width,
+      height,
+      arrowLength: 72 * dpr,
+    });
+    if (!gizmo) return;
+    this._moveGizmo = gizmo;
+
+    const colors = { x: this._colors.axisX, y: this._colors.axisY, z: this._colors.axisZ };
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = this._moveEnabled ? 1 : 0.42;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.font = `600 ${11 * dpr}px ${readColor('--font-mono', 'monospace')}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (const axis of ['x', 'y', 'z']) {
+      const projected = gizmo.axes[axis];
+      if (!(projected.pixelsPerWorld > 1e-6)) continue;
+      const active = axis === this._activeMoveAxis;
+      ctx.strokeStyle = colors[axis];
+      ctx.fillStyle = colors[axis];
+      ctx.lineWidth = (active ? 5 : 3) * dpr;
+      ctx.beginPath();
+      ctx.moveTo(gizmo.origin[0], gizmo.origin[1]);
+      ctx.lineTo(projected.end[0], projected.end[1]);
+      ctx.stroke();
+
+      const [ux, uy] = projected.direction;
+      const [nx, ny] = projected.normal;
+      const head = 10 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(projected.end[0] + ux * head * 0.35, projected.end[1] + uy * head * 0.35);
+      ctx.lineTo(projected.end[0] - ux * head + nx * head * 0.62, projected.end[1] - uy * head + ny * head * 0.62);
+      ctx.lineTo(projected.end[0] - ux * head - nx * head * 0.62, projected.end[1] - uy * head - ny * head * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillText(projected.label, projected.end[0] + ux * 16 * dpr, projected.end[1] + uy * 16 * dpr);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = this._colors.ink;
+    ctx.beginPath();
+    ctx.arc(gizmo.origin[0], gizmo.origin[1], 4 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   _draw() {
     const { ctx, canvas } = this;
     const width = canvas.width;
@@ -406,6 +516,7 @@ export class SceneRenderer {
     // pixels later.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.putImageData(this._image, 0, 0);
+    this._drawMoveOverlay({ cameraDistance: camDist, focalLength: focal, width, height, dpr });
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }

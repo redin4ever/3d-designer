@@ -20,11 +20,21 @@ import {
 } from './annotate.js';
 import { cropRect, fitWithin } from './capture.js';
 import {
+  DEFAULT_SNAP_M,
   buildDeleteMessage,
   buildDuplicateMessage,
   buildMoveMessage,
+  dragToTranslation,
   editingAllowed,
 } from './edit-tools.js';
+import {
+  beginMove,
+  cancelMove,
+  createMoveSession,
+  finishMove,
+  reconcileMove,
+  updateMove,
+} from './move-gizmo.js';
 import { NOTHING, cssToFrame, pickAt, pickInPath } from './picking.js';
 
 /** How far a pointer must travel before a click becomes a lasso, in CSS pixels. */
@@ -51,13 +61,31 @@ export function attachPointing(root, io) {
   const editGroup = root.querySelector('#edit-group');
   const editBlocked = root.querySelector('#edit-blocked');
   const pauseToEdit = root.querySelector('[data-action="pause-to-edit"]');
+  const moveButton = root.querySelector('[data-action="move-tool"]');
+  const moveStatus = root.querySelector('#move-status');
+  const axisButtons = [...root.querySelectorAll('[data-action="move-axis"]')];
 
   let pointMode = false;
   let attachView = false;
   let run = { runState: 'running', connected: false };
   let drag = null;
+  let moveMode = false;
+  let moveSession = createMoveSession();
+  let keyboardMove = null;
 
   const only = () => [...state.selection][0] ?? '';
+
+  const setMoveStatus = (message) => {
+    if (moveStatus) moveStatus.textContent = message;
+  };
+
+  const syncPositionFields = (position) => {
+    if (!position) return;
+    ['x', 'y', 'z'].forEach((axis, index) => {
+      const input = root.querySelector(`[data-field="edit-${axis}"]`);
+      if (input) input.value = String(position[index]);
+    });
+  };
 
   const renderFocus = () => {
     focusList.replaceChildren(
@@ -86,6 +114,7 @@ export function attachPointing(root, io) {
     selectionLabel.textContent = describeSelection(state);
     composer.hidden = state.selection.size === 0;
     if (!composer.hidden) textInput.focus();
+    syncPositionFields(io.renderer.objectPosition?.(only()));
     renderEditability();
   };
 
@@ -93,9 +122,14 @@ export function attachPointing(root, io) {
   // indistinguishable from a broken one, and the Pause that unblocks it is right here.
   const renderEditability = () => {
     const reason = editingAllowed(run, { explain: true });
+    const hasOne = state.selection.size === 1;
+    const allowed = hasOne && !reason;
     editGroup.dataset.blocked = reason ? 'true' : 'false';
     editBlocked.textContent = state.selection.size === 0 ? '' : reason;
     pauseToEdit.hidden = !(reason && run.connected && state.selection.size > 0);
+    if (moveButton) moveButton.disabled = !allowed;
+    for (const button of axisButtons) button.disabled = !allowed;
+    io.renderer.setMoveEnabled?.(allowed);
   };
 
   /** The crop of the live view that goes with an annotation (Q-08, Q-23). */
@@ -140,14 +174,140 @@ export function attachPointing(root, io) {
 
   const clearHover = () => io.renderer.setHovered([]);
 
+  const activateMoveMode = () => {
+    if (!only() || !editingAllowed(run)) return false;
+    pointMode = false;
+    moveMode = true;
+    modeButton?.setAttribute('aria-pressed', 'false');
+    moveButton?.setAttribute('aria-pressed', 'true');
+    panel.dataset.pointMode = 'off';
+    panel.dataset.tool = 'move';
+    io.renderer.setToolMode?.('move');
+    setMoveStatus('Move active. Drag an X, Y or Z arrow, or press an axis key.');
+    return true;
+  };
+
+  const leaveMoveMode = (nextMode = 'orbit') => {
+    moveMode = false;
+    moveButton?.setAttribute('aria-pressed', 'false');
+    panel.dataset.tool = nextMode;
+    io.renderer.setToolMode?.(nextMode);
+    io.renderer.setActiveMoveAxis?.(null);
+  };
+
+  const cancelPointerMove = (message = 'Move cancelled.') => {
+    const cancelled = cancelMove(moveSession);
+    if (cancelled.restore && moveSession.objectId) {
+      io.renderer.previewTranslation?.(moveSession.objectId, cancelled.restore);
+      syncPositionFields(cancelled.restore);
+    }
+    moveSession = cancelled.session;
+    io.renderer.setActiveMoveAxis?.(null);
+    setMoveStatus(message);
+  };
+
+  const cancelKeyboardMove = (message = 'Move cancelled.') => {
+    if (!keyboardMove) return;
+    io.renderer.previewTranslation?.(keyboardMove.objectId, keyboardMove.startPosition);
+    syncPositionFields(keyboardMove.startPosition);
+    keyboardMove = null;
+    io.renderer.setActiveMoveAxis?.(null);
+    setMoveStatus(message);
+  };
+
+  // ---- move gizmo -----------------------------------------------------------------
+  // Capture before point/lasso and before the renderer's bubble-phase orbit listener. A
+  // click on empty canvas is deliberately ignored here so orbit remains unchanged.
+  canvas?.addEventListener('pointerdown', (event) => {
+    if (!moveMode || !editingAllowed(run) || moveSession.phase !== 'idle') return;
+    const frame = io.renderer.frame;
+    if (!frame) return;
+    const point = cssToFrame(frame, canvas.getBoundingClientRect(), event.clientX, event.clientY);
+    const dpr = window.devicePixelRatio || 1;
+    const axis = io.renderer.hitMoveAxis?.(point, 14 * dpr);
+    const startPosition = io.renderer.objectPosition?.(only());
+    const projectedAxis = io.renderer.moveGizmo?.axes?.[axis];
+    if (!axis || !startPosition || !projectedAxis) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    canvas.setPointerCapture(event.pointerId);
+    moveSession = beginMove(moveSession, {
+      objectId: only(),
+      pointerId: event.pointerId,
+      axis,
+      startPointer: point,
+      startPosition,
+      projectedAxis,
+    });
+    io.renderer.setActiveMoveAxis?.(axis);
+    setMoveStatus(`Moving on ${axis.toUpperCase()}. Release to commit; Escape cancels.`);
+  }, true);
+
+  canvas?.addEventListener('pointermove', (event) => {
+    if (!['armed', 'dragging'].includes(moveSession.phase)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const point = cssToFrame(io.renderer.frame, canvas.getBoundingClientRect(), event.clientX, event.clientY);
+    moveSession = updateMove(moveSession, {
+      pointerId: event.pointerId,
+      point,
+      snap: DEFAULT_SNAP_M,
+      threshold: 3 * (window.devicePixelRatio || 1),
+    });
+    if (moveSession.phase === 'dragging') {
+      io.renderer.previewTranslation?.(moveSession.objectId, moveSession.previewPosition);
+      syncPositionFields(moveSession.previewPosition);
+      setMoveStatus(`${moveSession.axis.toUpperCase()}: ${moveSession.previewPosition.join(', ')} m`);
+    }
+  }, true);
+
+  const finishPointerMove = (event) => {
+    if (!['armed', 'dragging'].includes(moveSession.phase)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const objectId = moveSession.objectId;
+    const result = finishMove(moveSession, event.pointerId);
+    moveSession = result.session;
+    io.renderer.setActiveMoveAxis?.(null);
+    if (result.restore) io.renderer.previewTranslation?.(objectId, result.restore);
+    if (!result.translation) {
+      setMoveStatus('Move unchanged.');
+      return;
+    }
+    if (io.send(buildMoveMessage(objectId, result.translation)) === false) {
+      cancelPointerMove('Move reverted because the build is not connected.');
+      return;
+    }
+    setMoveStatus('Saving move… awaiting the build.');
+  };
+  canvas?.addEventListener('pointerup', finishPointerMove, true);
+  canvas?.addEventListener('pointercancel', () => cancelPointerMove(), true);
+
+  moveButton?.addEventListener('click', () => activateMoveMode());
+
+  for (const button of axisButtons) {
+    button.addEventListener('click', () => {
+      if (!activateMoveMode()) return;
+      const objectId = only();
+      const startPosition = io.renderer.objectPosition?.(objectId);
+      if (!startPosition) return;
+      keyboardMove = { objectId, axis: button.dataset.axis, startPosition, previewPosition: [...startPosition] };
+      io.renderer.setActiveMoveAxis?.(keyboardMove.axis);
+      setMoveStatus(`${keyboardMove.axis.toUpperCase()} constrained. Use arrow keys, Enter, or Escape.`);
+      canvas.focus();
+    });
+  }
+
   // ---- point mode -----------------------------------------------------------------
   // Q-05 chose a mode you switch into, so nothing an operator already does changes
   // behaviour and a camera angle can never be lost by trying to circle something.
   modeButton?.addEventListener('click', () => {
     pointMode = !pointMode;
+    if (pointMode) leaveMoveMode('point');
     modeButton.setAttribute('aria-pressed', String(pointMode));
     panel.dataset.pointMode = pointMode ? 'on' : 'off';
     if (!pointMode) {
+      io.renderer.setToolMode?.('orbit');
       clearHover();
       clearSelection(state);
       renderSelection();
@@ -194,6 +354,72 @@ export function attachPointing(root, io) {
   canvas?.addEventListener('pointerup', endDrag, true);
   canvas?.addEventListener('pointercancel', endDrag, true);
   canvas?.addEventListener('pointerleave', clearHover, true);
+
+  // Blender-like keyboard flow: G enters Move, X/Y/Z constrains it, arrows nudge by the
+  // active snap, Enter commits once, and Escape restores the authoritative position.
+  canvas?.addEventListener('keydown', (event) => {
+    const key = event.key.toLowerCase();
+    if (key === 'g') {
+      if (!activateMoveMode()) return;
+      const objectId = only();
+      const startPosition = io.renderer.objectPosition?.(objectId);
+      if (!startPosition) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      keyboardMove = { objectId, axis: null, startPosition, previewPosition: [...startPosition] };
+      setMoveStatus('Move ready. Press X, Y or Z to constrain.');
+      return;
+    }
+    if (!keyboardMove) return;
+    if (['x', 'y', 'z'].includes(key)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      keyboardMove.axis = key;
+      io.renderer.setActiveMoveAxis?.(key);
+      setMoveStatus(`${key.toUpperCase()} constrained. Use arrow keys, Enter, or Escape.`);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancelKeyboardMove();
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!keyboardMove.axis
+          || keyboardMove.previewPosition.every((value, index) => value === keyboardMove.startPosition[index])) {
+        cancelKeyboardMove('Move unchanged.');
+        return;
+      }
+      const pending = keyboardMove;
+      keyboardMove = null;
+      io.renderer.setActiveMoveAxis?.(null);
+      if (io.send(buildMoveMessage(pending.objectId, pending.previewPosition)) === false) {
+        io.renderer.previewTranslation?.(pending.objectId, pending.startPosition);
+        syncPositionFields(pending.startPosition);
+        setMoveStatus('Move reverted because the build is not connected.');
+      } else {
+        keyboardMove = { ...pending, pending: true };
+        setMoveStatus('Saving move… awaiting the build.');
+      }
+      return;
+    }
+    if (!keyboardMove.axis || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const sign = ['ArrowRight', 'ArrowUp'].includes(event.key) ? 1 : -1;
+    keyboardMove.previewPosition = dragToTranslation(
+      keyboardMove.previewPosition,
+      keyboardMove.axis,
+      sign * DEFAULT_SNAP_M,
+      DEFAULT_SNAP_M,
+    );
+    io.renderer.previewTranslation?.(keyboardMove.objectId, keyboardMove.previewPosition);
+    syncPositionFields(keyboardMove.previewPosition);
+    setMoveStatus(`${keyboardMove.axis.toUpperCase()}: ${keyboardMove.previewPosition.join(', ')} m`);
+  }, true);
 
   // Q-24: the canvas is already keyboard-operable for orbit and zoom, so pointing not being
   // would make this the one thing on the page needing a mouse.
@@ -319,6 +545,26 @@ export function attachPointing(root, io) {
       applyServerFocus(state, objectIds);
       renderFocus();
     },
+    /** The server transform replaces any optimistic preview and closes its pending state. */
+    reconcileTransforms(transforms) {
+      for (const transform of transforms ?? []) {
+        const matchedPointer = moveSession.objectId === transform.object_id;
+        const next = reconcileMove(moveSession, transform.object_id);
+        if (next !== moveSession) moveSession = next;
+        const matchedKeyboard = keyboardMove?.pending && keyboardMove.objectId === transform.object_id;
+        if (matchedKeyboard) keyboardMove = null;
+        if (matchedPointer || matchedKeyboard) {
+          syncPositionFields(transform.position);
+          io.renderer.setActiveMoveAxis?.(null);
+          setMoveStatus('Move saved.');
+        }
+      }
+    },
+    /** A rejected edit restores the position captured before the local preview. */
+    rejectMove(message = 'Move rejected by the build.') {
+      if (moveSession.phase !== 'idle') cancelPointerMove(message);
+      if (keyboardMove) cancelKeyboardMove(message);
+    },
     /**
      * Q-22: a disconnect reverts and says so. The selection is dropped because the ids it
      * names may not survive the resync, and a stale selection would silently annotate the
@@ -326,8 +572,13 @@ export function attachPointing(root, io) {
      */
     setRun(next) {
       run = { ...run, ...next };
+      if (!editingAllowed(run)) {
+        if (moveSession.phase !== 'idle') cancelPointerMove('Move cancelled because editing is unavailable.');
+        if (keyboardMove) cancelKeyboardMove('Move cancelled because editing is unavailable.');
+      }
       if (!run.connected) {
         clearSelection(state);
+        leaveMoveMode('orbit');
         renderSelection();
       }
       renderEditability();

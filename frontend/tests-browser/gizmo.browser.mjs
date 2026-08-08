@@ -108,10 +108,11 @@ export function registerGizmoTests({ test, withScene, waitUntil, greeting }) {
         assert.ok(stroke.count >= 5, `${token} is not visibly drawn`);
       }
 
+      const selectedBefore = await session.page.$eval('#point-selection', (element) => element.textContent);
       await session.page.click('[data-action="point-mode"]');
       assert.equal(
-        await session.page.$eval('#point-selection', (element) => /selected/i.test(element.textContent)),
-        true,
+        await session.page.$eval('#point-selection', (element) => element.textContent),
+        selectedBefore,
         'switching tools lost the selected part instead of preserving it',
       );
     } finally {
