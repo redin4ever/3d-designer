@@ -1,0 +1,155 @@
+{
+  "generatedAt": "ce962523cf4452925b5238bc8c15589eb06feb76",
+  "scope": "all frontend surfaces",
+  "items": [
+    {
+      "id": "route-editor",
+      "kind": "route",
+      "path": "/index.html",
+      "sourceFiles": [
+        "frontend/index.html",
+        "frontend/src/tokens.css",
+        "frontend/src/app.css",
+        "frontend/src/chat.css",
+        "frontend/src/connect.css",
+        "frontend/src/point.css"
+      ],
+      "states": [
+        "connected",
+        "disconnected",
+        "running",
+        "paused",
+        "error"
+      ],
+      "elements": [
+        "header",
+        "main",
+        "button",
+        "input",
+        "select",
+        "status",
+        "empty-state"
+      ],
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "id": "layout-viewport-workspace",
+      "kind": "layout",
+      "path": "/index.html",
+      "sourceFiles": [
+        "frontend/index.html",
+        "frontend/src/app.css"
+      ],
+      "states": [
+        "default",
+        "narrow",
+        "rtl"
+      ],
+      "elements": [
+        "toolbar",
+        "canvas",
+        "sidebar",
+        "status"
+      ],
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "id": "component-transform-tools",
+      "kind": "component",
+      "path": "/index.html",
+      "sourceFiles": [
+        "frontend/index.html",
+        "frontend/src/point.css"
+      ],
+      "states": [
+        "no-selection",
+        "selected",
+        "blocked",
+        "moving",
+        "pending",
+        "rejected"
+      ],
+      "elements": [
+        "button",
+        "input",
+        "help"
+      ],
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "id": "component-conversation-log",
+      "kind": "component",
+      "path": "/index.html",
+      "sourceFiles": [
+        "frontend/index.html",
+        "frontend/src/chat.css"
+      ],
+      "states": [
+        "empty",
+        "populated",
+        "pending",
+        "unconfirmed"
+      ],
+      "elements": [
+        "list",
+        "row",
+        "composer",
+        "status"
+      ],
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "id": "component-connect-dialog",
+      "kind": "component",
+      "path": "/index.html",
+      "sourceFiles": [
+        "frontend/index.html",
+        "frontend/src/connect.css"
+      ],
+      "states": [
+        "closed",
+        "loading",
+        "empty",
+        "picker",
+        "success",
+        "error"
+      ],
+      "elements": [
+        "dialog",
+        "button",
+        "list",
+        "status"
+      ],
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "id": "component-point-composer",
+      "kind": "component",
+      "path": "/index.html",
+      "sourceFiles": [
+        "frontend/index.html",
+        "frontend/src/point.css"
+      ],
+      "states": [
+        "hidden",
+        "selected",
+        "attachment",
+        "sent",
+        "error"
+      ],
+      "elements": [
+        "form",
+        "input",
+        "button",
+        "status"
+      ],
+      "status": "pending",
+      "evidence": null
+    }
+  ]
+}

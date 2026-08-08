@@ -30,6 +30,8 @@ venv/
 artifacts/
 .tmp/
 .superdesign/tmp/
+.redesign/baseline/
+.redesign/after/
 
 # add-feature internals — only the record of what was decided is tracked
 .feature/*

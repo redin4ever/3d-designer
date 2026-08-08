@@ -1,0 +1,24 @@
+{
+  "root": "frontend/src",
+  "tokenFile": "frontend/src/tokens.css",
+  "baseUrl": "http://127.0.0.1:8767",
+  "viewport": { "width": 1280, "height": 800 },
+  "threshold": 0.6,
+  "coverageFloor": 0.9,
+  "rootPx": 16,
+  "testCommand": "npm run test:frontend",
+  "testTimeoutSec": 600,
+  "typeScale": ["var(", "clamp(", "calc("],
+  "entryPoints": ["/index.html"],
+  "exclude": [
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/__tests__/**",
+    "**/*.stories.*"
+  ],
+  "substance": {
+    "level": "structure-labels-states",
+    "copy": "labels-and-headings-only",
+    "inventClaims": false
+  }
+}
