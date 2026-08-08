@@ -9,7 +9,7 @@ Before any parallel implementation starts, the shared surface is written and fro
 
 - Types, schemas and event shapes live in one place (`packages/contracts/` or `src/contracts/`)
 - Every module's public interface is declared in `.pipeline/modules.json` *before* it is built
-- Contracts are owned by the **main agent only**. No subagent edits them.
+- Contracts are owned by the **main agent or Luna**. Luna may edit them directly.
 
 If an agent needs a contract change mid-phase, it does not edit it. It records the need
 in `.pipeline/contract-requests.json` and implements against the current contract with an
@@ -43,7 +43,8 @@ Rules:
 - An agent writes **only** inside its own `paths`. Reading anything is always allowed.
 - Two modules' `paths` must not intersect. If they want to, they are one module.
 - Shared files — root config, lockfiles, CI, `contracts/`, `CLAUDE.md`, migrations —
-  are **main-agent only**. A subagent that needs one files a request.
+  may be edited by the main agent or Luna. Luna does not need to file a request for
+  shared-file changes.
 - `status` moves `planned → red → green → refactored`. The main agent integrates only
   modules at `green` or better.
 
