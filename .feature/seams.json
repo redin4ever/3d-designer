@@ -16,7 +16,7 @@
     {
       "id": "codex-config-writer",
       "file": "src/app/connect.py",
-      "line": 150,
+      "line": 171,
       "anchor": "def write_config(client: str) -> Path:",
       "status": "wired",
       "what": "the writer that currently assumes every client stores a JSON mcpServers object",
@@ -27,7 +27,7 @@
     {
       "id": "codex-cli-description",
       "file": "src/app/connect.py",
-      "line": 177,
+      "line": 202,
       "anchor": "def describe(client: str | None = None, *, http_port: int = 8765) -> str:",
       "status": "wired",
       "what": "the terminal fallback and config preview shared with the browser's no-client path",
@@ -60,7 +60,7 @@
     {
       "id": "point-hover-input",
       "file": "frontend/src/point-ui.js",
-      "line": 156,
+      "line": 170,
       "anchor": "    'pointermove',",
       "status": "wired",
       "what": "the pointer-move path that currently does work only while a lasso drag is active",
@@ -71,7 +71,7 @@
     {
       "id": "renderer-point-state",
       "file": "frontend/src/scene-renderer.js",
-      "line": 136,
+      "line": 149,
       "anchor": "  setFocused(objectIds) {",
       "status": "wired",
       "what": "the renderer state boundary for operator emphasis, currently limited to persistent marks",
@@ -82,8 +82,8 @@
     {
       "id": "renderer-point-colour",
       "file": "frontend/src/scene-renderer.js",
-      "line": 341,
-      "anchor": "      const base = focused ? marked : handle.highlighted ? accent : surface;",
+      "line": 367,
+      "anchor": "      const base = isPointed ? pointed : focused ? marked : handle.highlighted ? accent : surface;",
       "status": "wired",
       "what": "the final colour priority for normal, changed, and marked parts",
       "evidence": "there is no selected or hovered branch, so even correctly picked ids cannot look different in the canvas",
@@ -104,8 +104,8 @@
     {
       "id": "point-browser-regression",
       "file": "frontend/tests-browser/smoke.test.js",
-      "line": 678,
-      "anchor": "  test('pointing and the edit tools are wired into the real page', async () => {",
+      "line": 718,
+      "anchor": "  test('point mode visibly highlights hover and keeps a clicked part selected', async () => {",
       "status": "wired",
       "what": "the only real-canvas coverage for point mode",
       "evidence": "the current test checks mode state and tokens but never points at a rendered pixel, so the missing visual feedback shipped green",
@@ -133,6 +133,16 @@
       "evidence": "Codex speaks the same local stdio transport and would remain undiscoverable in the quick start if this list stayed unchanged",
       "asks": "should Codex be named in the quick-start client list?",
       "decision": "Q-06"
+    },
+    {
+      "id": "frontend-test-count",
+      "file": "frontend/CLAUDE.md",
+      "line": 9,
+      "anchor": "`npm run test:frontend:browser` for 24 smoke tests in real Chromium via Puppeteer.",
+      "status": "wired",
+      "what": "the module status count for the real-browser suite",
+      "evidence": "the point-highlight regression adds the twenty-fourth registered browser test, so leaving 22 would make the module's own verification command report stale evidence",
+      "asks": "none — this is the mechanical test count produced by the completed suite"
     }
   ],
   "dismissed": []

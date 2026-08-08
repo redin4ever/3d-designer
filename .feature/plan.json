@@ -8,7 +8,9 @@
         "src/app/connect.py",
         "src/app/codex_config.py",
         "src/app/connect_test.py",
-        "frontend/tests-browser/connect.browser.mjs"
+        "frontend/tests-browser/connect.browser.mjs",
+        "README.md",
+        "frontend/README.md"
       ],
       "publicInterface": "app.connect.CLIENTS, config_for, write_config, describe",
       "dependsOn": [],
@@ -16,10 +18,12 @@
         "codex-client-registry",
         "codex-config-writer",
         "codex-cli-description",
-        "connect-browser-reachability"
+        "connect-browser-reachability",
+        "connect-documentation",
+        "quick-start-client-list"
       ],
       "decisions": ["Q-01", "Q-02", "Q-03", "Q-06"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "point-highlight",
@@ -27,7 +31,8 @@
       "paths": [
         "frontend/src/point-ui.js",
         "frontend/src/scene-renderer.js",
-        "frontend/tests-browser/smoke.test.js"
+        "frontend/tests-browser/smoke.test.js",
+        "frontend/CLAUDE.md"
       ],
       "publicInterface": "SceneRenderer.setHovered and SceneRenderer.setSelected",
       "dependsOn": [],
@@ -36,19 +41,11 @@
         "point-hover-input",
         "renderer-point-state",
         "renderer-point-colour",
-        "point-browser-regression"
+        "point-browser-regression",
+        "frontend-test-count"
       ],
       "decisions": ["Q-04", "Q-05"],
-      "status": "planned"
-    },
-    {
-      "id": "feature-docs",
-      "what": "document Codex as a local stdio client and explain its shared TOML setup in Connect",
-      "paths": ["README.md", "frontend/README.md"],
-      "dependsOn": ["codex-connect", "point-highlight"],
-      "seams": ["connect-documentation", "quick-start-client-list"],
-      "decisions": ["Q-01", "Q-03", "Q-06"],
-      "status": "planned"
+      "status": "green"
     }
   ]
 }
