@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Blender-style editor tools, quality-of-life viewport chrome, and an axis-constrained move gizmo",
-  "slug": "blender-tools-gizmo",
-  "phase": 6,
-  "baseSha": "e9cd18109e8f787e92102dbef83e456df52b1f18",
-  "branch": "feat/blender-tools-gizmo",
-  "docsDir": "docs/features/blender-tools-gizmo",
+  "feature": "Ctrl or Alt multi-selection and immediately repeatable axis drags",
+  "slug": "multi-selection",
+  "phase": 2,
+  "baseSha": "915ed89bc0ff2444eccaaa89b96c3d43c990d2bc",
+  "branch": "feat/multi-selection",
+  "docsDir": "docs/features/multi-selection",
   "startedAt": "2026-08-08",
-  "status": "finished"
+  "status": "running"
 }

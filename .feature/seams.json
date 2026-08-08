@@ -1,159 +1,72 @@
 {
   "version": 1,
-  "feature": "Blender-style editor tools and move gizmo",
+  "feature": "Modifier multi-selection and repeatable move drags",
   "seams": [
     {
-      "id": "viewport-editor-shell",
-      "file": "frontend/index.html",
-      "line": 37,
-      "anchor": "    <section class=\"viewport-panel\" aria-label=\"Live 3D view\">",
-      "status": "wired",
-      "what": "the viewport currently has no header, left tool shelf, transform context, or status bar",
-      "evidence": "the current section begins directly with the canvas and overlays; Blender-style tool placement must enter here to stay spatially attached to the view",
-      "asks": "which viewport chrome should be persistent, and which panels should collapse on smaller screens?"
-    },
-    {
-      "id": "legacy-controls-strip",
-      "file": "frontend/index.html",
-      "line": 80,
-      "anchor": "    <section class=\"controls-panel\" aria-label=\"Operator controls\">",
-      "status": "wired",
-      "what": "run, point, edit, cadence, and rollback are currently mixed into one wrapping bottom strip",
-      "evidence": "the closest existing feature placed all editor actions here; the redesign must decide what moves into viewport tools versus remains global",
-      "asks": "should the old strip disappear entirely, or retain run and cadence while object tools move to the viewport?"
-    },
-    {
-      "id": "editor-responsive-layout",
-      "file": "frontend/src/app.css",
-      "line": 109,
-      "anchor": ".layout {",
-      "status": "wired",
-      "what": "the two-column viewport/sidebar and bottom controls geometry controls every editor surface",
-      "evidence": "desktop uses a fixed 340px sidebar and mobile becomes a long vertical stack; Blender-like chrome requires a different spatial hierarchy in both widths",
-      "asks": "on narrow screens, should properties and conversation become drawers, bottom sheets, or remain stacked?"
-    },
-    {
-      "id": "viewport-tool-styles",
-      "file": "frontend/src/app.css",
-      "line": 169,
-      "anchor": ".viewport-panel {",
-      "status": "wired",
-      "what": "the viewport surface owns the positioning context for floating editor chrome",
-      "evidence": "all new header, shelf, properties and status surfaces must layer over or around this positioned panel without reducing canvas usability",
-      "asks": "should tools overlay the canvas like Blender, or consume fixed rows and columns around it?"
-    },
-    {
-      "id": "move-destination-ui",
-      "file": "frontend/src/point-ui.js",
-      "line": 539,
-      "anchor": "  root.querySelector('[data-action=\"edit-move\"]')?.addEventListener('click', () => {",
-      "status": "wired",
-      "what": "the only reachable move interaction reads three absolute numeric fields and sends immediately",
-      "evidence": "a gizmo needs to coexist with precise numeric entry and share one commit/error path",
-      "asks": "should numeric entry remain visible alongside the arrows, move into a contextual properties panel, or be removed?"
-    },
-    {
-      "id": "gizmo-movement-math",
-      "file": "frontend/src/edit-tools.js",
-      "line": 67,
-      "anchor": "export function dragToTranslation(from, axis, delta, snap = DEFAULT_SNAP_M) {",
-      "status": "declined",
-      "reason": "The existing tested dragToTranslation arithmetic was sufficient; screen projection and hit testing belong to the new gizmo.js module.",
-      "what": "axis-constrained destination snapping already exists but has no screen projection or arrow hit testing",
-      "evidence": "the closest point-and-edit feature deliberately left draggable arrows as a known gap while preserving the arithmetic needed by them",
-      "asks": "should dragging preview continuously and send once on release, and how should cancellation and snapping feel?"
-    },
-    {
-      "id": "gizmo-pointer-lifecycle",
-      "file": "frontend/src/point-ui.js",
-      "line": 226,
-      "anchor": "  canvas?.addEventListener('pointerdown', (event) => {",
-      "status": "wired",
-      "what": "point-mode drag currently owns pointer gestures for lasso selection while the renderer owns orbit outside point mode",
-      "evidence": "gizmo dragging must take capture before either lasso or orbit and release or cancel without changing selection",
-      "asks": "should Move be its own tool mode, and which mouse, keyboard, and touch gestures switch or constrain axes?"
-    },
-    {
-      "id": "gizmo-rendering",
-      "file": "frontend/src/scene-renderer.js",
-      "line": 426,
-      "anchor": "  _draw() {",
-      "status": "wired",
-      "what": "the software renderer draws geometry and selection feedback but no transform manipulator",
-      "evidence": "a post-raster screen overlay can render labelled arrows without corrupting the depth-tested object-id picking channel",
-      "asks": "should arrows always render over geometry, fade when occluded, and use familiar X/Y/Z colours despite the one-accent design system?"
-    },
-    {
-      "id": "optimistic-transform-preview",
-      "file": "frontend/src/scene-renderer.js",
-      "line": 135,
-      "anchor": "  updateTransform(handle, position, quaternion, scale) {",
-      "status": "wired",
-      "what": "the renderer currently applies only authoritative transforms from viewport state",
-      "evidence": "smooth dragging needs a reversible local preview while the backend remains authoritative after pointer release or error",
-      "asks": "should the selected part move live under the cursor, or should only the gizmo preview until the server confirms?"
-    },
-    {
-      "id": "transform-reconciliation",
-      "file": "frontend/src/main.js",
-      "line": 132,
-      "anchor": "      case ServerMessageType.TRANSFORM_UPDATE:",
-      "status": "wired",
-      "what": "server transform updates are the authoritative result after an operator edit",
-      "evidence": "an optimistic preview must converge on this update and roll back visibly when an ERROR arrives instead",
-      "asks": "what feedback should appear while saving, on success, and when the move is rejected?"
-    },
-    {
-      "id": "axis-colour-tokens",
-      "file": "frontend/src/tokens.css",
+      "id": "selection-state",
+      "file": "frontend/src/annotate.js",
       "line": 36,
-      "anchor": "  --accent-hover: #828fff;",
-      "status": "wired",
-      "what": "all renderer colours must come from generated tokens, while the current system intentionally permits only one chromatic accent",
-      "evidence": "Blender-style X/Y/Z recognition normally depends on red, green, and blue; that needs an explicit exception or a labelled monochrome alternative",
-      "asks": "should the gizmo use familiar RGB axes, labelled single-accent arrows, or a hybrid?"
+      "anchor": "export function setSelection(state, objectIds) {",
+      "status": "open",
+      "what": "the pure pointing state currently exposes replacement selection only",
+      "evidence": "clicks and lassos both flow through setSelection, while the renderer and annotation payload already consume the resulting Set",
+      "asks": "should a modifier gesture add only, or toggle already-selected parts off as well?"
     },
     {
-      "id": "frontend-unit-registration",
-      "file": "frontend/tests/index.js",
-      "line": 23,
-      "anchor": "import './edit-tools.test.js';",
-      "status": "wired",
-      "what": "every new pure gizmo test file must be imported by the Windows test entry point",
-      "evidence": "frontend/CLAUDE.md documents that an unregistered sibling test silently disappears from npm run test:frontend",
-      "asks": "none — this is mechanical wiring required for any new gizmo-math module"
+      "id": "pointer-selection-gesture",
+      "file": "frontend/src/point-ui.js",
+      "line": 159,
+      "anchor": "  const pickFrom = (path) => {",
+      "status": "open",
+      "what": "point-mode pointer release loses Ctrl and Alt state before replacing selection",
+      "evidence": "endDrag passes only a path to pickFrom, which always calls setSelection",
+      "asks": "should Ctrl and Alt behave identically for both click and lasso gestures?"
     },
     {
-      "id": "browser-editor-journey",
+      "id": "multi-selection-inspector",
+      "file": "frontend/src/point-ui.js",
+      "line": 117,
+      "anchor": "  const renderSelection = () => {",
+      "status": "open",
+      "what": "the inspector name and transform fields assume the first selected object",
+      "evidence": "renderEditability already requires exactly one selection for move and frame, but the object heading still names the first item",
+      "asks": "when several parts are selected, should object editing stay disabled and should the heading show a count?"
+    },
+    {
+      "id": "move-release-lifecycle",
+      "file": "frontend/src/move-gizmo.js",
+      "line": 47,
+      "anchor": "export function finishMove(session, pointerId) {",
+      "status": "open",
+      "what": "a completed pointer drag enters pending and cannot arm another axis until a transform echo arrives",
+      "evidence": "beginMove accepts idle only and point-ui rejects pointerdown unless the session is idle",
+      "asks": "should another axis drag begin immediately after release while the prior absolute move is being confirmed?"
+    },
+    {
+      "id": "move-pointer-wiring",
+      "file": "frontend/src/point-ui.js",
+      "line": 228,
+      "anchor": "  canvas?.addEventListener('pointerdown', (event) => {",
+      "status": "open",
+      "what": "the gizmo pointer gate blocks any session that has not reconciled to idle",
+      "evidence": "the gate directly checks moveSession.phase before hit-testing a different axis",
+      "asks": "how should rejection restore chained optimistic drags?"
+    },
+    {
+      "id": "frontend-browser-journey",
       "file": "frontend/tests-browser/smoke.test.js",
-      "line": 671,
-      "anchor": "  registerGizmoTests({ test, withScene, waitUntil, greeting: FULL_SCENE_GREETING });",
-      "status": "wired",
-      "what": "the closest real-browser journey proves selection pixels but not editor-tool reachability or manipulation",
-      "evidence": "only a real canvas test can prove arrow hit targets, pointer capture, live preview, commit, cancellation, focus order, and responsive layout",
-      "asks": "which pointer, keyboard, touch, and narrow-screen paths are required for the first release?"
-    },
-    {
-      "id": "existing-edit-transport",
-      "file": "src/viewer/annotate.py",
-      "line": 103,
-      "anchor": "        edit = msg.data.get(\"edit\")",
-      "status": "declined",
-      "reason": "The existing ANNOTATE edit transport already carries one absolute move_object operation per commit; no protocol or backend change was needed.",
-      "what": "manual move operations already travel through annotation to the orchestrator and scene history",
-      "evidence": "the gizmo can send the existing absolute move_object payload once per committed drag without widening the wire protocol",
-      "asks": "should one final move be sent on release, or should intermediate moves also enter undo history?"
-    },
-    {
-      "id": "known-gizmo-gap-doc",
-      "file": "docs/features/point-and-edit/FEATURE.md",
-      "line": 61,
-      "anchor": "## Noticed but not done",
-      "status": "wired",
-      "what": "the previous feature record explicitly names draggable viewport arrows as unfinished",
-      "evidence": "closing the documented gap should point future maintainers to the new interaction and its constraints",
-      "asks": "should this release also expose rotate and scale tools, or place them visibly as disabled/future tools?"
+      "line": 720,
+      "anchor": "  test('point mode visibly highlights hover and keeps a clicked part selected', async () => {",
+      "status": "open",
+      "what": "the real browser proves one selected outline but not modifier accumulation",
+      "evidence": "canvas event modifiers and visible simultaneous outlines require a browser-level journey",
+      "asks": "which modifier combinations and visible feedback must be pinned in Chromium?"
     }
   ],
-  "dismissed": []
+  "dismissed": [
+    {
+      "path": "frontend/index.html",
+      "reason": "co-change candidate only; existing controls and accessible labels already cover selection and movement, so no markup registration is needed"
+    }
+  ]
 }
