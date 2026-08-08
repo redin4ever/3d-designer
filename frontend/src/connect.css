@@ -40,7 +40,7 @@
 }
 
 .viewport-actions .btn {
-  min-block-size: calc(var(--viewport-header-size) - var(--space-xxs));
+  min-block-size: var(--viewport-header-size);
   padding-inline: var(--space-xxs);
   border: 0;
   border-radius: 0;
@@ -56,8 +56,9 @@
 
 .connect-dialog {
   inline-size: min(var(--dialog-size), calc(100% - var(--space-xl)));
-  max-block-size: calc(100vh - var(--space-xl));
-  overflow: auto;
+  max-block-size: calc(100dvh - var(--space-xl));
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: var(--space-lg);
   border: var(--hairline-size) solid var(--hairline-strong);
   border-radius: var(--radius-lg);
@@ -67,41 +68,124 @@
 }
 
 .connect-dialog::backdrop { background: var(--scrim); }
-.connect-dialog-title { margin: 0; font-size: var(--text-body-sm); font-weight: 600; }
+.connect-dialog-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+}
 
 .connect-dialog-note,
 .connect-result-note {
   margin-block: var(--space-xs) var(--space-md);
+  max-inline-size: 70ch;
   color: var(--muted);
+  font-family: var(--font-text);
   font-size: var(--text-caption);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: var(--leading-body);
 }
 
-.connect-dialog-body { display: flex; flex-direction: column; gap: var(--space-xs); }
-.connect-client-list { display: grid; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
-
-.connect-client-button {
-  inline-size: 100%;
+.connect-dialog-body {
+  min-inline-size: 0;
+  max-block-size: calc(100dvh - var(--space-section) - var(--space-section));
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  flex-direction: column;
+  gap: var(--space-xs);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.connect-choices {
+  min-inline-size: 0;
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connect-choices > li { min-inline-size: 0; }
+
+.connect-choice {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--touch-target);
+  display: grid;
+  gap: var(--space-xxs);
   padding: var(--space-sm);
   border: var(--hairline-size) solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface-1);
   color: var(--ink);
   cursor: pointer;
+  font-family: var(--font-text);
   text-align: start;
+  white-space: normal;
 }
 
-.connect-client-button:hover { background: var(--surface-2); }
-.connect-client-name { font-weight: 600; }
-.connect-client-note,
-.connect-result-line { color: var(--muted); font-size: var(--text-caption); }
-.connect-result-line { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.connect-choice:hover {
+  border-color: var(--hairline-strong);
+  background: var(--surface-2);
+}
+
+.connect-choice:focus-visible {
+  border-color: var(--accent-focus);
+  outline-offset: calc(var(--focus-ring-size) * -1);
+}
+
+.connect-choice-label,
+.connect-choice-path,
+.connect-result-title,
+.connect-result-path,
+.connect-result-line {
+  min-inline-size: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.connect-choice-label,
+.connect-result-title {
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.connect-choice-path,
+.connect-result-path,
+.connect-result-line {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: var(--leading-body);
+}
+
+.connect-choice-path,
+.connect-result-path {
+  /* File paths retain their technical LTR order when the surrounding editor mirrors. */
+  direction: ltr;
+  unicode-bidi: plaintext;
+  word-break: break-word;
+}
+
+.connect-result-title { margin-block-end: var(--space-xxs); }
+.connect-result-path { margin-block-end: var(--space-xs); }
 .connect-result-critical { color: var(--ink); font-weight: 600; }
-.connect-result[data-tone='error'] .connect-result-line:first-child { color: var(--axis-x); }
-.connect-dialog-actions { display: flex; justify-content: flex-end; margin-block-start: var(--space-lg); }
+.connect-dialog-body[data-tone='error'] .connect-result-title { color: var(--axis-x); }
+
+.connect-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: var(--space-lg);
+  padding-block-start: var(--space-sm);
+  border-block-start: var(--hairline-size) solid var(--hairline);
+}
 
 @media (max-width: 1024px) {
   .viewport-actions { inset-inline-end: calc(var(--sidebar-compact-size) + var(--space-xs)); }
@@ -111,4 +195,9 @@
   .connect-button { padding-inline: var(--space-xs); }
   .connect-button::after { content: ''; }
   .viewport-actions { inset-inline-end: var(--space-xs); }
+  .connect-dialog {
+    inline-size: calc(100% - var(--space-md));
+    max-block-size: calc(100dvh - var(--space-md));
+    padding: var(--space-md);
+  }
 }

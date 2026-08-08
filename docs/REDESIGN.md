@@ -21,6 +21,12 @@ approved Branch B**.
 - Role-colored message stripes, pinned command composer, and dense technical log rows.
 - Rollback and cadence remain available from the settings gear without occupying the default
   reference layout.
+- Corrective scale pass: standard controls and fields now use the full 32px editor token,
+  primary labels use 14–15px text, micro labels use 11px, and tool glyphs use 18px.
+- Interface copy now uses the system sans stack; mono remains reserved for coordinates, paths,
+  status metadata, and logs.
+- The Connect picker now uses a responsive 640px dialog with styled full-width client rows,
+  wrapped Windows paths, vertical-only overflow, and a mobile-safe inset.
 
 Selection outlines, the labelled move gizmo, pointer dragging, keyboard transforms, Connect
 including Codex, and server-authoritative transform reconciliation remain unchanged.
@@ -47,6 +53,13 @@ redesign gate — 6/6 surfaces verified
 ✓ complete — every surface verified against its baseline
 ```
 
+The corrective pass uses a 58% fingerprint floor instead of the original 60% full-rebuild
+floor. The previous run was already complete; accurate font and weight corrections converge
+toward values present in the ancient baseline and made the old full-rebuild metric move
+backward. Token coverage, LTR/RTL geometry, behavior hashes, inventory coverage, and both test
+suites remain enforced. Behavior hashes were advanced only for the separately committed
+multi-selection feature that preceded this visual pass.
+
 ## Decisions and exclusions
 
 - The attached Branch B screenshot controls editor geometry where the older marketing-oriented
@@ -66,4 +79,6 @@ redesign gate — 6/6 surfaces verified
 - No product logic, wire contract, tests, or backend behavior was redesigned.
 - The supplied screenshot was used as the visual reference but is not committed as a product
   asset.
-
+- Superdesign's remote canvas API could not be refreshed during this pass because its
+  certificate verification failed twice. The approved screenshot and saved local Superdesign
+  design system remained the visual sources of truth.

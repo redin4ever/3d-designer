@@ -7,7 +7,7 @@
   color-scheme: dark;
   font-family: var(--font-text);
   background: var(--canvas);
-  color: var(--ink);
+  color: var(--ink-muted);
 }
 
 html,
@@ -22,12 +22,12 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--canvas);
-  color: var(--ink);
-  font-family: var(--font-mono);
+  color: var(--ink-muted);
+  font-family: var(--font-text);
   font-size: var(--text-caption);
-  font-weight: 500;
+  font-weight: 400;
   line-height: var(--leading-body);
-  letter-spacing: var(--tracking-editor);
+  letter-spacing: var(--tracking-body);
 }
 
 button,
@@ -70,6 +70,7 @@ canvas:focus-visible,
 
 .topbar-title {
   margin: 0;
+  color: var(--ink);
   font-family: var(--font-display);
   font-size: var(--text-body-sm);
   font-weight: 700;
@@ -79,7 +80,7 @@ canvas:focus-visible,
 .workspace-label { display: none; }
 
 .status-pill {
-  min-block-size: calc(var(--control-size) - var(--space-xxs));
+  min-block-size: var(--control-size);
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -325,7 +326,7 @@ button.btn,
 .tool-button,
 .icon-button,
 .axis-control {
-  min-block-size: calc(var(--control-size) - var(--space-xxs));
+  min-block-size: var(--control-size);
   border: var(--hairline-size) solid var(--hairline);
   border-radius: var(--radius-sm);
   background: var(--surface-1);
@@ -335,6 +336,8 @@ button.btn,
 
 button.btn {
   padding-inline: var(--space-sm);
+  border-color: var(--hairline-strong);
+  box-shadow: var(--elevation-raised);
   font-size: var(--text-caption);
   font-weight: 600;
 }
@@ -365,7 +368,7 @@ input[type='number'],
 select,
 textarea {
   min-inline-size: 0;
-  min-block-size: calc(var(--control-size) - var(--space-xxs));
+  min-block-size: var(--control-size);
   padding-inline: var(--space-xs);
   border: var(--hairline-size) solid var(--hairline);
   border-radius: var(--radius-sm);

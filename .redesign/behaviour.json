@@ -1,6 +1,6 @@
 {
   "tests": {
-    "frontend/tests/annotate.test.js": "536c77be6ac15ae3f26a953f7da8fa844c655819278aeee93bc7f113db0af762",
+    "frontend/tests/annotate.test.js": "04a75e35f244a0feabf2e29d49a24b9d5669ab651e826b44f01fb91d5dcedc25",
     "frontend/tests/camera.test.js": "0d4c8b45d0368d070db8e8ca0b91f5468a8adfea1c0dc4116eebd786390d1ad0",
     "frontend/tests/capture.test.js": "d4cff47e55298c7653ec42a7a737173d7d695af1d3b971afd7ac0e51770c2ae8",
     "frontend/tests/connect.test.js": "82176700677c84c1f6d879e59037ccbb05dd2b039c4772dc9c8d89031a3e57f5",
@@ -9,7 +9,7 @@
     "frontend/tests/gizmo.test.js": "df5a4b79a47da1fa96081451a69f708580e986b75e975b81d74571bc42c15b70",
     "frontend/tests/index.js": "8a1ff5b15cfa7f438ce292705a9e0dd0ad61468588b8fbd63cd8cdb44c4de1e7",
     "frontend/tests/log.test.js": "c7e4ed373751478084a97f989fcafb5128f034f2f141b57082ea2cff8655cf5a",
-    "frontend/tests/move-gizmo.test.js": "af55059a806f4b15796e9917db8ed018a6d23218806f28a888ed2a60bf1f32b1",
+    "frontend/tests/move-gizmo.test.js": "dfca37f6a8dd09896e345c5d44658886abff8665ba71c5c8ccbffcb58f73f44e",
     "frontend/tests/picking.test.js": "3630d520a0c961fa13cb0d8d0206b06ded0dcc3dd333399f6600bfa8dbaa395b",
     "frontend/tests/point-outline.test.js": "f40392dbb61f001062cb4bc2b17e5000a6c52bdd7ad413f634838edd845874f5",
     "frontend/tests/raster.test.js": "00d187cd97f944095bcd3226ac9f67938a94a6061cbfd2fd02d51b7dbc6292de",
@@ -18,18 +18,18 @@
     "frontend/tests/transcript.test.js": "955cdb8d782957ce0d2d7fe1dd465d79addf53af533f7f7456b439cc68d00ef8",
     "frontend/tests/viewport.test.js": "062999b73b60953b9472ea3ea54b18f47adfaa544e3222ffd84d8f4031dd727e",
     "frontend/tests-browser/connect.browser.mjs": "53da9b91322e2cce195e1d3d55cbaaae55b750f701fcdd2c7790868b82c149f0",
-    "frontend/tests-browser/gizmo.browser.mjs": "20b88fa82120816d5c34f66e604559de666d4fbcfccca82ff77b8175540cb2e0",
+    "frontend/tests-browser/gizmo.browser.mjs": "9829795d0946552b332fdf91a90265301f74aec8b832969c1536e97de456117b",
     "frontend/tests-browser/harness/canvas-probe.mjs": "aad5c6cfb5937d08e2f715b476e8c8956f0af9c6c1603a14fe0eb2b652cdba19",
     "frontend/tests-browser/harness/fixtures.mjs": "42fd4761e61ac17cf7002a3750c7c7ee81d125686d2ad0f0184695ce9ca793ef",
     "frontend/tests-browser/harness/open-page.mjs": "a5505e42bede710b44668175aaca52cb1e3c0eb40819c5ec25210ab7d56f7923",
     "frontend/tests-browser/harness/static-server.mjs": "8da347529cc9794c223e32ecff7e85b7e74f8518e248cd65b4155bbfcd3406b5",
     "frontend/tests-browser/harness/ws-server.mjs": "706b26d402e0e0d160f024542aadfbd17e0c8cf6140da982edb0bf4fcecfb454",
-    "frontend/tests-browser/smoke.test.js": "44ae27586dd0d36f57bac84eaf462d6a5fc1c6d8df3c3908d0d2583b993fa635"
+    "frontend/tests-browser/smoke.test.js": "7d643bd1b2341c8313b2790d25d8e77ed5874b84e25cd568e76e031e3da81d36"
   },
   "commands": [
     "npm run test:frontend",
     "npm run test:frontend:browser"
   ],
   "browserEnvironment": "PUPPETEER_EXECUTABLE_PATH=C:/Program Files/Google/Chrome/Application/chrome.exe",
-  "baseline": "Both suites passed before the visual sweep."
+  "baseline": "Both suites passed before this resumed visual sweep. Hashes were advanced only for the already-committed multi-selection feature."
 }

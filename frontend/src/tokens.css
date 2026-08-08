@@ -95,10 +95,10 @@
   /* Type scale (DESIGN.md "Typography"), transcribed verbatim from the frontmatter's
      `typography` block. Only the two rungs this console actually uses are mapped; add the
      rest here rather than writing a px literal into a stylesheet. */
-  --text-body-sm: 14px;
-  --text-body: 13px;
-  --text-caption: 12px;
-  --text-micro: 10px;
+  --text-body-sm: 15px;
+  --text-body: 14px;
+  --text-caption: 13px;
+  --text-micro: 11px;
   --leading-body: 1.35;
   --tracking-body: 0.01em;
   --tracking-controls: 0.5px;
@@ -119,14 +119,14 @@
   --hairline-size: 1px;
   --focus-ring-size: 2px;
   --composer-size: 28rem;
-  --dialog-size: 32rem;
+  --dialog-size: 40rem;
   --field-min-size: 3.5rem;
   --topbar-actions-inset: 108px;
   --tool-content-inset: 64px;
   --inspector-transform-size: 152px;
   --inspector-log-size: 112px;
   --annotation-panel-size: 288px;
-  --tool-icon-size: 16px;
+  --tool-icon-size: 18px;
 
   /* Elevation 2 — a control raised off the panel behind it (DESIGN.md "Elevation & Depth",
      level 2: surface-2 lift, 1px hairline-strong), plus that section's "subtle white edge
