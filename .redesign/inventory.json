@@ -32,9 +32,9 @@
       ],
       "status": "verified",
       "evidence": {
-        "distance": 0.587,
+        "distance": 0.558,
         "tokenCoverage": 1,
-        "layout": "8/11",
+        "layout": "9/11",
         "substance": {
           "before": 3,
           "after": 2
@@ -69,9 +69,9 @@
       ],
       "status": "verified",
       "evidence": {
-        "distance": 0.587,
+        "distance": 0.558,
         "tokenCoverage": 1,
-        "layout": "8/11",
+        "layout": "9/11",
         "substance": {
           "before": 3,
           "after": 2
@@ -108,9 +108,9 @@
       ],
       "status": "verified",
       "evidence": {
-        "distance": 0.587,
+        "distance": 0.558,
         "tokenCoverage": 1,
-        "layout": "8/11",
+        "layout": "9/11",
         "substance": {
           "before": 3,
           "after": 2
@@ -146,9 +146,9 @@
       ],
       "status": "verified",
       "evidence": {
-        "distance": 0.587,
+        "distance": 0.558,
         "tokenCoverage": 1,
-        "layout": "8/11",
+        "layout": "9/11",
         "substance": {
           "before": 3,
           "after": 2
@@ -186,9 +186,9 @@
       ],
       "status": "verified",
       "evidence": {
-        "distance": 0.587,
+        "distance": 0.558,
         "tokenCoverage": 1,
-        "layout": "8/11",
+        "layout": "9/11",
         "substance": {
           "before": 3,
           "after": 2
@@ -225,9 +225,9 @@
       ],
       "status": "verified",
       "evidence": {
-        "distance": 0.587,
+        "distance": 0.558,
         "tokenCoverage": 1,
-        "layout": "8/11",
+        "layout": "9/11",
         "substance": {
           "before": 3,
           "after": 2

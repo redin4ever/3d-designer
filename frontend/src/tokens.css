@@ -92,13 +92,12 @@
   --font-text: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
-  /* Type scale (DESIGN.md "Typography"), transcribed verbatim from the frontmatter's
-     `typography` block. Only the two rungs this console actually uses are mapped; add the
-     rest here rather than writing a px literal into a stylesheet. */
-  --text-body-sm: 15px;
-  --text-body: 14px;
-  --text-caption: 13px;
-  --text-micro: 11px;
+  /* Editor type scale from DESIGN.md's approved Branch B reference override. Add future
+     rungs here rather than writing a px literal into a component stylesheet. */
+  --text-body-sm: 16px;
+  --text-body: 15px;
+  --text-caption: 14px;
+  --text-micro: 12px;
   --leading-body: 1.35;
   --tracking-body: 0.01em;
   --tracking-controls: 0.5px;
@@ -126,7 +125,7 @@
   --inspector-transform-size: 152px;
   --inspector-log-size: 112px;
   --annotation-panel-size: 288px;
-  --tool-icon-size: 18px;
+  --tool-icon-size: 16px;
 
   /* Elevation 2 — a control raised off the panel behind it (DESIGN.md "Elevation & Depth",
      level 2: surface-2 lift, 1px hairline-strong), plus that section's "subtle white edge

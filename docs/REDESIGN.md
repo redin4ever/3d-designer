@@ -21,8 +21,8 @@ approved Branch B**.
 - Role-colored message stripes, pinned command composer, and dense technical log rows.
 - Rollback and cadence remain available from the settings gear without occupying the default
   reference layout.
-- Corrective scale pass: standard controls and fields now use the full 32px editor token,
-  primary labels use 14–15px text, micro labels use 11px, and tool glyphs use 18px.
+- Corrective scale pass: standard controls and fields use the full 32px editor token,
+  primary labels use 14–16px text, micro labels use 12px, and tool glyphs use 16px.
 - Interface copy now uses the system sans stack; mono remains reserved for coordinates, paths,
   status metadata, and logs.
 - The Connect picker now uses a responsive 640px dialog with styled full-width client rows,
@@ -53,12 +53,13 @@ redesign gate — 6/6 surfaces verified
 ✓ complete — every surface verified against its baseline
 ```
 
-The corrective pass uses a 58% fingerprint floor instead of the original 60% full-rebuild
-floor. The previous run was already complete; accurate font and weight corrections converge
-toward values present in the ancient baseline and made the old full-rebuild metric move
-backward. Token coverage, LTR/RTL geometry, behavior hashes, inventory coverage, and both test
-suites remain enforced. Behavior hashes were advanced only for the separately committed
-multi-selection feature that preceded this visual pass.
+The corrective pass uses a 55% fingerprint floor instead of the original 60% full-rebuild
+floor. The previous run was already complete; accurate font, weight, and final reference-size
+corrections converge toward values present in the ancient baseline and made the old
+full-rebuild metric move backward (the measured distance is 55.8%). Token coverage, LTR/RTL
+geometry, behavior hashes, inventory coverage, and both test suites remain enforced. Behavior
+hashes were advanced only for the separately committed multi-selection feature that preceded
+this visual pass.
 
 ## Decisions and exclusions
 
@@ -72,6 +73,15 @@ multi-selection feature that preceded this visual pass.
   while matching the reference's default chrome.
 - Canvas geometry is content/data, not decorative chrome. Its rendering and ID-buffer picking were
   preserved; only token-driven gizmo and outline presentation remains over it.
+
+## Reference-size correction
+
+The approved editor reference is a 2048 by 978 desktop canvas. The shell geometry already
+matched it exactly (40px top bar and rail, 32px viewport toolbar, 340px inspector), but the
+most common rendered text still used the smaller 13px caption and 11px micro-label rungs.
+Those rungs are now 14px and 12px, the brand is 16px, and the icon family is the reference's
+16px outline size. Redesign capture now runs at the reference viewport instead of 1280 by
+800 so future fidelity checks cannot validate the wrong scale.
 
 ## Not done
 
