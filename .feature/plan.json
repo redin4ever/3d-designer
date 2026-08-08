@@ -6,6 +6,7 @@
       "what": "detect Codex, safely merge its global TOML configuration, expose it through the Connect picker, and support the CLI description",
       "paths": [
         "src/app/connect.py",
+        "src/app/codex_config.py",
         "src/app/connect_test.py",
         "frontend/tests-browser/connect.browser.mjs"
       ],
