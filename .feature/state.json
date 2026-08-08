@@ -3,10 +3,10 @@
   "skill": "add-feature",
   "feature": "Blender-style editor tools, quality-of-life viewport chrome, and an axis-constrained move gizmo",
   "slug": "blender-tools-gizmo",
-  "phase": 2,
+  "phase": 6,
   "baseSha": "e9cd18109e8f787e92102dbef83e456df52b1f18",
   "branch": "feat/blender-tools-gizmo",
   "docsDir": "docs/features/blender-tools-gizmo",
   "startedAt": "2026-08-08",
-  "status": "running"
+  "status": "finished"
 }

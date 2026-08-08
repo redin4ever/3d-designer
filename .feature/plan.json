@@ -1,4 +1,10 @@
 {
   "feature": "Blender-style editor tools and move gizmo",
-  "units": []
+  "units": [
+    {
+      "id": "blender-tools-gizmo",
+      "status": "green",
+      "tests": "projection, hit testing, move lifecycle, reconciliation, and browser journeys"
+    }
+  ]
 }
