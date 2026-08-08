@@ -222,3 +222,15 @@ reversible option; each is recorded here rather than asked, because the gate had
   branch, which is what Rule 5 actually requires.
 - **Blast radius:** git history only.
 - **Reversal cost:** low — `git branch feat/point-and-edit` after the fact keeps every commit.
+
+## A-017 — Chained move drags keep the earliest rollback point
+
+- **Feature:** multi-selection · **Seams:** `move-release-lifecycle`, `move-pointer-wiring`
+- **Assumed:** each released drag sends an absolute position immediately, another axis may
+  start from that optimistic position, and rejection restores the position from before the
+  first still-unconfirmed drag.
+- **Why:** this keeps X-then-Y adjustment responsive without letting a failed first move
+  leave later optimistic movement based on a position the build rejected.
+- **Blast radius:** `frontend/src/move-gizmo.js`, `frontend/src/point-ui.js`.
+- **Reversal cost:** low — waiting for each transform echo can be restored by retaining the
+  pending phase as the pointer gate.

@@ -7,7 +7,8 @@
       "file": "frontend/src/annotate.js",
       "line": 36,
       "anchor": "export function setSelection(state, objectIds) {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01",
       "what": "the pure pointing state currently exposes replacement selection only",
       "evidence": "clicks and lassos both flow through setSelection, while the renderer and annotation payload already consume the resulting Set",
       "asks": "should a modifier gesture add only, or toggle already-selected parts off as well?"
@@ -17,7 +18,8 @@
       "file": "frontend/src/point-ui.js",
       "line": 159,
       "anchor": "  const pickFrom = (path) => {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01",
       "what": "point-mode pointer release loses Ctrl and Alt state before replacing selection",
       "evidence": "endDrag passes only a path to pickFrom, which always calls setSelection",
       "asks": "should Ctrl and Alt behave identically for both click and lasso gestures?"
@@ -27,7 +29,8 @@
       "file": "frontend/src/point-ui.js",
       "line": 117,
       "anchor": "  const renderSelection = () => {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-03",
       "what": "the inspector name and transform fields assume the first selected object",
       "evidence": "renderEditability already requires exactly one selection for move and frame, but the object heading still names the first item",
       "asks": "when several parts are selected, should object editing stay disabled and should the heading show a count?"
@@ -37,7 +40,8 @@
       "file": "frontend/src/move-gizmo.js",
       "line": 47,
       "anchor": "export function finishMove(session, pointerId) {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-04",
       "what": "a completed pointer drag enters pending and cannot arm another axis until a transform echo arrives",
       "evidence": "beginMove accepts idle only and point-ui rejects pointerdown unless the session is idle",
       "asks": "should another axis drag begin immediately after release while the prior absolute move is being confirmed?"
@@ -47,7 +51,8 @@
       "file": "frontend/src/point-ui.js",
       "line": 228,
       "anchor": "  canvas?.addEventListener('pointerdown', (event) => {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-05",
       "what": "the gizmo pointer gate blocks any session that has not reconciled to idle",
       "evidence": "the gate directly checks moveSession.phase before hit-testing a different axis",
       "asks": "how should rejection restore chained optimistic drags?"
@@ -57,7 +62,8 @@
       "file": "frontend/tests-browser/smoke.test.js",
       "line": 720,
       "anchor": "  test('point mode visibly highlights hover and keeps a clicked part selected', async () => {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-06",
       "what": "the real browser proves one selected outline but not modifier accumulation",
       "evidence": "canvas event modifiers and visible simultaneous outlines require a browser-level journey",
       "asks": "which modifier combinations and visible feedback must be pinned in Chromium?"
