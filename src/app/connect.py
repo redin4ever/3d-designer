@@ -11,7 +11,7 @@ filled in, and can write it into the client's own file.
 
 The honest part matters as much as the config. The two clients are not equally reachable:
 
-* **Claude Desktop, Claude Code and Cursor** speak MCP over **stdio** — they launch the
+* **Claude Desktop, Claude Code, Cursor and Codex** speak MCP over **stdio** — they launch the
   server as a subprocess. Localhost is not involved, nothing is exposed, and it works as
   soon as the config is saved.
 
@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
+import tomllib
 from pathlib import Path
 
 __all__ = ["CLIENTS", "config_for", "config_path_for", "describe", "write_config"]
@@ -82,6 +84,17 @@ CLIENTS: dict[str, dict] = {
         "wrap": lambda cmd: {"mcpServers": {"forge3d": cmd}},
         "note": "Settings -> MCP shows it once the file is saved.",
     },
+    "codex": {
+        "label": "Codex",
+        "transport": "stdio",
+        "path": lambda: Path.home() / ".codex" / "config.toml",
+        "wrap": lambda cmd: {"mcp_servers": {"forge3d": cmd}},
+        "format": "toml",
+        "note": (
+            "Restart Codex after saving, then use /mcp to verify forge3d. "
+            "Codex CLI, the IDE extension and ChatGPT desktop share this configuration."
+        ),
+    },
 }
 
 
@@ -107,10 +120,16 @@ def _already_configured(client: str) -> bool:
     if not path.exists():
         return False
     try:
-        data = json.loads(path.read_text(encoding="utf-8")) or {}
+        text = path.read_text(encoding="utf-8")
+        data = (
+            tomllib.loads(text)
+            if CLIENTS[client].get("format") == "toml"
+            else json.loads(text) or {}
+        )
     except (OSError, ValueError):
         return False
-    return "forge3d" in (data.get("mcpServers") or {})
+    key = "mcp_servers" if CLIENTS[client].get("format") == "toml" else "mcpServers"
+    return "forge3d" in (data.get(key) or {})
 
 
 def detect_clients() -> list[dict]:
@@ -137,7 +156,7 @@ def detect_clients() -> list[dict]:
 
 
 def config_for(client: str) -> dict:
-    """The JSON this client expects, ready to paste."""
+    """The client-native configuration shape, ready to render or write."""
     if client not in CLIENTS:
         raise KeyError(f"unknown client {client!r}; known: {', '.join(sorted(CLIENTS))}")
     return CLIENTS[client]["wrap"](_server_command())
@@ -145,6 +164,78 @@ def config_for(client: str) -> dict:
 
 def config_path_for(client: str) -> Path:
     return CLIENTS[client]["path"]()
+
+
+def _toml_string(value: str) -> str:
+    """A TOML basic string, using the JSON escaping both formats share."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _codex_server_toml(command: dict) -> str:
+    """The native Codex representation of one stdio MCP server."""
+    args = ", ".join(_toml_string(str(value)) for value in command.get("args", []))
+    lines = [
+        "[mcp_servers.forge3d]",
+        f"command = {_toml_string(str(command['command']))}",
+        f"args = [{args}]",
+    ]
+    env = command.get("env") or {}
+    if env:
+        lines.extend(["", "[mcp_servers.forge3d.env]"])
+        lines.extend(f"{key} = {_toml_string(str(value))}" for key, value in env.items())
+    return "\n".join(lines) + "\n"
+
+
+_TOML_TABLE = re.compile(r"^\s*\[([^\[\]]+)]\s*(?:#.*)?$")
+
+
+def _without_codex_server(text: str) -> tuple[str, bool]:
+    """Remove only forge3d's ordinary TOML tables, preserving every other byte."""
+    lines = text.splitlines(keepends=True)
+    headers: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        match = _TOML_TABLE.match(line.rstrip("\r\n"))
+        if match:
+            headers.append((index, match.group(1).strip()))
+
+    remove = [False] * len(lines)
+    found = False
+    for position, (start, name) in enumerate(headers):
+        if name != "mcp_servers.forge3d" and not name.startswith("mcp_servers.forge3d."):
+            continue
+        found = True
+        end = headers[position + 1][0] if position + 1 < len(headers) else len(lines)
+        for index in range(start, end):
+            remove[index] = True
+    return "".join(line for index, line in enumerate(lines) if not remove[index]), found
+
+
+def _write_codex_config(path: Path) -> None:
+    """Merge forge3d into Codex TOML without reserialising unrelated user settings."""
+    text = ""
+    parsed: dict = {}
+    if path.exists():
+        try:
+            text = path.read_text(encoding="utf-8")
+            parsed = tomllib.loads(text)
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            raise RuntimeError(
+                f"{path} exists but could not be read as TOML ({exc}). Left untouched — "
+                "fix or move it, then run this again."
+            ) from exc
+
+    kept, removed = _without_codex_server(text)
+    already_present = "forge3d" in (parsed.get("mcp_servers") or {})
+    if already_present and not removed:
+        raise RuntimeError(
+            f"{path} defines mcp_servers.forge3d in an unsupported inline TOML shape. "
+            "Left untouched — remove that entry, then run this again."
+        )
+
+    prefix = kept.rstrip()
+    merged = (prefix + "\n\n" if prefix else "") + _codex_server_toml(_server_command())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(merged, encoding="utf-8")
 
 
 def write_config(client: str) -> Path:
@@ -155,6 +246,10 @@ def write_config(client: str) -> Path:
     or malformed existing file is left alone and reported rather than clobbered.
     """
     path = config_path_for(client)
+    if CLIENTS[client].get("format") == "toml":
+        _write_codex_config(path)
+        return path
+
     existing: dict = {}
     if path.exists():
         try:
@@ -190,7 +285,11 @@ def describe(client: str | None = None, *, http_port: int = 8765) -> str:
         lines.append(f"\n  {spec['label']}  ({spec['transport']})")
         lines.append(f"  config: {config_path_for(name)}")
         lines.append("")
-        for row in json.dumps(config_for(name), indent=2).splitlines():
+        if spec.get("format") == "toml":
+            rendered = _codex_server_toml(_server_command()).rstrip()
+        else:
+            rendered = json.dumps(config_for(name), indent=2)
+        for row in rendered.splitlines():
             lines.append(f"    {row}")
         lines.append("")
         lines.append(f"  {spec['note']}")
