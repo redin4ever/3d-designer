@@ -7,6 +7,7 @@
         "frontend/src/annotate.js",
         "frontend/src/point-ui.js",
         "frontend/src/move-gizmo.js",
+        "frontend/CLAUDE.md",
         "frontend/tests/annotate.test.js",
         "frontend/tests/move-gizmo.test.js",
         "frontend/tests-browser/gizmo.browser.mjs",
@@ -21,9 +22,11 @@
         "move-release-lifecycle",
         "move-pointer-wiring",
         "frontend-browser-journey"
+        ,"repeat-drag-browser-journey"
+        ,"frontend-module-status"
       ],
       "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-06"],
-      "status": "red"
+      "status": "green"
     }
   ]
 }

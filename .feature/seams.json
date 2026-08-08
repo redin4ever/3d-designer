@@ -6,7 +6,7 @@
       "id": "selection-state",
       "file": "frontend/src/annotate.js",
       "line": 36,
-      "anchor": "export function setSelection(state, objectIds) {",
+      "anchor": "export function setSelection(state, objectIds, { toggle = false } = {}) {",
       "status": "wired",
       "decision": "Q-01",
       "what": "the pure pointing state currently exposes replacement selection only",
@@ -16,8 +16,8 @@
     {
       "id": "pointer-selection-gesture",
       "file": "frontend/src/point-ui.js",
-      "line": 159,
-      "anchor": "  const pickFrom = (path) => {",
+      "line": 172,
+      "anchor": "  const pickFrom = (path, toggle = false) => {",
       "status": "wired",
       "decision": "Q-01",
       "what": "point-mode pointer release loses Ctrl and Alt state before replacing selection",
@@ -27,7 +27,7 @@
     {
       "id": "multi-selection-inspector",
       "file": "frontend/src/point-ui.js",
-      "line": 117,
+      "line": 122,
       "anchor": "  const renderSelection = () => {",
       "status": "wired",
       "decision": "Q-03",
@@ -49,8 +49,8 @@
     {
       "id": "move-pointer-wiring",
       "file": "frontend/src/point-ui.js",
-      "line": 228,
-      "anchor": "  canvas?.addEventListener('pointerdown', (event) => {",
+      "line": 82,
+      "anchor": "  let pendingPointerMove = null;",
       "status": "wired",
       "decision": "Q-05",
       "what": "the gizmo pointer gate blocks any session that has not reconciled to idle",
@@ -60,8 +60,8 @@
     {
       "id": "frontend-browser-journey",
       "file": "frontend/tests-browser/smoke.test.js",
-      "line": 720,
-      "anchor": "  test('point mode visibly highlights hover and keeps a clicked part selected', async () => {",
+      "line": 836,
+      "anchor": "  test('Ctrl and Alt clicks visibly toggle multiple selected parts without enabling single-part edits', async () => {",
       "status": "wired",
       "decision": "Q-06",
       "what": "the real browser proves one selected outline but not modifier accumulation",
@@ -71,13 +71,24 @@
     {
       "id": "repeat-drag-browser-journey",
       "file": "frontend/tests-browser/gizmo.browser.mjs",
-      "line": 107,
-      "anchor": "  test('dragging a move arrow previews locally and sends one final existing move operation', async () => {",
+      "line": 153,
+      "anchor": "  test('a second axis drag starts immediately without waiting for the first transform echo', async () => {",
       "status": "wired",
       "decision": "Q-04",
       "what": "the browser gizmo journey proves one drag but never attempts a second axis before a transform echo",
       "evidence": "the reported lockout occurs only across two pointer lifecycles in the live canvas",
       "asks": "should X then Y work without an intervening server transform?"
+    },
+    {
+      "id": "frontend-module-status",
+      "file": "frontend/CLAUDE.md",
+      "line": 6,
+      "anchor": "## Status",
+      "status": "wired",
+      "decision": "Q-06",
+      "what": "the frontend module status records the suite counts maintainers expect",
+      "evidence": "new unit and Chromium journeys increase both counts and stale counts hide missing registration",
+      "asks": "should the module record include the new verified totals?"
     }
   ],
   "dismissed": [
