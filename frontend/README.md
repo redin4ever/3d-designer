@@ -131,7 +131,7 @@ changes after the row has already been read out.
 ## What "Connect" means
 
 The Connect button in the conversation panel's heading row wires this tool into an AI
-client without anyone opening a JSON file. It asks the page's own origin (`GET
+client without anyone opening its configuration file. It asks the page's own origin (`GET
 /api/clients`, `POST /api/connect` — served by `src/app/live.py`, deliberately *not* on the
 wire protocol, since setup is not a scene event) which clients this machine has, and then:
 
@@ -141,6 +141,11 @@ wire protocol, since setup is not a scene event) which clients this machine has,
 - **more than one** — offers a picker, with any client that already has forge3d labelled as
   a re-write rather than presented as new. Re-running is harmless and is exactly what
   someone wants after moving the checkout.
+
+Codex appears as one client because `~/.codex/config.toml` is shared by Codex CLI, the
+IDE extension and ChatGPT desktop on the same Codex host. Connect preserves unrelated
+TOML settings and comments, replaces only forge3d's MCP tables, and refuses malformed
+TOML rather than overwriting a configuration it cannot understand.
 
 All three answers appear in the `<dialog>`, not in the sidebar: a written-config result is
 five lines, and rendered inline it squeezed the transcript to nothing — the operator lost

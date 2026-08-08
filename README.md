@@ -30,7 +30,7 @@ The model keeps intent, taste, and sequencing. The tool keeps the geometry.
 
 ```bash
 python src/forge3d_cli.py doctor        # what is installed, and is it wired?
-python src/forge3d_cli.py serve         # stdio — Claude Desktop / Claude Code / Cursor
+python src/forge3d_cli.py serve         # stdio — Claude Desktop / Claude Code / Cursor / Codex
 python src/forge3d_cli.py serve --http  # streamable HTTP — ChatGPT developer-mode connector
 ```
 
