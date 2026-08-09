@@ -33,10 +33,13 @@ from __future__ import annotations
 
 import functools
 import http.server
+import base64
+import binascii
 import json
 import socket
 import sys
 import threading
+import tempfile
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -97,6 +100,12 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler's own naming
+        if self.path.split("?", 1)[0] == "/api/textures":
+            from textures import TextureLibrary
+
+            materials = TextureLibrary(self.managed_texture_root).list_materials()
+            self._json(200, {"materials": [material.to_dict() for material in materials]})
+            return
         if self.path.startswith("/textures/"):
             from app.texture_assets import TextureAssetError, resolve_texture_asset
 
@@ -125,6 +134,39 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path.split("?", 1)[0] == "/api/textures":
+            from textures import TextureLibrary, TextureTransform
+
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length <= 0 or length > 180_000_000:
+                    raise ValueError("texture upload size is invalid")
+                payload = json.loads(self.rfile.read(length))
+                name = str(payload["name"])
+                maps = payload["maps"]
+                transform = payload.get("transform") or {}
+                with tempfile.TemporaryDirectory(prefix="forge3d-texture-import-") as temp:
+                    sources = {}
+                    for channel, image in maps.items():
+                        suffix = Path(str(image["name"])).suffix.lower()
+                        target = Path(temp) / f"{channel}{suffix}"
+                        target.write_bytes(base64.b64decode(image["data"], validate=True))
+                        sources[channel] = target
+                    library = TextureLibrary(self.managed_texture_root)
+                    texture_transform = TextureTransform(
+                        repeat=tuple(transform.get("repeat", (1, 1))),
+                        rotation=float(transform.get("rotation", 0)),
+                        offset=tuple(transform.get("offset", (0, 0))),
+                    )
+                    try:
+                        material = library.update(name, sources, transform=texture_transform)
+                    except KeyError:
+                        material = library.create(name, sources, transform=texture_transform)
+            except (KeyError, TypeError, ValueError, OSError, binascii.Error) as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            self._json(200, {"ok": True, "material": material.to_dict()})
+            return
         if self.path.split("?")[0] != "/api/connect":
             self.send_error(404)
             return

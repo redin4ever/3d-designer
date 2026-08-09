@@ -168,15 +168,70 @@ export function attachTextureInspector(root, io) {
   const controller = createTextureInspector();
   const status = panel?.querySelector('[data-texture-status]');
   const apply = panel?.querySelector('[data-action="apply-texture"]');
+  const nameInput = panel?.querySelector('[data-texture-field="name"]');
+  const materialSelect = panel?.querySelector('[data-texture-field="material"]');
+  const fileInputs = [...(panel?.querySelectorAll('[data-texture-channel]') ?? [])];
+  const encodeFile = async (file) => {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (let start = 0; start < bytes.length; start += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+    }
+    return btoa(binary);
+  };
   const refresh = () => {
     const state = controller.getState();
-    if (apply) apply.disabled = state.selectedObjectIds.length === 0 || (!state.preset && !state.materialId);
+    const hasFiles = Object.values(state.files).some(Boolean);
+    if (apply) apply.disabled = state.selectedObjectIds.length === 0 || (!state.preset && !state.materialId && !(hasFiles && nameInput?.value.trim()));
     if (status) status.textContent = state.status.message || (state.selectedObjectIds.length ? `${state.selectedObjectIds.length} part${state.selectedObjectIds.length === 1 ? '' : 's'} selected` : 'Select one or more parts, then choose a texture.');
   };
   for (const button of panel?.querySelectorAll('[data-texture-preset]') ?? []) {
     button.addEventListener('click', () => { controller.setPreset(button.dataset.texturePreset); refresh(); });
   }
-  apply?.addEventListener('click', () => {
+  for (const input of fileInputs) {
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (file) controller.setChannelFile(input.dataset.textureChannel, file);
+      else controller.clearChannelFile(input.dataset.textureChannel);
+      refresh();
+    });
+  }
+  materialSelect?.addEventListener('change', () => { controller.setMaterial(materialSelect.value || null); refresh(); });
+  nameInput?.addEventListener('input', refresh);
+  const number = (name, fallback) => Number(panel?.querySelector(`[data-texture-field="${name}"]`)?.value) || fallback;
+  const syncMapping = () => {
+    controller.setSlot(Math.max(0, Math.trunc(number('slot', 0))));
+    controller.setTransform({
+      repeat: [number('repeat-x', 1), number('repeat-y', 1)],
+      rotation: number('rotation', 0) * Math.PI / 180,
+      offset: [number('offset-x', 0), number('offset-y', 0)],
+    });
+    refresh();
+  };
+  for (const input of panel?.querySelectorAll('.texture-transform input') ?? []) input.addEventListener('input', syncMapping);
+  fetch('/api/textures').then((response) => response.json()).then((payload) => {
+    for (const material of payload.materials ?? []) {
+      const option = document.createElement('option');
+      option.value = material.name;
+      option.textContent = material.builtin ? `${material.name} (built-in)` : material.name;
+      materialSelect?.append(option);
+    }
+  }).catch(() => {});
+  apply?.addEventListener('click', async () => {
+    controller.setStatus('loading', 'Importing texture…'); refresh();
+    const state = controller.getState();
+    const files = Object.entries(state.files).filter(([, file]) => file);
+    if (files.length) {
+      const maps = {};
+      for (const [channel, file] of files) maps[channel] = { name: file.name, data: await encodeFile(file) };
+      const response = await fetch('/api/textures', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameInput.value.trim(), maps, transform: state.transform }),
+      });
+      const payload = await response.json();
+      if (!response.ok) { controller.setStatus('error', payload.error || 'Texture import failed.'); refresh(); return; }
+      controller.setMaterial(payload.material.name);
+    }
     const command = controller.buildApplyCommand();
     const sent = io.send({ type: 'annotate', data: { object_ids: command.params.object_ids, text: '', image: '', edit: { kind: command.name, params: command.params } } });
     controller.setStatus(sent ? 'ready' : 'error', sent ? 'Texture applied.' : 'Texture could not be sent.');

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from contracts import EngineProtocol, Operation, OperationResult, ToolError, ToolRole, ToolSpec
-from textures import MaterialTexture, TextureLibrary, TextureTransform
+from textures import MaterialTexture, TextureLibrary, TextureMap, TextureTransform
 
 __all__ = [
     "TEXTURE_MATERIAL_SPECS",
@@ -115,6 +115,17 @@ def _engine_material(engine: EngineProtocol, material: MaterialTexture) -> None:
         raise _error("ops.engine_material_failed", str(exc), "check the connected engine material backend") from exc
 
 
+def _for_engine(material: MaterialTexture, root: Path) -> MaterialTexture:
+    if material.builtin:
+        return material
+    return MaterialTexture(
+        name=material.name,
+        maps=tuple(TextureMap(item.channel, str((root / item.path).resolve()), item.color_space) for item in material.maps),
+        transform=material.transform,
+        builtin=False,
+    )
+
+
 def _assign(engine: EngineProtocol, object_id: str, material: MaterialTexture, slot: int) -> None:
     assign_texture = getattr(engine, "assign_texture_material", None)
     if callable(assign_texture):
@@ -139,7 +150,7 @@ def create_texture_material(engine: EngineProtocol, op: Operation) -> OperationR
     library, name = _library(op.params)
     try:
         material = library.create(name, _maps(op.params), transform=_transform(op.params))
-        _engine_material(engine, material)
+        _engine_material(engine, _for_engine(material, library.root))
     except ToolError:
         raise
     except Exception as exc:
@@ -153,7 +164,7 @@ def update_texture_material(engine: EngineProtocol, op: Operation) -> OperationR
     try:
         previous = library.get(name)
         material = library.update(name, _maps(op.params), transform=_transform(op.params, previous.transform))
-        _engine_material(engine, material)
+        _engine_material(engine, _for_engine(material, library.root))
     except ToolError:
         raise
     except Exception as exc:
@@ -190,6 +201,7 @@ def apply_texture_material(engine: EngineProtocol, op: Operation) -> OperationRe
         except Exception as exc:
             raise _error("ops.unknown_object", str(exc), "reselect the part and try again") from exc
 
+    material = _for_engine(material, library.root)
     _engine_material(engine, material)
     for object_id, snapshot in zip(object_ids, snapshots):
         if snapshot.uvs is None:

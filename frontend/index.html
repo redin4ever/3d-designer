@@ -199,6 +199,8 @@
               <button type="button" data-texture-preset="plaster">Plaster</button>
             </div>
             <div class="texture-maps">
+              <label>Material name <input type="text" data-texture-field="name" maxlength="64" placeholder="e.g. oak_floor" /></label>
+              <label>Library <select data-texture-field="material"><option value="">Choose saved material</option></select></label>
               <label>Albedo <input type="file" data-texture-channel="albedo" accept=".png,.jpg,.jpeg,.webp" /></label>
               <label>Normal <input type="file" data-texture-channel="normal" accept=".png,.jpg,.jpeg,.webp" /></label>
               <label>Roughness <input type="file" data-texture-channel="roughness" accept=".png,.jpg,.jpeg,.webp" /></label>
@@ -208,6 +210,8 @@
               <label>Repeat X <input type="number" data-texture-field="repeat-x" min="0.01" step="0.1" value="1" /></label>
               <label>Repeat Y <input type="number" data-texture-field="repeat-y" min="0.01" step="0.1" value="1" /></label>
               <label>Rotation <input type="number" data-texture-field="rotation" step="1" value="0" /></label>
+              <label>Offset X <input type="number" data-texture-field="offset-x" step="0.1" value="0" /></label>
+              <label>Offset Y <input type="number" data-texture-field="offset-y" step="0.1" value="0" /></label>
               <label>Slot <input type="number" data-texture-field="slot" min="0" step="1" value="0" /></label>
             </div>
             <button type="button" class="btn primary texture-apply" data-action="apply-texture">Apply to selection</button>

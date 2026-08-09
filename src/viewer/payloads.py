@@ -51,6 +51,19 @@ def snapshot_to_payload(snap: MeshSnapshot) -> MeshPayload:
         for u, v in snap.uvs:
             uvs.extend((float(u), float(v)))
 
+    definitions = {}
+    for name, definition in snap.material_definitions.items():
+        material = dict(definition)
+        material["maps"] = [
+            {
+                **item,
+                "path": item.get("path") if str(item.get("path", "")).startswith("builtin://")
+                else f"/textures/{name}/{str(item.get('path', '')).replace(chr(92), '/').split('/')[-1]}",
+            }
+            for item in definition.get("maps", ())
+        ]
+        definitions[name] = material
+
     return MeshPayload(
         object_id=snap.object_id,
         positions=positions,
@@ -58,7 +71,7 @@ def snapshot_to_payload(snap: MeshSnapshot) -> MeshPayload:
         normals=normals,
         uvs=uvs,
         materials=tuple(snap.material_slots),
-        material_definitions=dict(snap.material_definitions),
+        material_definitions=definitions,
         groups=_material_groups(snap),
         triangle_count=snap.triangle_count,
     )
