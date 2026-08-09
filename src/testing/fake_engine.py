@@ -256,6 +256,11 @@ class FakeEngine(FakeSurfacingMixin):
             uvs=list(obj.uvs) if obj.uvs else None,
             polygon_count=len(obj.faces),
             material_slots=tuple(obj.materials),
+            material_definitions={
+                name: dict(self._materials[name].get("texture") or {})
+                for name in obj.materials
+                if name in self._materials and self._materials[name].get("texture")
+            },
         )
 
     def list_objects(self) -> list[str]:

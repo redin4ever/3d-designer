@@ -67,6 +67,23 @@ class FakeSurfacingMixin:
         obj.materials[slot] = material_id
         self._record("assign_material", object_id, material_id, slot)
 
+    def create_texture_material(self, material: object) -> str:
+        name = getattr(material, "name", "")
+        if not name:
+            raise EngineError("engine.bad_material", "texture material has no name")
+        definition = material.to_dict() if callable(getattr(material, "to_dict", None)) else {}
+        self._materials[name] = {"base_color": (0.8, 0.8, 0.8), "roughness": 0.5,
+                                 "metallic": 0.0, "texture": definition}
+        self._record("create_texture_material", name)
+        return name
+
+    def assign_texture_material(
+        self, object_id: str, material_id: str, slot: int = 0, material: object | None = None
+    ) -> None:
+        if material is not None and material_id not in self._materials:
+            self.create_texture_material(material)
+        self.assign_material(object_id, material_id, slot)
+
     # -------------------------------------------------------------- uv and bake
 
     def unwrap(self, object_id: str, *, method: str = "angle_based", margin: float = 0.001) -> None:

@@ -17,6 +17,7 @@ from typing import Sequence
 from contracts import EngineError, Quat, Transform, Vec3
 
 from ._shared import get_object, read_transform_fields
+from .texture_materials import export_settings
 
 __all__ = ["ExportingMixin"]
 
@@ -83,7 +84,7 @@ class ExportingMixin:
                 bpy.data.objects[tid].select_set(True)
             bpy.context.view_layer.objects.active = bpy.data.objects[temp_ids[0]]
 
-            export_format = "GLB" if path.lower().endswith(".glb") else "GLTF_EMBEDDED"
+            export_format = export_settings(path)["format"]
             bpy.ops.export_scene.gltf(
                 filepath=path,
                 export_format=export_format,

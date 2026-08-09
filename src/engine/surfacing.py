@@ -153,6 +153,25 @@ class SurfacingMixin:
             obj.data.materials.append(None)
         obj.data.materials[slot] = mat
 
+    def create_texture_material(self, material: object) -> str:
+        from engine.texture_materials import apply_to_blender
+
+        name = getattr(material, "name", "")
+        try:
+            mat = get_material(name)
+        except EngineError:
+            self.create_material(name, (0.8, 0.8, 0.8))
+            mat = get_material(name)
+        apply_to_blender(name, material, mat)
+        return name
+
+    def assign_texture_material(
+        self, object_id: str, material_id: str, slot: int = 0, material: object | None = None
+    ) -> None:
+        if material is not None:
+            self.create_texture_material(material)
+        self.assign_material(object_id, material_id, slot)
+
     # ---------------------------------------------------------------- uv
 
     def unwrap(self, object_id: str, *, method: str = "angle_based", margin: float = 0.001) -> None:

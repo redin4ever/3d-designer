@@ -131,17 +131,17 @@ Recorded counts, pinned by `registry_test.py::test_the_visible_tool_count_of_eve
 
 | Role | Tools | |
 |---|---|---|
-| `blockout` | 5 | |
-| `refine` | 4 | |
+| `blockout` | 15 | includes texture create/update/apply |
+| `refine` | 14 | includes texture create/update/apply |
 | `repair` | 8 | |
 | `align` | 7 | |
-| `detail` | 4 | bevel, panel lines, greebles, plus the bevel-topology cleanup (Gate B 3.4) |
-| `polish` | 2 | |
-| `inspect` | 9 | **over 8** — `measure`'s six tools plus this module's three session tools |
+| `detail` | 7 | detail tools plus texture create/update/apply |
+| `polish` | 5 | UV/bake tools plus texture create/update/apply |
+| `inspect` | 10 | **over 8** — measurement and session tools |
 | `export` | 2 | |
 | `admin` | 2 | |
 
-**`inspect` is the one role over 8, and it is over deliberately (Gate B 3.3).** Crossing the
+**Several editing roles are over 8, deliberately (Gate B 3.3).** Crossing the
 band is logged by `build_registry` every time it happens; it is never trimmed. That is the
 change from the previous pass: a `_cap.py` used to round-robin each role down to eight, and
 it silently hid `repair`, `make_plumb` and `close_visual_gap` — three core operations — from

@@ -58,6 +58,7 @@ def snapshot_to_payload(snap: MeshSnapshot) -> MeshPayload:
         normals=normals,
         uvs=uvs,
         materials=tuple(snap.material_slots),
+        material_definitions=dict(snap.material_definitions),
         groups=_material_groups(snap),
         triangle_count=snap.triangle_count,
     )

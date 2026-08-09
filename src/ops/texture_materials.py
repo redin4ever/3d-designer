@@ -37,7 +37,8 @@ def _text(params: Mapping[str, Any], name: str) -> str:
 
 
 def _root(params: Mapping[str, Any]) -> Path:
-    return Path(_text(params, "managed_root"))
+    value = params.get("managed_root")
+    return Path(value) if isinstance(value, str) and value.strip() else Path.cwd() / ".forge3d" / "textures"
 
 
 def _maps(params: Mapping[str, Any]) -> dict[str, str]:
@@ -74,7 +75,10 @@ def _transform(params: Mapping[str, Any], fallback: TextureTransform | None = No
 
 
 def _library(params: Mapping[str, Any]) -> tuple[TextureLibrary, str]:
-    return TextureLibrary(_root(params)), _text(params, "name")
+    name = params.get("name") or params.get("preset") or params.get("material_id")
+    if not isinstance(name, str) or not name.strip():
+        raise _error("ops.missing_parameter", "name or preset is required", "choose a texture material")
+    return TextureLibrary(_root(params)), name.strip()
 
 
 def _library_failure(exc: Exception) -> ToolError:
@@ -219,7 +223,7 @@ TEXTURE_MATERIAL_SPECS = (
         description="Apply a managed texture material to one or more selected objects, auto-unwrapping missing UVs.",
         roles=_TEXTURE_ROLES,
         input_schema={"type": "object", "properties": {"name": {"type": "string"}, "managed_root": {"type": "string"}, "object_ids": {"type": "array"}, "slot": {"type": "integer", "minimum": 0}},
-        "required": ["name", "managed_root", "object_ids"], "additionalProperties": False},
+        "required": ["object_ids"], "additionalProperties": True},
         mutating=True,
     ),
 )

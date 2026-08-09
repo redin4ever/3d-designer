@@ -249,6 +249,12 @@ class MaterialOps(Protocol):
 
     def assign_material(self, object_id: str, material_id: str, slot: int = 0) -> None: ...
 
+    def create_texture_material(self, material: object) -> str: ...
+
+    def assign_texture_material(
+        self, object_id: str, material_id: str, slot: int = 0, material: object | None = None
+    ) -> None: ...
+
 
 @runtime_checkable
 class UVBakeOps(Protocol):

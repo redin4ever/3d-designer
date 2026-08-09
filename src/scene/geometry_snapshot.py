@@ -13,11 +13,10 @@ Written against :class:`contracts.EngineProtocol` alone — ``list_objects``, ``
 against ``testing.FakeEngine`` and against real Blender, and needs no ``.blend`` file
 format knowledge in a module that is not allowed to import ``bpy``.
 
-**What a restore reproduces:** every object's id, its evaluated triangles, its vertices in
-local space, its transform and its material slot names. **What it does not:** a material's
-PBR values (``MeshSnapshot`` does not carry them), UV layouts, and the pre-triangulation
-face count — ``snapshot`` hands over triangles, so a restored mesh is the triangulated form
-of the captured one. Recorded here rather than discovered later.
+**What a restore reproduces:** every object's id, evaluated triangles, local vertices,
+transform, UV layout, material slots, and managed texture definitions. The
+pre-triangulation face count is not recoverable because ``snapshot`` hands over triangles,
+so a restored mesh is the triangulated form of the captured one.
 """
 
 from __future__ import annotations
@@ -105,6 +104,8 @@ def capture(engine: EngineProtocol, path: str) -> str:
                 "triangle_materials": (
                     list(snap.triangle_materials) if snap.triangle_materials is not None else None
                 ),
+                "uvs": [list(uv) for uv in snap.uvs] if snap.uvs is not None else None,
+                "material_definitions": dict(snap.material_definitions),
             }
         )
 
@@ -171,6 +172,12 @@ def _restore_object(engine: EngineProtocol, entry: dict[str, Any]) -> None:
         [tuple(f) for f in entry["faces"]],
         _transform_from_dict(entry.get("transform")),
     )
+    definitions = entry.get("material_definitions") or {}
+    if definitions:
+        from textures import MaterialTexture
+
+        for definition in definitions.values():
+            engine.create_texture_material(MaterialTexture.from_dict(definition))
     for slot, material in enumerate(entry.get("materials") or ()):
         if not material:
             continue
@@ -179,7 +186,13 @@ def _restore_object(engine: EngineProtocol, entry: dict[str, Any]) -> None:
             # colour genuinely is not in the capture. Restoring the *assignment* keeps a
             # multi-material mesh splittable by the viewer, which dropping the slot would
             # not.
-            engine.create_material(material, (0.8, 0.8, 0.8))
+            if material not in definitions:
+                engine.create_material(material, (0.8, 0.8, 0.8))
             engine.assign_material(object_id, material, slot)
         except Exception:  # noqa: BLE001 — geometry matters more than a slot name
             continue
+    uvs = entry.get("uvs")
+    if uvs and hasattr(engine, "_get"):
+        restored = engine._get(object_id)
+        restored.uvs = [tuple(uv) for uv in uvs]
+        restored.unwrapped = True

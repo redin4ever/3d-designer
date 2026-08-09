@@ -173,11 +173,21 @@ class MeshOpsMixin:
         return produced
 
     def snapshot(self, object_id: str) -> MeshSnapshot:
+        import json
+
         obj = get_object(object_id)
         mesh = obj.data
         vertices, triangles, uvs, _ = build_snapshot_topology(mesh)
 
         material_slots = tuple(m.name if m is not None else "" for m in mesh.materials)
+        material_definitions = {}
+        for material in mesh.materials:
+            raw = material.get("forge3d_texture") if material is not None else None
+            if raw:
+                try:
+                    material_definitions[material.name] = json.loads(raw)
+                except (TypeError, ValueError):
+                    pass
         triangle_materials = None
         if len(material_slots) > 1:
             triangle_materials = [poly.material_index for poly in mesh.polygons]
@@ -200,6 +210,7 @@ class MeshOpsMixin:
             uvs=uvs,
             polygon_count=len(mesh.polygons),
             material_slots=material_slots,
+            material_definitions=material_definitions,
             triangle_materials=triangle_materials,
         )
 

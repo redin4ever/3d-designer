@@ -25,6 +25,28 @@ def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, 
     """
     object_id = params.get("object_id", "")
 
+    if kind in ("create_texture_material", "update_texture_material"):
+        name = params.get("name", "material")
+        return (
+            AcceptanceQuery(
+                query_id=f"{name}_material_recorded",
+                description=f"managed texture material {name} remains addressable",
+                metric=MetricKind.TRIANGLE_COUNT,
+                subject=str(name), expected=0.0, comparison=Comparison.GTE,
+            ),
+        )
+
+    if kind == "apply_texture_material":
+        subject = next(iter(params.get("object_ids") or ()), "")
+        return (
+            AcceptanceQuery(
+                query_id=f"{subject}_survived_texture_apply",
+                description=f"{subject} still has positive volume after surfacing",
+                metric=MetricKind.VOLUME,
+                subject=subject, expected=1e-9, comparison=Comparison.GTE,
+            ),
+        )
+
     if kind == "add_primitive":
         return (
             AcceptanceQuery(

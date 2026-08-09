@@ -97,6 +97,26 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler's own naming
+        if self.path.startswith("/textures/"):
+            from app.texture_assets import TextureAssetError, resolve_texture_asset
+
+            parts = self.path.split("?", 1)[0].split("/")
+            if len(parts) != 4:
+                self.send_error(404)
+                return
+            try:
+                asset = resolve_texture_asset(self.managed_texture_root, parts[2], parts[3])
+                body = asset.path.read_bytes()
+            except (TextureAssetError, OSError):
+                self.send_error(404)
+                return
+            self.send_response(200)
+            for name, value in asset.headers.items():
+                self.send_header(name, value)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.split("?")[0] == "/api/clients":
             from app.connect import detect_clients
 
@@ -139,6 +159,7 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
 
 def serve_frontend(port: int, directory: Path) -> http.server.ThreadingHTTPServer:
     """Serve ``directory`` on loopback, on a daemon thread, and return the server."""
+    _QuietHandler.managed_texture_root = directory.parent / ".forge3d" / "textures"
     handler = functools.partial(_QuietHandler, directory=str(directory))
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
     threading.Thread(target=httpd.serve_forever, name="forge3d-web", daemon=True).start()

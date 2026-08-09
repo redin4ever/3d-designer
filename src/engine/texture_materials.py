@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import importlib
+import json
 from pathlib import Path
 from typing import Any
 
-from src.textures.library import (
+from textures.library import (
     MaterialTexture,
     SUPPORTED_CHANNELS,
     SUPPORTED_COLOR_SPACES,
@@ -42,7 +43,7 @@ _BUILTIN_NODE_TYPES = {
 
 
 def _validate(texture: MaterialTexture) -> None:
-    if not isinstance(texture, MaterialTexture):
+    if not all(hasattr(texture, name) for name in ("name", "maps", "transform", "builtin")):
         raise TextureMaterialError("material must be a MaterialTexture")
     seen: set[str] = set()
     for item in _maps_for(texture):
@@ -201,6 +202,8 @@ def apply_to_blender(
             _link(tree, image_node, "Color", created["Principled BSDF"], _socket_for(item.channel))
         _link(tree, created["Texture Mapping"], "Vector", image_node, "Vector")
     _link(tree, created["Principled BSDF"], "BSDF", created["Material Output"], "Surface")
+    if hasattr(blender_material, "__setitem__"):
+        blender_material["forge3d_texture"] = json.dumps(texture.to_dict())
     return blender_material
 
 

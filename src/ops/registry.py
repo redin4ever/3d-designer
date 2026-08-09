@@ -38,6 +38,12 @@ from .transform import (
     scale_object,
     set_object_material,
 )
+from .texture_materials import (
+    TEXTURE_MATERIAL_SPECS,
+    apply_texture_material,
+    create_texture_material,
+    update_texture_material,
+)
 
 __all__ = ["OPS", "OP_SPECS", "EDIT_SPECS"]
 
@@ -81,6 +87,9 @@ OPS: HandlerRegistry = {
     "duplicate_object": duplicate_object,
     "rename_object": rename_object,
     "set_object_material": set_object_material,
+    "create_texture_material": create_texture_material,
+    "update_texture_material": update_texture_material,
+    "apply_texture_material": apply_texture_material,
 }
 
 
@@ -453,4 +462,4 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         },
         mutating=True,
     ),
-) + EDIT_SPECS
+) + EDIT_SPECS + TEXTURE_MATERIAL_SPECS
