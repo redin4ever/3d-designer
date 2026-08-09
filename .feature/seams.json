@@ -6,7 +6,8 @@
       "file": "src/contracts/engine.py",
       "line": 233,
       "anchor": "class MaterialOps(Protocol):",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-03",
       "what": "the backend-neutral material and texture capability exposed by every engine",
       "evidence": "MaterialOps can create a flat-color PBR material and assign it, but has no image-texture operation or material query",
       "asks": "which PBR channels and texture sources must the public method support?"
@@ -16,7 +17,8 @@
       "file": "src/engine/surfacing.py",
       "line": 109,
       "anchor": "def create_material(self, name: str, base_color: tuple[float, float, float]) -> str:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-05",
       "what": "Blender node creation, image loading, colour-space setup, and texture transforms",
       "evidence": "SurfacingMixin already owns Principled BSDF setup and bake image nodes, making it the existing texture integration point",
       "asks": "should files be linked from their original location or copied into a managed project texture directory?"
@@ -26,7 +28,8 @@
       "file": "src/testing/fake_surfacing.py",
       "line": 19,
       "anchor": "class FakeSurfacingMixin:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-03",
       "what": "deterministic texture state used by the fast backend suite",
       "evidence": "the fake stores flat PBR values and material assignments but no channel paths or texture settings",
       "asks": "what texture state must be observable for tests and reports?"
@@ -36,7 +39,8 @@
       "file": "src/ops/transform.py",
       "line": 294,
       "anchor": "def set_object_material(engine: EngineProtocol, op: Operation) -> OperationResult:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-09",
       "what": "the logged, replayable operation that applies surfacing to a part",
       "evidence": "set_object_material requires a pre-existing material even though no agent tool can create one",
       "asks": "should texture creation and assignment be one action or separate reusable material-library actions?"
@@ -46,7 +50,8 @@
       "file": "src/ops/registry.py",
       "line": 204,
       "anchor": "name=\"set_object_material\"",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-19",
       "what": "the MCP declaration, phase roles, schema, descriptions, and replay registry",
       "evidence": "the existing tool advertises assignment only and instructs callers to create a material through a method that is not exposed",
       "asks": "in which phases should creating and applying textures be legal?"
@@ -56,7 +61,8 @@
       "file": "src/mcp_server/registry.py",
       "line": 85,
       "anchor": "def _sources(*, include_raw: bool) -> list[tuple[str, tuple[ToolSpec, ...]]]:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-07",
       "what": "tool discovery and read-only material browsing for connected agents",
       "evidence": "MCP composes operation specs automatically, but there is no inspect-role material or texture listing tool",
       "asks": "does the agent need a list/search tool for available materials and presets?"
@@ -66,7 +72,8 @@
       "file": "src/scene/geometry_snapshot.py",
       "line": 84,
       "anchor": "def capture(engine: EngineProtocol, path: str) -> str:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-14",
       "what": "undo barriers, replay, and restoration of textured material definitions",
       "evidence": "snapshots retain only material slot names and explicitly discard PBR values, UVs, and texture paths",
       "asks": "must texture definitions survive rollback, restart, and replay or only the current Blender session?"
@@ -76,7 +83,8 @@
       "file": "src/contracts/wire.py",
       "line": 226,
       "anchor": "materials: tuple[str, ...] = ()",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-17",
       "what": "material information sent with each mesh to the live viewer",
       "evidence": "MeshPayload sends material names and groups but no colour, channel files, sampler, or texture transform",
       "asks": "which material data must the viewer receive, and how large may it be?"
@@ -86,7 +94,8 @@
       "file": "src/app/live.py",
       "line": 99,
       "anchor": "def do_GET(self) -> None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-18",
       "what": "safe browser access to local texture images",
       "evidence": "the local HTTP server has API routes but no allowlisted texture-asset route",
       "asks": "should the viewer load original local files, managed copies, or generated thumbnails?"
@@ -96,7 +105,8 @@
       "file": "frontend/src/viewport.js",
       "line": 101,
       "anchor": "const handle = renderer.createNode(objectId, geometry, geometry.materials, geometry.groups);",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-17",
       "what": "material and texture state retained by each live scene node",
       "evidence": "material names reach createNode but no definitions are resolved or updated",
       "asks": "should texture changes stream live without a full-scene refresh?"
@@ -106,7 +116,8 @@
       "file": "frontend/src/scene-renderer.js",
       "line": 492,
       "anchor": "const base = isPointed ? pointed : focused ? marked : handle.highlighted ? accent : surface;",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02",
       "what": "visible textured rendering in the editor viewport",
       "evidence": "the accepted Canvas2D renderer ignores material names and ADR-016 says textures require a renderer migration rather than an incremental flat-shading tweak",
       "asks": "must v1 textures appear in the live viewport, or is Blender/export visibility sufficient?"
@@ -116,7 +127,8 @@
       "file": "frontend/index.html",
       "line": 132,
       "anchor": "<aside class=\"sidebar\" aria-label=\"Transform, conversation and action log\">",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-07",
       "what": "the operator-facing texture library and selected-part assignment controls",
       "evidence": "frontend/index.html co-changed in 9 of the last 35 feature commits and the selected-object inspector currently exposes transforms only",
       "asks": "should people browse/apply textures in the inspector, or should this release expose agent methods only?"
@@ -126,7 +138,8 @@
       "file": "src/uv/specs.py",
       "line": 34,
       "anchor": "name=\"unwrap_uvs\"",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-08",
       "what": "UV generation required before image textures can map predictably",
       "evidence": "unwrap exists only as a POLISH tool while direct material assignment is available in BLOCKOUT and REFINE",
       "asks": "should applying a texture auto-unwrap missing UVs, refuse with guidance, or use generated coordinates?"
@@ -136,7 +149,8 @@
       "file": "src/engine/exporting.py",
       "line": 27,
       "anchor": "def export_gltf(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-15",
       "what": "PBR texture inclusion and path portability in exported glTF/GLB",
       "evidence": "Blender export can carry node materials, but external-file packaging and missing-file behavior are not defined",
       "asks": "should GLB embed textures by default and should glTF copy them beside the export?"

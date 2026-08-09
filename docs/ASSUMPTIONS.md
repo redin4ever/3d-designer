@@ -234,3 +234,26 @@ reversible option; each is recorded here rather than asked, because the gate had
 - **Blast radius:** `frontend/src/move-gizmo.js`, `frontend/src/point-ui.js`.
 - **Reversal cost:** low — waiting for each transform echo can be restored by retaining the
   pending phase as the pointer gate.
+## A-020 — Initial built-in texture set
+
+- **Feature:** part-textures
+- **Assumed:** ship neutral wood, brick, concrete, stone, metal, and plaster presets.
+- **Why:** the user chose built-in presets but did not name a starter set.
+- **Blast radius:** preset catalogue only; custom textures and saved material definitions are unaffected.
+- **Reversal:** add or remove catalogue records and assets without changing the texture contract.
+
+## A-021 — Texture tools in every mutating phase
+
+- **Feature:** part-textures
+- **Assumed:** create, update, and apply textures are legal in blockout, refine, detail, and polish.
+- **Why:** texture availability should not disappear when the run changes phase.
+- **Blast radius:** MCP role visibility only.
+- **Reversal:** narrow the role tuple in the texture tool specs.
+
+## A-022 — Texture import size limit
+
+- **Feature:** part-textures
+- **Assumed:** reject individual image files larger than 32 MB.
+- **Why:** this bounds accidental memory and browser-transfer cost while covering ordinary 4K PBR maps.
+- **Blast radius:** import validation only; existing managed assets remain readable.
+- **Reversal:** change one limit constant and its validation tests.
