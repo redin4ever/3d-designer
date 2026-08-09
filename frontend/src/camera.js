@@ -159,9 +159,9 @@ export function clipTriangleNear(a, b, c, limit) {
   if (kept.length === 0) return [];
 
   const cross = (p, q) => {
-    // Interpolate every component, not just z: the crossing point has to be on the edge.
+    // Interpolate every carried component, including UV attributes appended after xyz.
     const t = (limit - p[2]) / (q[2] - p[2]);
-    return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, limit];
+    return p.map((value, index) => index === 2 ? limit : value + (q[index] - value) * t);
   };
 
   const poly = [];

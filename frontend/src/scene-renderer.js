@@ -21,8 +21,9 @@
 import { OrbitCamera, clipTriangleNear, shadeFactor, triangleNormal, zUpToYUp } from './camera.js';
 import { hitTestMoveAxis, projectMoveGizmo } from './gizmo.js';
 import { paintIdOutline } from './point-outline.js';
-import { clearFrame, createFrame, drawTriangle } from './raster.js';
+import { clearFrame, createFrame, drawTexturedTriangle, drawTriangle } from './raster.js';
 import { createIdIndex } from './picking.js';
+import { createTextureCache, sampleRgba as sampleTexture } from './texture-renderer.js';
 
 function readColor(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -92,6 +93,20 @@ export class SceneRenderer {
     this._focused = new Set();
     this._hovered = new Set();
     this._selected = new Set();
+    this._textureCache = createTextureCache({
+      fallback: null,
+      loadImage: async (source) => {
+        const image = new Image();
+        image.src = source;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(image, 0, 0);
+        return { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data };
+      },
+    });
     this._toolMode = 'orbit';
     this._moveEnabled = false;
     this._activeMoveAxis = null;
@@ -125,10 +140,15 @@ export class SceneRenderer {
       geometry,
       materials,
       groups,
+      materialDefinitions: geometry.materialDefinitions ?? {},
       highlighted: false,
       transform: { position: [0, 0, 0], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] },
     };
     this.nodes.set(handle.handleId, handle);
+    for (const definition of Object.values(handle.materialDefinitions)) {
+      const albedo = definition.maps?.find((map) => map.channel === 'albedo');
+      if (albedo && !albedo.path.startsWith('builtin://')) this._textureCache.load(albedo.path);
+    }
     return handle;
   }
 
@@ -501,11 +521,42 @@ export class SceneRenderer {
 
         const shade = shadeFactor(triangleNormal(a, b, c));
         const rgb = this._shaded(base, background, shade);
+        const triangleIndex = i / 3;
+        const group = handle.groups?.find((candidate) => {
+          const start = candidate.start ?? candidate[0];
+          const count = candidate.count ?? candidate[1];
+          return i >= start && i < start + count;
+        });
+        const materialIndex = group ? (group.material_index ?? group[2]) : 0;
+        const materialName = handle.materials?.[materialIndex];
+        const material = handle.materialDefinitions?.[materialName];
+        const albedo = material?.maps?.find((map) => map.channel === 'albedo');
+        const hasUv = handle.geometry.uvs?.length === handle.geometry.vertexCount * 2;
+        const texture = albedo?.path?.startsWith('builtin://')
+          ? { builtin: materialName }
+          : albedo ? this._textureCache.get(albedo.path) : null;
+        const builtinSample = ([u, v]) => {
+          const seed = [...(materialName ?? '')].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+          const cell = (Math.floor(u * 8) + Math.floor(v * 8)) & 1;
+          const baseValue = 70 + (seed % 100);
+          return [baseValue + cell * 34, baseValue + cell * 20, Math.max(35, baseValue - 30), 255];
+        };
 
         // No sort, no subdivision, no seam inflation. The depth buffer decides visibility
         // per pixel, so draw order does not matter and none of those are needed.
-        for (const [ca, cb, cc] of clipTriangleNear(a, b, c, nearPlane)) {
-          drawTriangle(frame, project(ca), project(cb), project(cc), rgb, id);
+        const uv = handle.geometry.uvs;
+        const ia = indices[i]; const ib = indices[i + 1]; const ic = indices[i + 2];
+        const withUv = (point, vertex) => [point[0], point[1], point[2], uv?.[vertex * 2] ?? 0, uv?.[vertex * 2 + 1] ?? 0];
+        for (const [ca, cb, cc] of clipTriangleNear(withUv(a, ia), withUv(b, ib), withUv(c, ic), nearPlane)) {
+          const pa = [...project(ca), ca[3], ca[4]];
+          const pb = [...project(cb), cb[3], cb[4]];
+          const pc = [...project(cc), cc[3], cc[4]];
+          if (!isPointed && !focused && !handle.highlighted && hasUv && texture) {
+            const sampler = texture.builtin ? builtinSample : (sampleUv) => sampleTexture(texture, sampleUv, material.transform ?? {});
+            drawTexturedTriangle(frame, pa, pb, pc, sampler, id, shade);
+          } else {
+            drawTriangle(frame, pa, pb, pc, rgb, id);
+          }
         }
       }
     }

@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="src/chat.css" />
   <link rel="stylesheet" href="src/connect.css" />
   <link rel="stylesheet" href="src/point.css" />
+  <link rel="stylesheet" href="src/texture-inspector.css" />
 </head>
 <body>
   <header class="topbar">
@@ -187,6 +188,31 @@
           <div class="transform-actions">
             <button type="button" class="btn primary" data-action="edit-move">Apply position</button>
           </div>
+          <section id="texture-inspector" class="texture-inspector" aria-labelledby="texture-heading">
+            <h3 id="texture-heading">Material &amp; texture</h3>
+            <div class="texture-presets" role="group" aria-label="Built-in texture presets">
+              <button type="button" data-texture-preset="wood">Wood</button>
+              <button type="button" data-texture-preset="brick">Brick</button>
+              <button type="button" data-texture-preset="concrete">Concrete</button>
+              <button type="button" data-texture-preset="stone">Stone</button>
+              <button type="button" data-texture-preset="metal">Metal</button>
+              <button type="button" data-texture-preset="plaster">Plaster</button>
+            </div>
+            <div class="texture-maps">
+              <label>Albedo <input type="file" data-texture-channel="albedo" accept=".png,.jpg,.jpeg,.webp" /></label>
+              <label>Normal <input type="file" data-texture-channel="normal" accept=".png,.jpg,.jpeg,.webp" /></label>
+              <label>Roughness <input type="file" data-texture-channel="roughness" accept=".png,.jpg,.jpeg,.webp" /></label>
+              <label>Metallic <input type="file" data-texture-channel="metallic" accept=".png,.jpg,.jpeg,.webp" /></label>
+            </div>
+            <div class="texture-transform">
+              <label>Repeat X <input type="number" data-texture-field="repeat-x" min="0.01" step="0.1" value="1" /></label>
+              <label>Repeat Y <input type="number" data-texture-field="repeat-y" min="0.01" step="0.1" value="1" /></label>
+              <label>Rotation <input type="number" data-texture-field="rotation" step="1" value="0" /></label>
+              <label>Slot <input type="number" data-texture-field="slot" min="0" step="1" value="0" /></label>
+            </div>
+            <button type="button" class="btn primary texture-apply" data-action="apply-texture">Apply to selection</button>
+            <p data-texture-status role="status">Select one or more parts, then choose a texture.</p>
+          </section>
           <button type="button" class="btn pause-to-edit" data-action="pause-to-edit" hidden>Pause the build to edit</button>
         </div>
       </section>

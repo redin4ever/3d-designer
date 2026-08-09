@@ -161,3 +161,27 @@ export function renderTextureInspector(options = {}) {
     status: { ...state.status },
   };
 }
+
+/** Connect the pure controller to the selected-object inspector. */
+export function attachTextureInspector(root, io) {
+  const panel = root.querySelector('#texture-inspector');
+  const controller = createTextureInspector();
+  const status = panel?.querySelector('[data-texture-status]');
+  const apply = panel?.querySelector('[data-action="apply-texture"]');
+  const refresh = () => {
+    const state = controller.getState();
+    if (apply) apply.disabled = state.selectedObjectIds.length === 0 || (!state.preset && !state.materialId);
+    if (status) status.textContent = state.status.message || (state.selectedObjectIds.length ? `${state.selectedObjectIds.length} part${state.selectedObjectIds.length === 1 ? '' : 's'} selected` : 'Select one or more parts, then choose a texture.');
+  };
+  for (const button of panel?.querySelectorAll('[data-texture-preset]') ?? []) {
+    button.addEventListener('click', () => { controller.setPreset(button.dataset.texturePreset); refresh(); });
+  }
+  apply?.addEventListener('click', () => {
+    const command = controller.buildApplyCommand();
+    const sent = io.send({ type: 'annotate', data: { object_ids: command.params.object_ids, text: '', image: '', edit: { kind: command.name, params: command.params } } });
+    controller.setStatus(sent ? 'ready' : 'error', sent ? 'Texture applied.' : 'Texture could not be sent.');
+    refresh();
+  });
+  refresh();
+  return { setSelection(ids) { controller.setSelection(ids); refresh(); }, controller };
+}

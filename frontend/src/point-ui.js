@@ -131,6 +131,7 @@ export function attachPointing(root, io) {
     if (!composer.hidden) textInput.focus();
     syncPositionFields(io.renderer.objectPosition?.(only()));
     renderEditability();
+    io.onSelection?.([...state.selection]);
   };
 
   // Q-20: the reason, not just the fact. A disabled control with nothing said about it is

@@ -45,6 +45,13 @@ export function buildGeometryBuffers(mesh) {
   const vertexCount = positions.length / 3;
   const triangleCount = indices.length / 3;
 
+  if (mesh.uvs && mesh.uvs.length !== vertexCount * 2) {
+    throw new Error(
+      `mesh ${mesh.object_id ?? '?'}: uvs length ${mesh.uvs.length} does not match ` +
+        `${vertexCount} vertices`,
+    );
+  }
+
   if (typeof mesh.triangle_count === 'number' && mesh.triangle_count !== triangleCount) {
     throw new Error(
       `mesh ${mesh.object_id ?? '?'}: triangle_count ${mesh.triangle_count} does not match the ` +
@@ -60,6 +67,7 @@ export function buildGeometryBuffers(mesh) {
     vertexCount,
     triangleCount,
     materials: mesh.materials ?? [],
+    materialDefinitions: mesh.material_definitions ?? {},
     groups: mesh.groups ?? [],
   };
 }

@@ -141,3 +141,43 @@ export function drawTriangle(frame, a, b, c, [r, g, b_, ], id = 0) {
   }
   return written;
 }
+
+/** Rasterize a UV-mapped triangle while preserving the same depth and picking channels. */
+export function drawTexturedTriangle(frame, a, b, c, sample, id = 0, shade = 1) {
+  const { width, height, color, depth, ids } = frame;
+  const area = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]);
+  if (area === 0 || !Number.isFinite(area)) return 0;
+  const sign = area < 0 ? -1 : 1;
+  const invArea = 1 / (area * sign);
+  const minX = Math.max(0, Math.floor(Math.min(a[0], b[0], c[0])));
+  const maxX = Math.min(width - 1, Math.ceil(Math.max(a[0], b[0], c[0])));
+  const minY = Math.max(0, Math.floor(Math.min(a[1], b[1], c[1])));
+  const maxY = Math.min(height - 1, Math.ceil(Math.max(a[1], b[1], c[1])));
+  let written = 0;
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      const px = x + 0.5;
+      const py = y + 0.5;
+      const w0 = ((b[0] - a[0]) * (py - a[1]) - (px - a[0]) * (b[1] - a[1])) * sign;
+      const w1 = ((c[0] - b[0]) * (py - b[1]) - (px - b[0]) * (c[1] - b[1])) * sign;
+      const w2 = ((a[0] - c[0]) * (py - c[1]) - (px - c[0]) * (a[1] - c[1])) * sign;
+      if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+      const bary = [w1 * invArea, w2 * invArea, w0 * invArea];
+      const invW = bary[0] * a[2] + bary[1] * b[2] + bary[2] * c[2];
+      const idx = y * width + x;
+      if (invW <= depth[idx]) continue;
+      const u = (bary[0] * a[3] * a[2] + bary[1] * b[3] * b[2] + bary[2] * c[3] * c[2]) / invW;
+      const v = (bary[0] * a[4] * a[2] + bary[1] * b[4] * b[2] + bary[2] * c[4] * c[2]) / invW;
+      const rgba = sample([u, v]);
+      depth[idx] = invW;
+      if (ids) ids[idx] = id;
+      const o = idx * 4;
+      color[o] = rgba[0] * shade;
+      color[o + 1] = rgba[1] * shade;
+      color[o + 2] = rgba[2] * shade;
+      color[o + 3] = rgba[3] ?? 255;
+      written += 1;
+    }
+  }
+  return written;
+}

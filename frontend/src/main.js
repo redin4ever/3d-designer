@@ -29,6 +29,7 @@ import {
 import { attachControls, buildRequestFullSceneMessage } from './controls.js';
 import { attachPointing } from './point-ui.js';
 import { attachConnectButton } from './connect-ui.js';
+import { attachTextureInspector } from './texture-inspector.js';
 
 function resolveSocketUrl() {
   const override = new URLSearchParams(location.search).get('ws');
@@ -189,6 +190,7 @@ function main() {
   // Pointing, priority and the edit tools. Given the renderer because picking reads the
   // frame the renderer just drew — the id channel is written in the same inner loop as the
   // depth, so this is the only object that can answer "what is under that pixel".
+  let textureInspector;
   const pointing = attachPointing(controlsRoot, {
     renderer,
     send: (clientMessage) => {
@@ -199,6 +201,11 @@ function main() {
     onError: (message) => {
       controlError.textContent = message;
     },
+    onSelection: (ids) => textureInspector?.setSelection(ids),
+  });
+
+  textureInspector = attachTextureInspector(controlsRoot, {
+    send: (message) => socket.send(message),
   });
 
   attachControls(controlsRoot, {
