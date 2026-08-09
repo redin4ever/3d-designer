@@ -29,4 +29,7 @@ test('the selected-object panel visibly wires the texture inspector', () => {
   assert.match(html, /texture-inspector\.css/);
   assert.match(main, /attachTextureInspector/);
   assert.match(renderer, /sampleTexture/);
+  const inspector = readFileSync(new URL('../src/texture-inspector.js', import.meta.url), 'utf8');
+  assert.match(inspector, /\/api\/textures/);
+  assert.match(inspector, /arrayBuffer/);
 });

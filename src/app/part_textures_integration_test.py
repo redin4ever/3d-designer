@@ -29,3 +29,10 @@ def test_live_server_wires_the_managed_texture_asset_resolver() -> None:
     source = inspect.getsource(live._QuietHandler.do_GET)
     assert "/textures/" in source
     assert "resolve_texture_asset" in source
+
+
+def test_live_server_exposes_texture_library_browse_and_import_endpoints() -> None:
+    assert "/api/textures" in inspect.getsource(live._QuietHandler.do_GET)
+    post_source = inspect.getsource(live._QuietHandler.do_POST)
+    assert "/api/textures" in post_source
+    assert "base64" in post_source
