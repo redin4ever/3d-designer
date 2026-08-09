@@ -137,7 +137,7 @@ Recorded counts, pinned by `registry_test.py::test_the_visible_tool_count_of_eve
 | `align` | 7 | |
 | `detail` | 7 | detail tools plus texture create/update/apply |
 | `polish` | 5 | UV/bake tools plus texture create/update/apply |
-| `inspect` | 10 | **over 8** — measurement and session tools |
+| `inspect` | 11 | **over 8** — measurement, session, and texture discovery tools |
 | `export` | 2 | |
 | `admin` | 2 | |
 

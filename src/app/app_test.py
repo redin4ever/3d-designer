@@ -38,7 +38,7 @@ RECORDED_TOOL_COUNTS: dict[str, int] = {
     "polish": 5,
     # +1: get_operator_context (Q-03) — the tool that returns an annotation image,
     # which an ActionReport is text and cannot carry.
-    "inspect": 10,
+    "inspect": 11,
     "export": 2,
     "admin": 2,
 }

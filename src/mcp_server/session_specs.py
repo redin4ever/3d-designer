@@ -24,12 +24,25 @@ from contracts import ToolRole, ToolSpec
 from .operator_context import get_operator_context
 from .phase_tools import get_phase, promote_phase
 from .scene_query import DEFAULT_PAGE, MAX_PAGE, describe_object, list_objects
+from .texture_tools import list_texture_materials
 
 __all__ = ["SESSION_SPECS"]
 
 _NO_PARAMS = {"type": "object", "properties": {}, "additionalProperties": False}
 
 SESSION_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name="list_texture_materials",
+        description="List built-in presets and reusable managed texture materials with their PBR maps and transforms.",
+        roles=(ToolRole.INSPECT,),
+        input_schema={
+            "type": "object",
+            "properties": {"managed_root": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        handler=list_texture_materials,
+        mutating=False,
+    ),
     ToolSpec(
         name="get_operator_context",
         description=(

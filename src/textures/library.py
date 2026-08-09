@@ -106,6 +106,16 @@ class TextureLibrary:
     def list_presets(self) -> tuple[str, ...]:
         return BUILTIN_PRESETS
 
+    def list_materials(self) -> tuple[MaterialTexture, ...]:
+        custom = []
+        if self.root.is_dir():
+            for manifest in sorted(self.root.glob("*/material.json")):
+                try:
+                    custom.append(self.get(manifest.parent.name))
+                except (KeyError, ValueError):
+                    continue
+        return tuple(self._builtin(name) for name in BUILTIN_PRESETS) + tuple(custom)
+
     def create(self, name: str, source_maps: Mapping[str, Path | str], *, transform: TextureTransform | None = None) -> MaterialTexture:
         self._validate_name(name)
         if name in BUILTIN_PRESETS or (self.root / name).exists():
