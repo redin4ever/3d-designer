@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Create, browse, and apply textures to scene parts",
   "slug": "part-textures",
-  "phase": 3,
+  "phase": 4,
   "baseSha": "4d268afc0c6026d9ed04a4d02e2e24208e8bdba8",
   "branch": "feat/part-textures",
   "docsDir": "docs/features/part-textures",
