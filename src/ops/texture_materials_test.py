@@ -136,3 +136,12 @@ def test_bad_input_is_tool_error_and_does_not_create_material(tmp_path: Path) ->
             _op("create_texture_material", name="bad", managed_root=str(tmp_path / "managed"), maps={"albedo": "missing.gif"}),
         )
     assert "bad" not in engine._materials
+
+
+def test_apply_tool_schema_describes_browser_and_agent_inputs_without_open_ended_fields() -> None:
+    from ops.texture_materials import TEXTURE_MATERIAL_SPECS
+
+    spec = next(item for item in TEXTURE_MATERIAL_SPECS if item.name == "apply_texture_material")
+    properties = spec.input_schema["properties"]
+    assert {"name", "preset", "material_id", "managed_root", "object_ids", "slot"} <= set(properties)
+    assert spec.input_schema["additionalProperties"] is False
