@@ -38,11 +38,11 @@ def test_node_plan_connects_channels_and_preserves_transform() -> None:
     assert {node["channel"] for node in plan.nodes if node["kind"] == "image"} == {
         "albedo", "normal", "roughness", "metallic"
     }
-    assert ("albedo", "Color", "Principled BSDF", "Base Color") in plan.links
-    assert ("normal", "Color", "Normal Map", "Color") in plan.links
+    assert ("Texture albedo", "Color", "Principled BSDF", "Base Color") in plan.links
+    assert ("Texture normal", "Color", "Normal Map", "Color") in plan.links
     assert ("Normal Map", "Normal", "Principled BSDF", "Normal") in plan.links
-    assert ("roughness", "Color", "Principled BSDF", "Roughness") in plan.links
-    assert ("metallic", "Color", "Principled BSDF", "Metallic") in plan.links
+    assert ("Texture roughness", "Color", "Principled BSDF", "Roughness") in plan.links
+    assert ("Texture metallic", "Color", "Principled BSDF", "Metallic") in plan.links
 
 
 def test_every_node_plan_link_names_a_node_that_exists() -> None:
