@@ -75,7 +75,7 @@ def test_apply_validates_every_object_before_mutating(tmp_path: Path) -> None:
     engine = _engine()
     create_texture_material(
         engine,
-        _op("create_texture_material", name="stone", managed_root=str(root), maps={"albedo": str(source)}),
+        _op("create_texture_material", name="stone_custom", managed_root=str(root), maps={"albedo": str(source)}),
     )
 
     with pytest.raises(ToolError, match="missing"):
@@ -83,7 +83,7 @@ def test_apply_validates_every_object_before_mutating(tmp_path: Path) -> None:
             engine,
             _op(
                 "apply_texture_material",
-                name="stone",
+                name="stone_custom",
                 managed_root=str(root),
                 object_ids=["box", "missing"],
             ),
@@ -98,24 +98,23 @@ def test_apply_auto_unwraps_then_assigns_all_objects(tmp_path: Path) -> None:
     engine = _engine()
     create_texture_material(
         engine,
-        _op("create_texture_material", name="concrete", managed_root=str(root), maps={"albedo": str(source)}),
+        _op("create_texture_material", name="concrete_custom", managed_root=str(root), maps={"albedo": str(source)}),
     )
 
     result = apply_texture_material(
         engine,
         _op(
             "apply_texture_material",
-            name="concrete",
+            name="concrete_custom",
             managed_root=str(root),
             object_ids=["box", "plate"],
-            slot=1,
         ),
     )
 
     assert result.modified_objects == ("box", "plate")
     assert engine.snapshot("box").uvs is not None
-    assert engine.snapshot("box").material_slots == ("", "concrete")
-    assert engine.snapshot("plate").material_slots == ("", "concrete")
+    assert engine.snapshot("box").material_slots == ("concrete_custom",)
+    assert engine.snapshot("plate").material_slots == ("concrete_custom",)
 
 
 def test_builtin_preset_can_be_applied_without_files(tmp_path: Path) -> None:
