@@ -64,11 +64,13 @@ def _pair(params: Mapping[str, Any], name: str, default: tuple[float, float]) ->
 
 def _transform(params: Mapping[str, Any], fallback: TextureTransform | None = None) -> TextureTransform:
     base = fallback or TextureTransform()
+    nested = params.get("transform")
+    values = nested if isinstance(nested, Mapping) else params
     try:
         return TextureTransform(
-            repeat=_pair(params, "repeat", base.repeat),
-            rotation=float(params.get("rotation", base.rotation)),
-            offset=_pair(params, "offset", base.offset),
+            repeat=_pair(values, "repeat", base.repeat),
+            rotation=float(values.get("rotation", base.rotation)),
+            offset=_pair(values, "offset", base.offset),
         )
     except (TypeError, ValueError) as exc:
         raise _error("ops.invalid_parameter_value", f"invalid texture transform: {exc}", "use finite repeat, rotation, and offset values") from exc
@@ -222,8 +224,16 @@ TEXTURE_MATERIAL_SPECS = (
         name="apply_texture_material",
         description="Apply a managed texture material to one or more selected objects, auto-unwrapping missing UVs.",
         roles=_TEXTURE_ROLES,
-        input_schema={"type": "object", "properties": {"name": {"type": "string"}, "managed_root": {"type": "string"}, "object_ids": {"type": "array"}, "slot": {"type": "integer", "minimum": 0}},
-        "required": ["object_ids"], "additionalProperties": True},
+        input_schema={"type": "object", "properties": {
+            "name": {"type": ["string", "null"]},
+            "preset": {"type": ["string", "null"]},
+            "material_id": {"type": ["string", "null"]},
+            "managed_root": {"type": "string"},
+            "object_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "slot": {"type": "integer", "minimum": 0},
+            "files": {"type": "object"},
+            "transform": {"type": "object"},
+        }, "required": ["object_ids"], "additionalProperties": False},
         mutating=True,
     ),
 )
