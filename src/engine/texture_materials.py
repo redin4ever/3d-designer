@@ -117,11 +117,11 @@ def node_plan(material_id: str, texture: MaterialTexture) -> NodePlan:
                     "color_space": item.color_space,
                 }
             )
-        links.append((item.channel, "Color", "Principled BSDF", _socket_for(item.channel)))
+        links.append((node_name, "Color", "Principled BSDF", _socket_for(item.channel)))
         links.append(("Texture Mapping", "Vector", node_name, "Vector"))
         if item.channel == "normal":
             links.pop(-2)
-            links.append((item.channel, "Color", "Normal Map", "Color"))
+            links.append((node_name, "Color", "Normal Map", "Color"))
             links.append(("Normal Map", "Normal", "Principled BSDF", "Normal"))
             nodes.append({"name": "Normal Map", "kind": "normal", "type": "ShaderNodeNormalMap"})
     return NodePlan(material_id, tuple(nodes), tuple(links), {
