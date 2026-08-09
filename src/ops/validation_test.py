@@ -18,6 +18,9 @@ from ops import OPS, acceptance_for, validate_params
 #: One minimal, otherwise-valid params dict per registered kind — used to smoke-test
 #: acceptance_for without also exercising validate_params's rejection paths.
 _MINIMAL_VALID_PARAMS: dict[str, dict] = {
+    "create_texture_material": {"name": "paint", "managed_root": ".textures", "maps": {"albedo": "paint.png"}},
+    "update_texture_material": {"name": "paint", "managed_root": ".textures", "maps": {"albedo": "paint.png"}},
+    "apply_texture_material": {"preset": "wood", "object_ids": ["hero"]},
     # The direct edits (Q-14). Each acts on something that already exists, so the acceptance
     # query is about the object surviving the edit rather than about a shape being built.
     "move_object": {"object_id": "hero", "translation": [1.0, 0.0, 0.0]},

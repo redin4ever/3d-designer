@@ -43,17 +43,22 @@ def test_every_op_tool_is_mutating() -> None:
         assert spec.mutating is True, spec.name
 
 
-def test_every_op_tool_role_is_blockout_or_refine() -> None:
+def test_every_op_tool_role_is_an_editing_role() -> None:
     """The construction library is a blockout/refine tool set, never exposed under detail,
     polish, export or admin partitioning — role-partitioning is what keeps each agent's
     visible tool count in the 2-7 range accuracy depends on (ADR-003)."""
     allowed = {ToolRole.BLOCKOUT, ToolRole.REFINE}
     for spec in OP_SPECS:
         assert spec.roles, spec.name
-        assert set(spec.roles) <= allowed, spec.name
+        if "texture_material" in spec.name:
+            assert set(spec.roles) == {
+                ToolRole.BLOCKOUT, ToolRole.REFINE, ToolRole.DETAIL, ToolRole.POLISH,
+            }
+        else:
+            assert set(spec.roles) <= allowed, spec.name
 
 
-def test_registry_covers_exactly_the_sixteen_operations_this_library_declares() -> None:
+def test_registry_covers_exactly_the_nineteen_operations_this_library_declares() -> None:
     """Sixteen kinds are this library's stated public surface: ADR-004's nine construction
     operations, plus the seven direct edits added at Q-14 (move, rotate, scale, delete,
     duplicate, rename, set material).
@@ -65,8 +70,8 @@ def test_registry_covers_exactly_the_sixteen_operations_this_library_declares() 
     shared history for the operator's edits and the agent's: ``OPS`` is what ``scene``
     replays through, so being here is what makes a manual nudge undoable, replayable and
     reachable by roll-back-N-steps."""
-    assert len(OPS) == 16
-    assert len(OP_SPECS) == 16
+    assert len(OPS) == 19
+    assert len(OP_SPECS) == 19
 
 
 def test_every_op_tool_has_a_non_empty_input_schema() -> None:

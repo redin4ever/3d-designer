@@ -14,10 +14,17 @@ refused.
 
 from __future__ import annotations
 
+from pathlib import Path
+import tempfile
+
 import pytest
 
 from contracts import Operation, Vec3
 from ops import OPS
+from textures import TextureLibrary
+
+_TEXTURE_ROOT = Path(tempfile.mkdtemp(prefix="forge3d-texture-ops-"))
+_TEXTURE_FIXTURE = Path(__file__).parents[1] / "textures" / "fixtures" / "pixel.png"
 
 # ------------------------------------------------------------------ shared fixtures/helpers
 
@@ -25,6 +32,9 @@ from ops import OPS
 #: i.e. every optional parameter omitted, so the sweep below sees every default this
 #: library carries.
 _MINIMAL_PARAMS: dict[str, dict] = {
+    "create_texture_material": {"object_id": "texture-library", "name": "create_assumption", "managed_root": str(_TEXTURE_ROOT), "maps": {"albedo": str(_TEXTURE_FIXTURE)}},
+    "update_texture_material": {"object_id": "texture-library", "name": "update_assumption", "managed_root": str(_TEXTURE_ROOT), "maps": {"albedo": str(_TEXTURE_FIXTURE)}},
+    "apply_texture_material": {"object_id": "hero", "preset": "wood", "object_ids": ["hero"]},
     # The direct edits (Q-14). Each takes an object that already exists rather than making
     # one, so they name `hero` from _seed. Included in the sweep for the same reason as
     # everything else: an operation that reports an assumption about a parameter the caller
@@ -102,6 +112,11 @@ def _seed(engine) -> None:
     # The direct edits added at Q-14 target existing things rather than creating them, so the
     # sweep needs a material to exist as well as an object.
     engine.create_material("seed_paint", (0.5, 0.5, 0.5))
+    library = TextureLibrary(_TEXTURE_ROOT)
+    try:
+        library.get("update_assumption")
+    except KeyError:
+        library.create("update_assumption", {"albedo": _TEXTURE_FIXTURE})
 
 
 def _railing_op(op_id: str = "rail", **extra) -> Operation:
