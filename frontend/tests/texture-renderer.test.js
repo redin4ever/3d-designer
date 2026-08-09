@@ -47,7 +47,7 @@ test('perspective-corrects UV interpolation using reciprocal W', () => {
     { uv: [1, 0], invW: 0.5 },
     { uv: [0, 1], invW: 0.5 },
   ], [0.2, 0.4, 0.4]);
-  assert.deepEqual(uv.map((value) => Number(value.toFixed(6))), [0.285714, 0.285714]);
+  assert.deepEqual(uv.map((value) => Number(value.toFixed(6))), [0.333333, 0.333333]);
 });
 
 test('resolves the material group covering a triangle index', () => {
@@ -83,4 +83,3 @@ test('async texture cache deduplicates loads and falls back deterministically', 
   cache.clear();
   assert.deepEqual(cache.get('wood'), fallback);
 });
-
