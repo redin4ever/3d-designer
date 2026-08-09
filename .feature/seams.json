@@ -1,100 +1,146 @@
 {
-  "version": 1,
-  "feature": "Modifier multi-selection and repeatable move drags",
+  "feature": "Part textures",
   "seams": [
     {
-      "id": "selection-state",
-      "file": "frontend/src/annotate.js",
-      "line": 36,
-      "anchor": "export function setSelection(state, objectIds, { toggle = false } = {}) {",
-      "status": "wired",
-      "decision": "Q-01",
-      "what": "the pure pointing state currently exposes replacement selection only",
-      "evidence": "clicks and lassos both flow through setSelection, while the renderer and annotation payload already consume the resulting Set",
-      "asks": "should a modifier gesture add only, or toggle already-selected parts off as well?"
+      "id": "engine-contract",
+      "file": "src/contracts/engine.py",
+      "line": 233,
+      "anchor": "class MaterialOps(Protocol):",
+      "status": "open",
+      "what": "the backend-neutral material and texture capability exposed by every engine",
+      "evidence": "MaterialOps can create a flat-color PBR material and assign it, but has no image-texture operation or material query",
+      "asks": "which PBR channels and texture sources must the public method support?"
     },
     {
-      "id": "pointer-selection-gesture",
-      "file": "frontend/src/point-ui.js",
-      "line": 172,
-      "anchor": "  const pickFrom = (path, toggle = false) => {",
-      "status": "wired",
-      "decision": "Q-01",
-      "what": "point-mode pointer release loses Ctrl and Alt state before replacing selection",
-      "evidence": "endDrag passes only a path to pickFrom, which always calls setSelection",
-      "asks": "should Ctrl and Alt behave identically for both click and lasso gestures?"
+      "id": "blender-materials",
+      "file": "src/engine/surfacing.py",
+      "line": 109,
+      "anchor": "def create_material(self, name: str, base_color: tuple[float, float, float]) -> str:",
+      "status": "open",
+      "what": "Blender node creation, image loading, colour-space setup, and texture transforms",
+      "evidence": "SurfacingMixin already owns Principled BSDF setup and bake image nodes, making it the existing texture integration point",
+      "asks": "should files be linked from their original location or copied into a managed project texture directory?"
     },
     {
-      "id": "multi-selection-inspector",
-      "file": "frontend/src/point-ui.js",
-      "line": 122,
-      "anchor": "  const renderSelection = () => {",
-      "status": "wired",
-      "decision": "Q-03",
-      "what": "the inspector name and transform fields assume the first selected object",
-      "evidence": "renderEditability already requires exactly one selection for move and frame, but the object heading still names the first item",
-      "asks": "when several parts are selected, should object editing stay disabled and should the heading show a count?"
+      "id": "fake-engine",
+      "file": "src/testing/fake_surfacing.py",
+      "line": 19,
+      "anchor": "class FakeSurfacingMixin:",
+      "status": "open",
+      "what": "deterministic texture state used by the fast backend suite",
+      "evidence": "the fake stores flat PBR values and material assignments but no channel paths or texture settings",
+      "asks": "what texture state must be observable for tests and reports?"
     },
     {
-      "id": "move-release-lifecycle",
-      "file": "frontend/src/move-gizmo.js",
-      "line": 47,
-      "anchor": "export function finishMove(session, pointerId) {",
-      "status": "wired",
-      "decision": "Q-04",
-      "what": "a completed pointer drag enters pending and cannot arm another axis until a transform echo arrives",
-      "evidence": "beginMove accepts idle only and point-ui rejects pointerdown unless the session is idle",
-      "asks": "should another axis drag begin immediately after release while the prior absolute move is being confirmed?"
+      "id": "operation",
+      "file": "src/ops/transform.py",
+      "line": 294,
+      "anchor": "def set_object_material(engine: EngineProtocol, op: Operation) -> OperationResult:",
+      "status": "open",
+      "what": "the logged, replayable operation that applies surfacing to a part",
+      "evidence": "set_object_material requires a pre-existing material even though no agent tool can create one",
+      "asks": "should texture creation and assignment be one action or separate reusable material-library actions?"
     },
     {
-      "id": "move-pointer-wiring",
-      "file": "frontend/src/point-ui.js",
-      "line": 82,
-      "anchor": "  let pendingPointerMove = null;",
-      "status": "wired",
-      "decision": "Q-05",
-      "what": "the gizmo pointer gate blocks any session that has not reconciled to idle",
-      "evidence": "the gate directly checks moveSession.phase before hit-testing a different axis",
-      "asks": "how should rejection restore chained optimistic drags?"
+      "id": "tool-registry",
+      "file": "src/ops/registry.py",
+      "line": 204,
+      "anchor": "name=\"set_object_material\"",
+      "status": "open",
+      "what": "the MCP declaration, phase roles, schema, descriptions, and replay registry",
+      "evidence": "the existing tool advertises assignment only and instructs callers to create a material through a method that is not exposed",
+      "asks": "in which phases should creating and applying textures be legal?"
     },
     {
-      "id": "frontend-browser-journey",
-      "file": "frontend/tests-browser/smoke.test.js",
-      "line": 836,
-      "anchor": "  test('Ctrl and Alt clicks visibly toggle multiple selected parts without enabling single-part edits', async () => {",
-      "status": "wired",
-      "decision": "Q-06",
-      "what": "the real browser proves one selected outline but not modifier accumulation",
-      "evidence": "canvas event modifiers and visible simultaneous outlines require a browser-level journey",
-      "asks": "which modifier combinations and visible feedback must be pinned in Chromium?"
+      "id": "mcp-discovery",
+      "file": "src/mcp_server/registry.py",
+      "line": 85,
+      "anchor": "def _sources(*, include_raw: bool) -> list[tuple[str, tuple[ToolSpec, ...]]]:",
+      "status": "open",
+      "what": "tool discovery and read-only material browsing for connected agents",
+      "evidence": "MCP composes operation specs automatically, but there is no inspect-role material or texture listing tool",
+      "asks": "does the agent need a list/search tool for available materials and presets?"
     },
     {
-      "id": "repeat-drag-browser-journey",
-      "file": "frontend/tests-browser/gizmo.browser.mjs",
-      "line": 153,
-      "anchor": "  test('a second axis drag starts immediately without waiting for the first transform echo', async () => {",
-      "status": "wired",
-      "decision": "Q-04",
-      "what": "the browser gizmo journey proves one drag but never attempts a second axis before a transform echo",
-      "evidence": "the reported lockout occurs only across two pointer lifecycles in the live canvas",
-      "asks": "should X then Y work without an intervening server transform?"
+      "id": "undo-replay",
+      "file": "src/scene/geometry_snapshot.py",
+      "line": 84,
+      "anchor": "def capture(engine: EngineProtocol, path: str) -> str:",
+      "status": "open",
+      "what": "undo barriers, replay, and restoration of textured material definitions",
+      "evidence": "snapshots retain only material slot names and explicitly discard PBR values, UVs, and texture paths",
+      "asks": "must texture definitions survive rollback, restart, and replay or only the current Blender session?"
     },
     {
-      "id": "frontend-module-status",
-      "file": "frontend/CLAUDE.md",
-      "line": 6,
-      "anchor": "## Status",
-      "status": "wired",
-      "decision": "Q-06",
-      "what": "the frontend module status records the suite counts maintainers expect",
-      "evidence": "new unit and Chromium journeys increase both counts and stale counts hide missing registration",
-      "asks": "should the module record include the new verified totals?"
+      "id": "wire-payload",
+      "file": "src/contracts/wire.py",
+      "line": 226,
+      "anchor": "materials: tuple[str, ...] = ()",
+      "status": "open",
+      "what": "material information sent with each mesh to the live viewer",
+      "evidence": "MeshPayload sends material names and groups but no colour, channel files, sampler, or texture transform",
+      "asks": "which material data must the viewer receive, and how large may it be?"
+    },
+    {
+      "id": "asset-serving",
+      "file": "src/app/live.py",
+      "line": 99,
+      "anchor": "def do_GET(self) -> None:",
+      "status": "open",
+      "what": "safe browser access to local texture images",
+      "evidence": "the local HTTP server has API routes but no allowlisted texture-asset route",
+      "asks": "should the viewer load original local files, managed copies, or generated thumbnails?"
+    },
+    {
+      "id": "viewer-model",
+      "file": "frontend/src/viewport.js",
+      "line": 101,
+      "anchor": "const handle = renderer.createNode(objectId, geometry, geometry.materials, geometry.groups);",
+      "status": "open",
+      "what": "material and texture state retained by each live scene node",
+      "evidence": "material names reach createNode but no definitions are resolved or updated",
+      "asks": "should texture changes stream live without a full-scene refresh?"
+    },
+    {
+      "id": "viewer-renderer",
+      "file": "frontend/src/scene-renderer.js",
+      "line": 492,
+      "anchor": "const base = isPointed ? pointed : focused ? marked : handle.highlighted ? accent : surface;",
+      "status": "open",
+      "what": "visible textured rendering in the editor viewport",
+      "evidence": "the accepted Canvas2D renderer ignores material names and ADR-016 says textures require a renderer migration rather than an incremental flat-shading tweak",
+      "asks": "must v1 textures appear in the live viewport, or is Blender/export visibility sufficient?"
+    },
+    {
+      "id": "inspector-ui",
+      "file": "frontend/index.html",
+      "line": 132,
+      "anchor": "<aside class=\"sidebar\" aria-label=\"Transform, conversation and action log\">",
+      "status": "open",
+      "what": "the operator-facing texture library and selected-part assignment controls",
+      "evidence": "frontend/index.html co-changed in 9 of the last 35 feature commits and the selected-object inspector currently exposes transforms only",
+      "asks": "should people browse/apply textures in the inspector, or should this release expose agent methods only?"
+    },
+    {
+      "id": "uv-policy",
+      "file": "src/uv/specs.py",
+      "line": 34,
+      "anchor": "name=\"unwrap_uvs\"",
+      "status": "open",
+      "what": "UV generation required before image textures can map predictably",
+      "evidence": "unwrap exists only as a POLISH tool while direct material assignment is available in BLOCKOUT and REFINE",
+      "asks": "should applying a texture auto-unwrap missing UVs, refuse with guidance, or use generated coordinates?"
+    },
+    {
+      "id": "export",
+      "file": "src/engine/exporting.py",
+      "line": 27,
+      "anchor": "def export_gltf(",
+      "status": "open",
+      "what": "PBR texture inclusion and path portability in exported glTF/GLB",
+      "evidence": "Blender export can carry node materials, but external-file packaging and missing-file behavior are not defined",
+      "asks": "should GLB embed textures by default and should glTF copy them beside the export?"
     }
   ],
-  "dismissed": [
-    {
-      "path": "frontend/index.html",
-      "reason": "co-change candidate only; existing controls and accessible labels already cover selection and movement, so no markup registration is needed"
-    }
-  ]
+  "dismissed": []
 }

@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Ctrl or Alt multi-selection and immediately repeatable axis drags",
-  "slug": "multi-selection",
-  "phase": 5,
-  "baseSha": "915ed89bc0ff2444eccaaa89b96c3d43c990d2bc",
-  "branch": "feat/multi-selection",
-  "docsDir": "docs/features/multi-selection",
-  "startedAt": "2026-08-08",
-  "status": "finished"
+  "feature": "Create, browse, and apply textures to scene parts",
+  "slug": "part-textures",
+  "phase": 2,
+  "baseSha": "4d268afc0c6026d9ed04a4d02e2e24208e8bdba8",
+  "branch": "feat/part-textures",
+  "docsDir": "docs/features/part-textures",
+  "startedAt": "2026-08-09",
+  "status": "running"
 }
