@@ -45,6 +45,12 @@ def test_node_plan_connects_channels_and_preserves_transform() -> None:
     assert ("metallic", "Color", "Principled BSDF", "Metallic") in plan.links
 
 
+def test_every_node_plan_link_names_a_node_that_exists() -> None:
+    plan = node_plan("wall", material(("albedo", "wall/albedo.png", "sRGB")))
+    names = {node["name"] for node in plan.nodes}
+    assert all(source in names and target in names for source, _out, target, _in in plan.links)
+
+
 def test_node_plan_uses_deterministic_procedural_nodes_for_builtins() -> None:
     plan = node_plan("wood", material(builtin=True))
 
