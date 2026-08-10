@@ -9,9 +9,16 @@ engine with ``bake_supported=False``.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Sequence
 
-from contracts import EngineError, EngineUnavailable
+from contracts import (
+    EngineError,
+    EngineUnavailable,
+    ModelImportResult,
+    SUPPORTED_MODEL_EXTENSIONS,
+    Vec3,
+)
 
 __all__ = ["FakeSurfacingMixin"]
 
@@ -131,6 +138,81 @@ class FakeSurfacingMixin:
         return {c: f"{output_dir}/{object_id}_{c}.png" for c in channels}
 
     # -------------------------------------------------------------- export
+
+    def import_model(
+        self,
+        path: str,
+        *,
+        source_up: str = "AUTO",
+        unit_scale: float = 1.0,
+        flatten: bool = True,
+    ) -> ModelImportResult:
+        """Bookkeep a deterministic placeholder mesh; the fake never parses asset bytes."""
+        source = Path(path)
+        suffix = source.suffix.lower()
+        if suffix not in SUPPORTED_MODEL_EXTENSIONS:
+            raise EngineError(
+                "engine.unsupported_import_format",
+                f"{suffix or '(none)'} is not a supported model format",
+                f"use one of: {', '.join(SUPPORTED_MODEL_EXTENSIONS)}",
+            )
+        if unit_scale <= 0:
+            raise EngineError(
+                "engine.bad_import_scale", f"unit scale {unit_scale} must be positive",
+                "pass a positive metres-per-source-unit multiplier",
+            )
+        if source_up.upper() not in {"AUTO", "X", "Y", "Z"}:
+            raise EngineError(
+                "engine.bad_import_axis", f"source up axis {source_up!r} is invalid",
+                "use AUTO, X, Y, or Z",
+            )
+        if not source.is_file():
+            raise EngineError(
+                "engine.import_file_missing", f"model file does not exist: {source}",
+                "pass an existing local file path",
+            )
+
+        size = float(unit_scale)
+        object_id = self.create_mesh(
+            source.stem or "Imported",
+            (Vec3(0, 0, 0), Vec3(size, 0, 0), Vec3(0, size, 0)),
+            ((0, 1, 2),),
+        )
+        self._record("import_model", str(source), suffix, source_up.upper(), unit_scale, flatten)
+        return ModelImportResult(object_ids=(object_id,))
+
+    def export_model(
+        self,
+        object_ids: Sequence[str],
+        path: str,
+        *,
+        y_up: bool,
+        mirror_x: bool = False,
+        negate_rotation: bool = False,
+        scale: float = 1.0,
+        apply_modifiers: bool = True,
+    ) -> str:
+        suffix = Path(path).suffix.lower()
+        if suffix not in SUPPORTED_MODEL_EXTENSIONS:
+            raise EngineError(
+                "engine.unsupported_export_format",
+                f"{suffix or '(none)'} is not a supported model format",
+                f"use one of: {', '.join(SUPPORTED_MODEL_EXTENSIONS)}",
+            )
+        if not object_ids:
+            raise EngineError(
+                "engine.nothing_to_export", "no objects were selected for export",
+                "pass at least one object id",
+            )
+        if scale <= 0:
+            raise EngineError("engine.bad_export_scale", f"scale {scale} must be positive")
+        for oid in object_ids:
+            self._get(oid)
+        self._record(
+            "export_model", tuple(object_ids), path, suffix, y_up, mirror_x,
+            negate_rotation, scale, apply_modifiers,
+        )
+        return path
 
     def export_gltf(
         self,
