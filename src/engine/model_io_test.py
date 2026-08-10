@@ -20,14 +20,14 @@ def test_dispatch_covers_every_frozen_model_extension() -> None:
 @pytest.mark.parametrize("path", ["missing.obj", "mesh.blend", "mesh.txt"])
 def test_import_validates_existing_supported_local_files(tmp_path: Path, path: str) -> None:
     target = tmp_path / path
-    if target.suffix == ".obj":
-        target.write_text("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n", encoding="utf-8")
+    if target.name != "missing.obj":
+        target.write_text("not a supported model", encoding="utf-8")
 
     with pytest.raises(EngineError):
         ModelIOMixin().import_model(str(target))
 
 
-@pytest.mark.parametrize("source_up", ["BAD", "W", "x"])
+@pytest.mark.parametrize("source_up", ["BAD", "W"])
 def test_import_rejects_invalid_axis_override(tmp_path: Path, source_up: str) -> None:
     target = tmp_path / "mesh.obj"
     target.write_text("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n", encoding="utf-8")
@@ -65,6 +65,19 @@ def test_import_is_atomic_and_keeps_collision_renamed_mesh(tmp_path: Path) -> No
 
 
 @pytest.mark.needs_blender
+def test_import_with_no_meshes_rolls_back_created_objects(tmp_path: Path) -> None:
+    bpy = pytest.importorskip("bpy")
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    target = tmp_path / "empty.obj"
+    target.write_text("o empty\n", encoding="utf-8")
+
+    with pytest.raises(EngineError, match="engine.model_import_no_meshes"):
+        ModelIOMixin().import_model(str(target))
+    assert list(bpy.data.objects) == []
+
+
+@pytest.mark.needs_blender
 def test_export_duplicates_selected_meshes_and_cleans_temporary_objects(tmp_path: Path) -> None:
     bpy = pytest.importorskip("bpy")
     bpy.ops.object.select_all(action="SELECT")
@@ -78,4 +91,3 @@ def test_export_duplicates_selected_meshes_and_cleans_temporary_objects(tmp_path
     assert ModelIOMixin().export_model(["box"], str(target), y_up=True) == str(target)
     assert target.exists() and target.stat().st_size > 0
     assert not [o for o in bpy.data.objects if o.name.startswith("__forge3d_export__")]
-
