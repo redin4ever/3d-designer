@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Create, browse, and apply textures to scene parts",
-  "slug": "part-textures",
-  "phase": 5,
-  "baseSha": "4d268afc0c6026d9ed04a4d02e2e24208e8bdba8",
-  "branch": "feat/part-textures",
-  "docsDir": "docs/features/part-textures",
-  "startedAt": "2026-08-09",
-  "status": "finished"
+  "feature": "Import and export scene files",
+  "slug": "scene-file-io",
+  "phase": 2,
+  "baseSha": "385731a644cb684b536ca30c7c82500af15574e5",
+  "branch": "feat/scene-file-io",
+  "docsDir": "docs/features/scene-file-io",
+  "startedAt": "2026-08-10",
+  "status": "running"
 }

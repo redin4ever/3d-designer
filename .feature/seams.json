@@ -1,160 +1,223 @@
 {
-  "feature": "Part textures",
+  "feature": "Import and export scene files",
   "seams": [
     {
-      "id": "engine-contract",
-      "file": "src/contracts/engine.py",
-      "line": 233,
-      "anchor": "class MaterialOps(Protocol):",
-      "status": "wired",
-      "decision": "Q-03",
-      "what": "the backend-neutral material and texture capability exposed by every engine",
-      "evidence": "MaterialOps can create a flat-color PBR material and assign it, but has no image-texture operation or material query",
-      "asks": "which PBR channels and texture sources must the public method support?"
-    },
-    {
-      "id": "blender-materials",
-      "file": "src/engine/surfacing.py",
-      "line": 156,
-      "anchor": "def create_texture_material(self, material: object) -> str:",
-      "status": "wired",
-      "decision": "Q-05",
-      "what": "Blender node creation, image loading, colour-space setup, and texture transforms",
-      "evidence": "SurfacingMixin already owns Principled BSDF setup and bake image nodes, making it the existing texture integration point",
-      "asks": "should files be linked from their original location or copied into a managed project texture directory?"
-    },
-    {
-      "id": "fake-engine",
-      "file": "src/testing/fake_surfacing.py",
-      "line": 70,
-      "anchor": "def create_texture_material(self, material: object) -> str:",
-      "status": "wired",
-      "decision": "Q-03",
-      "what": "deterministic texture state used by the fast backend suite",
-      "evidence": "the fake stores flat PBR values and material assignments but no channel paths or texture settings",
-      "asks": "what texture state must be observable for tests and reports?"
-    },
-    {
-      "id": "operation",
-      "file": "src/ops/texture_materials.py",
-      "line": 175,
-      "anchor": "def apply_texture_material(engine: EngineProtocol, op: Operation) -> OperationResult:",
-      "status": "wired",
-      "decision": "Q-09",
-      "what": "the logged, replayable operation that applies surfacing to a part",
-      "evidence": "set_object_material requires a pre-existing material even though no agent tool can create one",
-      "asks": "should texture creation and assignment be one action or separate reusable material-library actions?"
-    },
-    {
-      "id": "tool-registry",
-      "file": "src/ops/registry.py",
-      "line": 465,
-      "anchor": ") + EDIT_SPECS + TEXTURE_MATERIAL_SPECS",
-      "status": "wired",
-      "decision": "Q-19",
-      "what": "the MCP declaration, phase roles, schema, descriptions, and replay registry",
-      "evidence": "the existing tool advertises assignment only and instructs callers to create a material through a method that is not exposed",
-      "asks": "in which phases should creating and applying textures be legal?"
-    },
-    {
-      "id": "mcp-discovery",
-      "file": "src/mcp_server/session_specs.py",
-      "line": 35,
-      "anchor": "name=\"list_texture_materials\"",
-      "status": "wired",
-      "decision": "Q-07",
-      "what": "tool discovery and read-only material browsing for connected agents",
-      "evidence": "MCP composes operation specs automatically, but there is no inspect-role material or texture listing tool",
-      "asks": "does the agent need a list/search tool for available materials and presets?"
-    },
-    {
-      "id": "undo-replay",
-      "file": "src/scene/geometry_snapshot.py",
-      "line": 108,
-      "anchor": "\"material_definitions\": dict(snap.material_definitions),",
-      "status": "wired",
-      "decision": "Q-14",
-      "what": "undo barriers, replay, and restoration of textured material definitions",
-      "evidence": "snapshots retain only material slot names and explicitly discard PBR values, UVs, and texture paths",
-      "asks": "must texture definitions survive rollback, restart, and replay or only the current Blender session?"
-    },
-    {
-      "id": "wire-payload",
-      "file": "src/contracts/wire.py",
-      "line": 236,
-      "anchor": "material_definitions: dict[str, dict] = field(default_factory=dict)",
-      "status": "wired",
-      "decision": "Q-17",
-      "what": "material information sent with each mesh to the live viewer",
-      "evidence": "MeshPayload sends material names and groups but no colour, channel files, sampler, or texture transform",
-      "asks": "which material data must the viewer receive, and how large may it be?"
-    },
-    {
-      "id": "asset-serving",
-      "file": "src/app/live.py",
-      "line": 109,
-      "anchor": "if self.path.startswith(\"/textures/\"):",
-      "status": "wired",
-      "decision": "Q-18",
-      "what": "safe browser access to local texture images",
-      "evidence": "the local HTTP server has API routes but no allowlisted texture-asset route",
-      "asks": "should the viewer load original local files, managed copies, or generated thumbnails?"
-    },
-    {
-      "id": "viewer-model",
-      "file": "frontend/src/viewport.js",
-      "line": 70,
-      "anchor": "materialDefinitions: mesh.material_definitions ?? {},",
-      "status": "wired",
-      "decision": "Q-17",
-      "what": "material and texture state retained by each live scene node",
-      "evidence": "material names reach createNode but no definitions are resolved or updated",
-      "asks": "should texture changes stream live without a full-scene refresh?"
-    },
-    {
-      "id": "viewer-renderer",
-      "file": "frontend/src/scene-renderer.js",
-      "line": 555,
-      "anchor": "const sampler = texture.builtin ? builtinSample : (sampleUv) => sampleTexture(texture, sampleUv, material.transform ?? {});",
-      "status": "wired",
-      "decision": "Q-02",
-      "what": "visible textured rendering in the editor viewport",
-      "evidence": "the accepted Canvas2D renderer ignores material names and ADR-016 says textures require a renderer migration rather than an incremental flat-shading tweak",
-      "asks": "must v1 textures appear in the live viewport, or is Blender/export visibility sufficient?"
-    },
-    {
-      "id": "inspector-ui",
+      "id": "editor-file-entry",
       "file": "frontend/index.html",
-      "line": 191,
-      "anchor": "<section id=\"texture-inspector\" class=\"texture-inspector\" aria-labelledby=\"texture-heading\">",
-      "status": "wired",
-      "decision": "Q-07",
-      "what": "the operator-facing texture library and selected-part assignment controls",
-      "evidence": "frontend/index.html co-changed in 9 of the last 35 feature commits and the selected-object inspector currently exposes transforms only",
-      "asks": "should people browse/apply textures in the inspector, or should this release expose agent methods only?"
+      "line": 17,
+      "anchor": "<header class=\"topbar\">",
+      "status": "open",
+      "what": "the persistent editor chrome where a Blender-like File entry can be reached",
+      "evidence": "the top bar is always visible, while object-specific actions live in the sidebar and viewport tools live on the left shelf",
+      "asks": "should file actions live in a Blender-style File menu, as separate top-bar buttons, or in editor settings?"
     },
     {
-      "id": "uv-policy",
-      "file": "src/ops/texture_materials.py",
-      "line": 209,
-      "anchor": "engine.unwrap(object_id)",
-      "status": "wired",
-      "decision": "Q-08",
-      "what": "UV generation required before image textures can map predictably",
-      "evidence": "unwrap exists only as a POLISH tool while direct material assignment is available in BLOCKOUT and REFINE",
-      "asks": "should applying a texture auto-unwrap missing UVs, refuse with guidance, or use generated coordinates?"
+      "id": "frontend-composition",
+      "file": "frontend/src/main.js",
+      "line": 31,
+      "anchor": "import { attachConnectButton } from './connect-ui.js';",
+      "status": "open",
+      "what": "the only frontend composition point that may wire DOM modules and live scene state together",
+      "evidence": "Connect and the texture inspector both expose attach functions and are composed here; export scope needs current selection and file actions need status reporting",
+      "asks": "should import/export status stay in its dialog, enter the action log, or appear in both?"
     },
     {
-      "id": "export",
-      "file": "src/engine/exporting.py",
-      "line": 87,
-      "anchor": "export_format = export_settings(path)[\"format\"]",
-      "status": "wired",
-      "decision": "Q-15",
-      "what": "PBR texture inclusion and path portability in exported glTF/GLB",
-      "evidence": "Blender export can carry node materials, but external-file packaging and missing-file behavior are not defined",
-      "asks": "should GLB embed textures by default and should glTF copy them beside the export?"
+      "id": "frontend-test-discovery",
+      "file": "frontend/tests/index.js",
+      "line": 21,
+      "anchor": "import './connect.test.js';",
+      "status": "open",
+      "what": "the explicit unit-test discovery list required by this Windows Node setup",
+      "evidence": "frontend/CLAUDE.md states every new *.test.js must be imported here or npm run test:frontend silently skips it",
+      "asks": "no product choice; this seam will wire the file-flow tests into the required suite"
+    },
+    {
+      "id": "browser-journey-registration",
+      "file": "frontend/tests-browser/smoke.test.js",
+      "line": 41,
+      "anchor": "import { registerConnectTests } from './connect.browser.mjs';",
+      "status": "open",
+      "what": "the real-browser journey suite where file picker, download, focus, and dialog behavior can be verified",
+      "evidence": "Connect and gizmo browser journeys are registered from this single smoke-test entry point",
+      "asks": "should completed exports automatically download, or show a ready row that the user clicks?"
+    },
+    {
+      "id": "live-http-api",
+      "file": "src/app/live.py",
+      "line": 73,
+      "anchor": "class _QuietHandler(http.server.SimpleHTTPRequestHandler):",
+      "status": "open",
+      "what": "the same-origin upload/download boundary used by the static editor",
+      "evidence": "texture uploads already use bounded POST bodies and managed temporary files here; client setup and texture assets use named allowlisted routes",
+      "asks": "which formats and maximum upload size should the editor accept, and should multi-file formats arrive as a bundle?"
+    },
+    {
+      "id": "live-app-binding",
+      "file": "src/app/live.py",
+      "line": 202,
+      "anchor": "def serve_frontend(port: int, directory: Path) -> http.server.ThreadingHTTPServer:",
+      "status": "open",
+      "what": "the point where the HTTP server must receive a safe capability for the live scene instead of only a static directory",
+      "evidence": "serve_frontend currently exposes only managed_texture_root; import needs the running orchestrator/scene and export needs the engine",
+      "asks": "must imports require the build to be paused, while exports remain available during a run?"
+    },
+    {
+      "id": "app-runtime-graph",
+      "file": "src/app/__init__.py",
+      "line": 34,
+      "anchor": "class App:",
+      "status": "open",
+      "what": "the live graph holding engine, scene, orchestrator, registry, and viewer references",
+      "evidence": "opening a native project may replace scene state and must keep all five references coherent; importing an asset can use the existing scene",
+      "asks": "should Open replace the current project in-place while keeping the agent/browser session connected, or restart the live session?"
+    },
+    {
+      "id": "engine-file-contract",
+      "file": "src/contracts/engine.py",
+      "line": 278,
+      "anchor": "class ExportOps(Protocol):",
+      "status": "open",
+      "what": "the frozen engine boundary that currently exposes GLB/glTF export but no import capability",
+      "evidence": "all non-Blender code and the fake engine compile against EngineProtocol; Blender 5.2 locally exposes glTF, FBX, OBJ, PLY, STL, and USD import/export operators",
+      "asks": "which interchange formats belong in the supported public contract for this version?"
+    },
+    {
+      "id": "blender-engine-composition",
+      "file": "src/engine/session.py",
+      "line": 33,
+      "anchor": "class BlenderEngine(",
+      "status": "open",
+      "what": "the concrete Blender engine composition where file-import behavior must become reachable",
+      "evidence": "BlenderEngine composes MeshOps, surfacing, and ExportingMixin; a new import responsibility must be mixed in here",
+      "asks": "on import, should hierarchy be flattened to world transforms and non-mesh objects be ignored with a report, or should hierarchy/cameras/lights be preserved?"
+    },
+    {
+      "id": "fake-engine-file-io",
+      "file": "src/testing/fake_surfacing.py",
+      "line": 135,
+      "anchor": "def export_gltf(",
+      "status": "open",
+      "what": "the bpy-free engine implementation every backend and integration suite depends on",
+      "evidence": "it records the full export conversion today; import must gain deterministic fake behavior so the feature is testable without Blender",
+      "asks": "no product choice; the fake will mirror the chosen public import/export contract"
+    },
+    {
+      "id": "export-policy",
+      "file": "src/export/writer.py",
+      "line": 67,
+      "anchor": "def export_scene(",
+      "status": "open",
+      "what": "the existing export policy that checks geometry, applies target conversion, writes, and returns a warning report",
+      "evidence": "it always writes despite defects and currently delegates only export_gltf",
+      "asks": "should editor export keep the existing warn-and-continue policy, and should it export the current selection or the whole scene by default?"
+    },
+    {
+      "id": "export-profile-default",
+      "file": "src/contracts/export_profiles.py",
+      "line": 158,
+      "anchor": "DEFAULT_PROFILE = \"roblox\"",
+      "status": "open",
+      "what": "the current agent export default, which converts metres to Roblox studs",
+      "evidence": "an editor Save/Export action using this default would unexpectedly rescale a generic GLB; Godot is currently the closest generic glTF profile but is not named that way",
+      "asks": "should the editor default to generic glTF metres with optional Roblox/Unity/Unreal/Godot profiles, or inherit Roblox?"
+    },
+    {
+      "id": "agent-export-specs",
+      "file": "src/export/registry.py",
+      "line": 16,
+      "anchor": "EXPORT_SPECS: tuple[ToolSpec, ...] = (",
+      "status": "open",
+      "what": "the public agent-facing file tool declarations",
+      "evidence": "export_scene and check_export_budget are declared here, then rebound to live handlers without changing their schemas",
+      "asks": "should agents receive a matching import_scene_file tool, and should the existing export_scene schema gain a format option without breaking current calls?"
+    },
+    {
+      "id": "agent-file-handlers",
+      "file": "src/mcp_server/export_specs.py",
+      "line": 175,
+      "anchor": "_HANDLERS = {",
+      "status": "open",
+      "what": "the direct MCP execution route for file operations that do not belong in the ordinary export log path",
+      "evidence": "export runs outside scene history because it mutates no geometry; import must instead enter shared history and report produced objects",
+      "asks": "may agents import any local path under the existing unrestricted-local trust model, while browser uploads remain managed and allowlisted?"
+    },
+    {
+      "id": "operation-handler-registry",
+      "file": "src/app/handlers.py",
+      "line": 210,
+      "anchor": "def build_handlers(*, include_raw: bool = True) -> HandlerRegistry:",
+      "status": "open",
+      "what": "the replay registry every geometry-changing operation must reach",
+      "evidence": "browser edits and agent operations share this registry; an imported asset must be replayable or explicitly opaque to keep undo honest",
+      "asks": "should one import be one undo step, with the source copied into managed project storage so replay remains deterministic?"
+    },
+    {
+      "id": "operator-edit-history",
+      "file": "src/orchestration/reporting.py",
+      "line": 284,
+      "anchor": "def apply_operator_edit(self, op: Operation) -> ActionReport:",
+      "status": "open",
+      "what": "the browser-originated write path that logs edits, takes a short lease, publishes reports, and keeps one shared history",
+      "evidence": "direct engine writes are explicitly rejected here as a second timeline; import from the editor has the same consequence",
+      "asks": "should import use this shared operation path and remain undoable, while Open Project deliberately replaces history after confirmation?"
+    },
+    {
+      "id": "native-project-persistence",
+      "file": "src/scene/persistence.py",
+      "line": 123,
+      "anchor": "class PersistenceMixin:",
+      "status": "open",
+      "what": "the existing but UI-inaccessible forge3d JSON operation-log save/load capability",
+      "evidence": "save preserves operations, head, checkpoints, barriers, and metadata; load returns a new Scene and requires replay, while texture/import source assets are currently external paths",
+      "asks": "does 'the file' include a native editable forge3d project package, or only ordinary 3D interchange files?"
+    },
+    {
+      "id": "durable-geometry-assets",
+      "file": "src/scene/geometry_snapshot.py",
+      "line": 83,
+      "anchor": "def capture(engine: EngineProtocol, path: str) -> str:",
+      "status": "open",
+      "what": "the current all-geometry serializer used for undo barriers, including UVs and managed material definitions",
+      "evidence": "captures are temporary session files and deliberately not durable projects; a self-contained project package needs explicit asset packing rather than silently reusing temp paths",
+      "asks": "should native project files be self-contained packages with imported models and texture maps embedded, or reference files beside the project?"
+    },
+    {
+      "id": "phase-visibility",
+      "file": "src/contracts/phases.py",
+      "line": 66,
+      "anchor": "PHASE_ROLES: dict[Phase, tuple[ToolRole, ...]] = {",
+      "status": "open",
+      "what": "the phase gate that currently makes EXPORT tools visible only during Polish",
+      "evidence": "a mutating import assigned only to the EXPORT role would be unavailable during Blockout, when bringing in reference or base geometry is most useful",
+      "asks": "in which phases should agents be allowed to import models, and should browser import be available whenever the operator pauses?"
+    },
+    {
+      "id": "export-report-visibility",
+      "file": "src/viewer/report.py",
+      "line": 77,
+      "anchor": "def report_export(self, report: ExportReport) -> None:",
+      "status": "open",
+      "what": "the existing viewer path for export completion and warnings",
+      "evidence": "the frontend already handles EXPORT_REPORT, but the current MCP export handler never calls this method, so agent exports are invisible in the editor",
+      "asks": "should file completion and warnings appear in both the file dialog and action log for browser and agent exports?"
     }
   ],
-  "dismissed": []
+  "dismissed": [
+    {
+      "path": "src/contracts/wire.py",
+      "reason": "no new WebSocket message is required if browser import uploads over same-origin HTTP and then uses the existing operator-edit operation path; export is a same-origin HTTP download"
+    },
+    {
+      "path": "src/app/texture_assets.py",
+      "reason": "its resolver is deliberately image-only; scene file upload/download needs a separate allowlist and must not weaken the texture route"
+    },
+    {
+      "path": "package.json",
+      "reason": "the browser already has File/Blob/download APIs and Python has zip/tempfile support; no runtime dependency is required"
+    },
+    {
+      "path": "database and account permissions",
+      "reason": "the product is a loopback-only local process with no accounts or database; visibility is controlled by local process access and MCP roles"
+    }
+  ]
 }
