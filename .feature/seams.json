@@ -6,7 +6,8 @@
       "file": "frontend/index.html",
       "line": 17,
       "anchor": "<header class=\"topbar\">",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-08,Q-09,Q-25",
       "what": "the persistent editor chrome where a Blender-like File entry can be reached",
       "evidence": "the top bar is always visible, while object-specific actions live in the sidebar and viewport tools live on the left shelf",
       "asks": "should file actions live in a Blender-style File menu, as separate top-bar buttons, or in editor settings?"
@@ -16,7 +17,8 @@
       "file": "frontend/src/main.js",
       "line": 31,
       "anchor": "import { attachConnectButton } from './connect-ui.js';",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02,Q-09,Q-10,Q-15,Q-18,Q-22",
       "what": "the only frontend composition point that may wire DOM modules and live scene state together",
       "evidence": "Connect and the texture inspector both expose attach functions and are composed here; export scope needs current selection and file actions need status reporting",
       "asks": "should import/export status stay in its dialog, enter the action log, or appear in both?"
@@ -26,7 +28,8 @@
       "file": "frontend/tests/index.js",
       "line": 21,
       "anchor": "import './connect.test.js';",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02",
       "what": "the explicit unit-test discovery list required by this Windows Node setup",
       "evidence": "frontend/CLAUDE.md states every new *.test.js must be imported here or npm run test:frontend silently skips it",
       "asks": "no product choice; this seam will wire the file-flow tests into the required suite"
@@ -36,7 +39,8 @@
       "file": "frontend/tests-browser/smoke.test.js",
       "line": 41,
       "anchor": "import { registerConnectTests } from './connect.browser.mjs';",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-10,Q-18",
       "what": "the real-browser journey suite where file picker, download, focus, and dialog behavior can be verified",
       "evidence": "Connect and gizmo browser journeys are registered from this single smoke-test entry point",
       "asks": "should completed exports automatically download, or show a ready row that the user clicks?"
@@ -46,7 +50,8 @@
       "file": "src/app/live.py",
       "line": 73,
       "anchor": "class _QuietHandler(http.server.SimpleHTTPRequestHandler):",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-17,Q-22,Q-24,Q-30,Q-31,Q-32",
       "what": "the same-origin upload/download boundary used by the static editor",
       "evidence": "texture uploads already use bounded POST bodies and managed temporary files here; client setup and texture assets use named allowlisted routes",
       "asks": "which formats and maximum upload size should the editor accept, and should multi-file formats arrive as a bundle?"
@@ -56,7 +61,8 @@
       "file": "src/app/live.py",
       "line": 202,
       "anchor": "def serve_frontend(port: int, directory: Path) -> http.server.ThreadingHTTPServer:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-19",
       "what": "the point where the HTTP server must receive a safe capability for the live scene instead of only a static directory",
       "evidence": "serve_frontend currently exposes only managed_texture_root; import needs the running orchestrator/scene and export needs the engine",
       "asks": "must imports require the build to be paused, while exports remain available during a run?"
@@ -66,7 +72,8 @@
       "file": "src/app/__init__.py",
       "line": 34,
       "anchor": "class App:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-11,Q-25",
       "what": "the live graph holding engine, scene, orchestrator, registry, and viewer references",
       "evidence": "opening a native project may replace scene state and must keep all five references coherent; importing an asset can use the existing scene",
       "asks": "should Open replace the current project in-place while keeping the agent/browser session connected, or restart the live session?"
@@ -76,7 +83,8 @@
       "file": "src/contracts/engine.py",
       "line": 278,
       "anchor": "class ExportOps(Protocol):",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01,Q-04,Q-06,Q-14",
       "what": "the frozen engine boundary that currently exposes GLB/glTF export but no import capability",
       "evidence": "all non-Blender code and the fake engine compile against EngineProtocol; Blender 5.2 locally exposes glTF, FBX, OBJ, PLY, STL, and USD import/export operators",
       "asks": "which interchange formats belong in the supported public contract for this version?"
@@ -86,7 +94,8 @@
       "file": "src/engine/session.py",
       "line": 33,
       "anchor": "class BlenderEngine(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-04,Q-07,Q-12,Q-13,Q-14,Q-21",
       "what": "the concrete Blender engine composition where file-import behavior must become reachable",
       "evidence": "BlenderEngine composes MeshOps, surfacing, and ExportingMixin; a new import responsibility must be mixed in here",
       "asks": "on import, should hierarchy be flattened to world transforms and non-mesh objects be ignored with a report, or should hierarchy/cameras/lights be preserved?"
@@ -96,7 +105,8 @@
       "file": "src/testing/fake_surfacing.py",
       "line": 135,
       "anchor": "def export_gltf(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-04,Q-12",
       "what": "the bpy-free engine implementation every backend and integration suite depends on",
       "evidence": "it records the full export conversion today; import must gain deterministic fake behavior so the feature is testable without Blender",
       "asks": "no product choice; the fake will mirror the chosen public import/export contract"
@@ -106,7 +116,8 @@
       "file": "src/export/writer.py",
       "line": 67,
       "anchor": "def export_scene(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-15,Q-16,Q-29",
       "what": "the existing export policy that checks geometry, applies target conversion, writes, and returns a warning report",
       "evidence": "it always writes despite defects and currently delegates only export_gltf",
       "asks": "should editor export keep the existing warn-and-continue policy, and should it export the current selection or the whole scene by default?"
@@ -116,7 +127,8 @@
       "file": "src/contracts/export_profiles.py",
       "line": 158,
       "anchor": "DEFAULT_PROFILE = \"roblox\"",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-16,Q-29",
       "what": "the current agent export default, which converts metres to Roblox studs",
       "evidence": "an editor Save/Export action using this default would unexpectedly rescale a generic GLB; Godot is currently the closest generic glTF profile but is not named that way",
       "asks": "should the editor default to generic glTF metres with optional Roblox/Unity/Unreal/Godot profiles, or inherit Roblox?"
@@ -126,7 +138,8 @@
       "file": "src/export/registry.py",
       "line": 16,
       "anchor": "EXPORT_SPECS: tuple[ToolSpec, ...] = (",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02,Q-27,Q-29",
       "what": "the public agent-facing file tool declarations",
       "evidence": "export_scene and check_export_budget are declared here, then rebound to live handlers without changing their schemas",
       "asks": "should agents receive a matching import_scene_file tool, and should the existing export_scene schema gain a format option without breaking current calls?"
@@ -136,7 +149,8 @@
       "file": "src/mcp_server/export_specs.py",
       "line": 175,
       "anchor": "_HANDLERS = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-28,Q-29",
       "what": "the direct MCP execution route for file operations that do not belong in the ordinary export log path",
       "evidence": "export runs outside scene history because it mutates no geometry; import must instead enter shared history and report produced objects",
       "asks": "may agents import any local path under the existing unrestricted-local trust model, while browser uploads remain managed and allowlisted?"
@@ -146,7 +160,8 @@
       "file": "src/app/handlers.py",
       "line": 210,
       "anchor": "def build_handlers(*, include_raw: bool = True) -> HandlerRegistry:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-11,Q-20,Q-21",
       "what": "the replay registry every geometry-changing operation must reach",
       "evidence": "browser edits and agent operations share this registry; an imported asset must be replayable or explicitly opaque to keep undo honest",
       "asks": "should one import be one undo step, with the source copied into managed project storage so replay remains deterministic?"
@@ -156,7 +171,8 @@
       "file": "src/orchestration/reporting.py",
       "line": 284,
       "anchor": "def apply_operator_edit(self, op: Operation) -> ActionReport:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-19,Q-20",
       "what": "the browser-originated write path that logs edits, takes a short lease, publishes reports, and keeps one shared history",
       "evidence": "direct engine writes are explicitly rejected here as a second timeline; import from the editor has the same consequence",
       "asks": "should import use this shared operation path and remain undoable, while Open Project deliberately replaces history after confirmation?"
@@ -166,7 +182,8 @@
       "file": "src/scene/persistence.py",
       "line": 123,
       "anchor": "class PersistenceMixin:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01,Q-03,Q-05,Q-23,Q-24,Q-26",
       "what": "the existing but UI-inaccessible forge3d JSON operation-log save/load capability",
       "evidence": "save preserves operations, head, checkpoints, barriers, and metadata; load returns a new Scene and requires replay, while texture/import source assets are currently external paths",
       "asks": "does 'the file' include a native editable forge3d project package, or only ordinary 3D interchange files?"
@@ -176,7 +193,8 @@
       "file": "src/scene/geometry_snapshot.py",
       "line": 83,
       "anchor": "def capture(engine: EngineProtocol, path: str) -> str:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-03,Q-05,Q-23,Q-32",
       "what": "the current all-geometry serializer used for undo barriers, including UVs and managed material definitions",
       "evidence": "captures are temporary session files and deliberately not durable projects; a self-contained project package needs explicit asset packing rather than silently reusing temp paths",
       "asks": "should native project files be self-contained packages with imported models and texture maps embedded, or reference files beside the project?"
@@ -186,7 +204,8 @@
       "file": "src/contracts/phases.py",
       "line": 66,
       "anchor": "PHASE_ROLES: dict[Phase, tuple[ToolRole, ...]] = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-27",
       "what": "the phase gate that currently makes EXPORT tools visible only during Polish",
       "evidence": "a mutating import assigned only to the EXPORT role would be unavailable during Blockout, when bringing in reference or base geometry is most useful",
       "asks": "in which phases should agents be allowed to import models, and should browser import be available whenever the operator pauses?"
@@ -196,7 +215,8 @@
       "file": "src/viewer/report.py",
       "line": 77,
       "anchor": "def report_export(self, report: ExportReport) -> None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-18",
       "what": "the existing viewer path for export completion and warnings",
       "evidence": "the frontend already handles EXPORT_REPORT, but the current MCP export handler never calls this method, so agent exports are invisible in the editor",
       "asks": "should file completion and warnings appear in both the file dialog and action log for browser and agent exports?"
