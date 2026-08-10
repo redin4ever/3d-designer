@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Import and export scene files",
   "slug": "scene-file-io",
-  "phase": 3,
+  "phase": 4,
   "baseSha": "385731a644cb684b536ca30c7c82500af15574e5",
   "branch": "feat/scene-file-io",
   "docsDir": "docs/features/scene-file-io",

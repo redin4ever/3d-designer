@@ -1,4 +1,74 @@
 {
   "feature": "Import and export scene files",
-  "units": []
+  "units": [
+    {
+      "id": "file-contracts",
+      "what": "typed model import result, generic file-format engine operations, and generic editor export profile",
+      "paths": ["src/contracts/engine.py", "src/contracts/export_profiles.py", "src/contracts/file_io_test.py"],
+      "publicInterface": "src/contracts/engine.py",
+      "dependsOn": [],
+      "seams": ["engine-file-contract", "export-profile-default"],
+      "decisions": ["Q-04", "Q-06", "Q-07", "Q-12", "Q-14", "Q-16", "Q-29"],
+      "status": "planned"
+    },
+    {
+      "id": "engine-model-io",
+      "what": "atomic Blender model import and multi-format export adapters with deterministic names and flattened mesh transforms",
+      "paths": ["src/engine/model_io.py", "src/engine/model_io_test.py"],
+      "publicInterface": "src/engine/model_io.py",
+      "dependsOn": ["file-contracts"],
+      "seams": ["blender-engine-composition", "fake-engine-file-io", "export-policy"],
+      "decisions": ["Q-04", "Q-07", "Q-12", "Q-13", "Q-14", "Q-21"],
+      "status": "planned"
+    },
+    {
+      "id": "scene-file-package",
+      "what": "portable .forge3d ZIP package, legacy JSON loading, content-addressed asset storage, and atomic project replacement",
+      "paths": ["src/scene_files/**"],
+      "publicInterface": "src/scene_files/__init__.py",
+      "dependsOn": ["file-contracts"],
+      "seams": ["native-project-persistence", "durable-geometry-assets"],
+      "decisions": ["Q-01", "Q-03", "Q-05", "Q-11", "Q-23", "Q-24", "Q-26", "Q-32"],
+      "status": "planned"
+    },
+    {
+      "id": "frontend-file-flow",
+      "what": "pure file-flow controller, Blender-style menu/dialog UI, shortcuts, selection-aware export, progress, cancellation, and downloads",
+      "paths": ["frontend/src/file-io.js", "frontend/src/file-io.css", "frontend/tests/file-io.test.js", "frontend/tests-browser/file-io.browser.mjs"],
+      "publicInterface": "frontend/src/file-io.js",
+      "dependsOn": [],
+      "seams": ["editor-file-entry", "frontend-composition", "frontend-test-discovery", "browser-journey-registration", "export-report-visibility"],
+      "decisions": ["Q-08", "Q-09", "Q-10", "Q-15", "Q-16", "Q-17", "Q-18", "Q-19", "Q-22", "Q-25"],
+      "status": "planned"
+    },
+    {
+      "id": "live-file-api",
+      "what": "bounded same-origin file jobs, managed upload/download tokens, progress/cancel state, and project/model service orchestration",
+      "paths": ["src/app/file_api.py", "src/app/file_api_test.py"],
+      "publicInterface": "src/app/file_api.py",
+      "dependsOn": ["engine-model-io", "scene-file-package"],
+      "seams": ["live-http-api", "live-app-binding", "app-runtime-graph"],
+      "decisions": ["Q-11", "Q-17", "Q-18", "Q-19", "Q-21", "Q-22", "Q-24", "Q-25", "Q-30", "Q-31", "Q-32"],
+      "status": "planned"
+    },
+    {
+      "id": "agent-file-operations",
+      "what": "replay-honest import operation and agent-facing import tool schemas/handlers across modelling phases",
+      "paths": ["src/importing/**", "src/mcp_server/import_specs.py", "src/mcp_server/import_specs_test.py"],
+      "publicInterface": "src/importing/__init__.py",
+      "dependsOn": ["file-contracts", "engine-model-io"],
+      "seams": ["agent-export-specs", "agent-file-handlers", "operation-handler-registry", "operator-edit-history", "phase-visibility"],
+      "decisions": ["Q-02", "Q-20", "Q-21", "Q-27", "Q-28", "Q-29"],
+      "status": "planned"
+    },
+    {
+      "id": "scene-file-integration",
+      "what": "main-agent reconciliation of shared composition, registries, engine/fake surfaces, HTTP routes, editor chrome, viewer reports, and end-to-end wiring tests",
+      "paths": ["src/app/scene_file_integration_test.py"],
+      "dependsOn": ["engine-model-io", "scene-file-package", "frontend-file-flow", "live-file-api", "agent-file-operations"],
+      "seams": ["editor-file-entry", "frontend-composition", "frontend-test-discovery", "browser-journey-registration", "live-http-api", "live-app-binding", "app-runtime-graph", "engine-file-contract", "blender-engine-composition", "fake-engine-file-io", "export-policy", "export-profile-default", "agent-export-specs", "agent-file-handlers", "operation-handler-registry", "operator-edit-history", "native-project-persistence", "durable-geometry-assets", "phase-visibility", "export-report-visibility"],
+      "decisions": ["Q-01", "Q-02", "Q-04", "Q-08", "Q-11", "Q-15", "Q-18", "Q-19", "Q-20", "Q-21", "Q-27", "Q-29"],
+      "status": "planned"
+    }
+  ]
 }
