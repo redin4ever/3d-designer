@@ -175,6 +175,14 @@ def _axis_export_kwargs(y_up: bool) -> dict[str, object]:
     return {"axis_forward": "-Y", "axis_up": "Z"}
 
 
+def _wm_axis_export_kwargs(y_up: bool) -> dict[str, object]:
+    """Blender 4+/5 ``wm`` exporters use long-form axis property names."""
+
+    if y_up:
+        return {"forward_axis": "NEGATIVE_Z", "up_axis": "Y"}
+    return {"forward_axis": "NEGATIVE_Y", "up_axis": "Z"}
+
+
 def _export_kwargs(suffix: str, *, y_up: bool, apply_modifiers: bool) -> dict[str, object]:
     if suffix in (".glb", ".gltf"):
         return {
@@ -194,7 +202,7 @@ def _export_kwargs(suffix: str, *, y_up: bool, apply_modifiers: bool) -> dict[st
         return {
             "export_selected_objects": True,
             "apply_modifiers": apply_modifiers,
-            **_axis_export_kwargs(y_up),
+            **_wm_axis_export_kwargs(y_up),
         }
     return {
         "selected_objects_only": True,
@@ -401,4 +409,3 @@ class ModelIOMixin:
                 bpy.context.view_layer.objects.active = None
 
         return str(path)
-
