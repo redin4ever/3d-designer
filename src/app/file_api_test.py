@@ -81,13 +81,15 @@ def test_rejects_oversize_and_non_local_binary_requests(tmp_path: Path) -> None:
     assert oversize.value.status == 413
     assert oversize.value.payload["error"]["code"] == "upload_too_large"
 
+    remote_manager = FileJobManager(tmp_path / "remote")
     with pytest.raises(FileApiError) as remote:
-        manager.submit(
+        remote_manager.submit(
             {"content-type": "application/json"},
             b'{"action":"import-model","url":"https://example.invalid/part.obj"}',
         )
     assert remote.value.status == 400
     assert remote.value.payload["error"]["code"] == "local_file_required"
+    remote_manager.close()
     manager.close()
 
 

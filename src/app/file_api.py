@@ -161,14 +161,15 @@ class FileJobManager:
                     raise FileApiError("size_mismatch", "The announced file size does not match the upload.")
             except ValueError as exc:
                 raise FileApiError("invalid_size", "The announced file size is invalid.") from exc
+        if len(raw) > self.max_upload_bytes:
+            limit = (
+                f"{self.max_upload_bytes / (1024 * 1024):g} MiB"
+                if self.max_upload_bytes >= 1024 * 1024
+                else f"{self.max_upload_bytes} bytes"
+            )
+            raise FileApiError("upload_too_large", f"Files must be {limit} or smaller.", status=413)
         content_type = normalized.get("content-type", "").split(";", 1)[0].strip().lower()
         is_json = content_type == "application/json"
-        if not is_json and len(raw) > self.max_upload_bytes:
-            raise FileApiError(
-                "upload_too_large",
-                f"Files must be {self.max_upload_bytes // (1024 * 1024)} MiB or smaller.",
-                status=413,
-            )
         payload: dict[str, Any]
         if is_json:
             try:
