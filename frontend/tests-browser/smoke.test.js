@@ -40,6 +40,7 @@ import {
 import { probeCanvas, waitForCanvasDrawn } from './harness/canvas-probe.mjs';
 import { registerConnectTests } from './connect.browser.mjs';
 import { registerGizmoTests } from './gizmo.browser.mjs';
+import { registerFileIoTests } from './file-io.browser.mjs';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NARROW = { width: 360, height: 720 };
@@ -669,6 +670,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   // browser and static server this suite already pays for.
   registerConnectTests({ withScene, waitUntil });
   registerGizmoTests({ test, withScene, waitUntil, greeting: FULL_SCENE_GREETING });
+  registerFileIoTests({ withScene, waitUntil });
 
   // ---- pointing, priority and the edit tools --------------------------------------
   //
