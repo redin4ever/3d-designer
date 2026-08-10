@@ -155,13 +155,19 @@ def test_filenames_are_deterministic_and_download_paths_are_confined(tmp_path: P
 
 
 def test_cleanup_removes_job_files_and_tokens(tmp_path: Path) -> None:
+    seen: dict[str, Path] = {}
+
+    def export(context):
+        seen["source_root"] = context.source_path
+        return FileOperationResult(data=b"x", filename="scene.glb")
+
     manager = FileJobManager(
         tmp_path,
-        operations={"export-model": lambda _context: FileOperationResult(data=b"x", filename="scene.glb")},
+        operations={"export-model": export},
     )
     job = manager.submit({"content-type": "application/json"}, b'{"action":"export-model"}')
     result = _eventually(manager, job["job_id"], "complete")
-    source_root = Path(manager.get(job["job_id"])["source_root"])
+    source_root = seen["source_root"]
     output = manager.download_path(result["download_token"])
 
     manager.cleanup(job["job_id"])

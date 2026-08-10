@@ -429,7 +429,6 @@ class FileJobManager:
                 "progress": job.progress,
                 "message": job.message,
                 "filename": job.download_filename or job.filename,
-                "source_root": str(job.source_root),
             }
             if job.error is not None:
                 result["ok"] = False
