@@ -10,6 +10,7 @@ import pytest
 
 from contracts import Operation, Vec3
 from scene import Scene
+from scene.geometry_snapshot import capture
 from scene_files import (
     MissingDependencyError,
     load_package,
@@ -17,6 +18,7 @@ from scene_files import (
     validate_package,
 )
 from testing import FakeEngine
+from textures import MaterialTexture, TextureMap
 
 
 def _scene_with_geometry() -> Scene:
@@ -47,6 +49,22 @@ def test_save_contains_manifest_document_current_geometry_and_barrier_snapshots(
     assert result.path == path
 
 
+def test_save_packages_each_undo_barrier_geometry_state(tmp_path):
+    """Undo barriers must keep both sides of their geometry state in the portable file."""
+    scene = _scene_with_geometry()
+    before = tmp_path / "before.json"
+    after = tmp_path / "after.json"
+    capture(scene.engine, str(before))
+    capture(scene.engine, str(after))
+    scene._snapshots.register(0, str(before), str(after))
+
+    save_scene(scene, tmp_path / "barriers.forge3d")
+
+    with zipfile.ZipFile(tmp_path / "barriers.forge3d") as archive:
+        assert "geometry/barriers/0.json" in archive.namelist()
+        assert "geometry/barriers/1.json" in archive.namelist()
+
+
 def test_save_deduplicates_identical_source_and_texture_assets(tmp_path):
     """Identical referenced bytes must occupy one content-addressed managed entry."""
     source = tmp_path / "source.obj"
@@ -60,7 +78,8 @@ def test_save_deduplicates_identical_source_and_texture_assets(tmp_path):
     scene.document.head = 1
     scene.engine.snapshot("cube")
     # The material definition is placed in the current geometry snapshot by the package.
-    scene.engine.create_texture_material(type("Material", (), {"name": "mat", "to_dict": lambda self: {"name": "mat", "maps": [{"channel": "albedo", "path": str(texture)}]}})())
+    material = MaterialTexture("mat", (TextureMap("albedo", str(texture), "sRGB"),))
+    scene.engine.assign_texture_material("cube", "mat", material=material)
     path = tmp_path / "dedupe.forge3d"
 
     save_scene(scene, path)
@@ -96,7 +115,8 @@ def test_save_reports_all_missing_dependencies_atomically(tmp_path):
     with pytest.raises(MissingDependencyError) as exc:
         save_scene(scene, target)
 
-    assert {"one.obj", "two.obj"} <= set(exc.value.paths)
+    assert any(path.endswith("one.obj") for path in exc.value.paths)
+    assert any(path.endswith("two.obj") for path in exc.value.paths)
     assert not target.exists()
 
 
@@ -147,3 +167,22 @@ def test_load_validation_failure_does_not_mutate_live_engine(tmp_path):
 
     assert not result.validation.valid
     assert tuple(scene.engine.list_objects()) == before
+
+
+def test_valid_load_prepares_scene_without_replaying_into_live_engine(tmp_path):
+    """Validation and extraction may prepare a document, but replay remains an explicit commit."""
+    source = tmp_path / "model.obj"
+    source.write_bytes(b"mesh")
+    scene = _scene_with_geometry()
+    scene.document.operations.append(Operation("import", "import_model", {"path": str(source)}))
+    scene.document.head = 1
+    package = tmp_path / "valid.forge3d"
+    save_scene(scene, package)
+    target_engine = FakeEngine()
+
+    result = load_package(package, target_engine, {})
+
+    assert result.validation.valid
+    assert result.scene is not None
+    assert tuple(target_engine.list_objects()) == ()
+    assert result.current_geometry_path is not None
