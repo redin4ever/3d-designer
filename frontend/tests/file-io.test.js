@@ -5,6 +5,7 @@ import {
   MAX_FILE_BYTES,
   buildExportPayload,
   createFileController,
+  attachFileMenu,
   validateLocalFile,
 } from '../src/file-io.js';
 
@@ -26,7 +27,7 @@ test('local file validation rejects URLs, text values, unsupported extensions, a
   assert.equal(validateLocalFile(file('model.glb')).ok, true);
   assert.equal(validateLocalFile(file('scene.forge3d')).ok, true);
   assert.equal(validateLocalFile('https://example.test/model.glb').ok, false);
-  assert.equal(validateLocalFile(file('scene.gltf', 2, 'text/plain')).ok, false);
+  assert.equal(validateLocalFile(file('scene.txt', 2, 'text/plain')).ok, false);
   assert.equal(validateLocalFile(file('model.exe')).ok, false);
   assert.equal(validateLocalFile(file('huge.glb', MAX_FILE_BYTES + 1)).ok, false);
 });
@@ -56,7 +57,9 @@ test('controller uploads local files as binary and sends the requested import ac
   const controller = createFileController({
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
-      return response({ job_id: 'job-1' });
+      return url === '/api/file-io/jobs'
+        ? response({ job_id: 'job-1' })
+        : response({ status: 'complete' });
     },
     pollInterval: 0,
   });
@@ -137,6 +140,7 @@ test('dirty Open and Import honor Save, Discard, and Cancel', async () => {
   const fetchImpl = async (url, init) => {
     actions.push({ url, init });
     if (url === '/api/file-io/jobs') return response({ job_id: `${actions.length}` });
+    if (url.includes('/downloads/')) return response(new Blob(['project']));
     return response({ status: 'complete', download_url: '/downloads/project.forge3d' });
   };
   const outcomes = ['save', 'discard', 'cancel'];
@@ -169,13 +173,29 @@ test('shortcut decisions are Ctrl+O, Ctrl+S, and Ctrl+Shift+S', () => {
 test('save and export status is delivered to the dialog and callback', async () => {
   const statuses = [];
   const controller = createFileController({
-    fetchImpl: async (url) => url === '/api/file-io/jobs'
-      ? response({ job_id: 'job-4' })
-      : response({ status: 'complete', download_url: '/downloads/out.glb' }),
+    fetchImpl: async (url) => {
+      if (url === '/api/file-io/jobs') return response({ job_id: 'job-4' });
+      if (url === '/downloads/out.glb') return response(new Blob(['mesh']));
+      return response({ status: 'complete', download_url: '/downloads/out.glb' });
+    },
+    urlImpl: {
+      createObjectURL: () => 'blob:out',
+      revokeObjectURL: () => {},
+    },
     pollInterval: 0,
     onStatus: (status) => statuses.push(status),
   });
   const result = await controller.saveProject({ filename: 'house.forge3d' });
   assert.equal(result.ok, true);
   assert.ok(statuses.some((status) => status.phase === 'complete'));
+});
+
+test('DOM attachment is optional-element safe and still returns a controller', () => {
+  const root = {
+    ownerDocument: {},
+    querySelector: () => null,
+    addEventListener: () => {},
+  };
+  const attached = attachFileMenu(root, { fetchImpl: async () => response({}) });
+  assert.ok(attached?.controller);
 });
