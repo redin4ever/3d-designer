@@ -89,6 +89,28 @@ def test_save_deduplicates_identical_source_and_texture_assets(tmp_path):
     assert len(assets) == 1
 
 
+def test_save_embeds_sources_from_the_registered_import_operation(tmp_path):
+    """Packaging follows the operation kind exposed to the editor and agents."""
+    from importing import IMPORT_OPERATION_KIND
+
+    source = tmp_path / "registered.obj"
+    source.write_text("v 0 0 0\n", encoding="utf-8")
+    scene = _scene_with_geometry()
+    scene.document.operations.append(
+        Operation("registered-import", IMPORT_OPERATION_KIND, {"path": str(source)})
+    )
+    scene.document.head = 1
+    target = tmp_path / "registered.forge3d"
+
+    save_scene(scene, target)
+
+    with zipfile.ZipFile(target) as archive:
+        document = json.loads(archive.read("scene/document.json"))
+        saved_path = document["operations"][0]["params"]["path"]
+        assert saved_path.startswith("assets/sources/")
+        assert saved_path in archive.namelist()
+
+
 def test_validate_rejects_zip_traversal(tmp_path):
     """A crafted archive must not escape the extraction directory."""
     path = tmp_path / "evil.forge3d"
