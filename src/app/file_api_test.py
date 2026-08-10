@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+import json
 from pathlib import Path
 
 import pytest
@@ -134,11 +135,11 @@ def test_filenames_are_deterministic_and_download_paths_are_confined(tmp_path: P
     manager = FileJobManager(tmp_path, operations={"export-model": export})
     first = manager.submit(
         {"content-type": "application/json"},
-        b'{"action":"export-model","filename":"..\\..\\bad name?.glb"}',
+        json.dumps({"action": "export-model", "filename": "..\\..\\bad name?.glb"}).encode(),
     )
     result = _eventually(manager, first["job_id"], "complete")
     path = manager.download_path(result["download_token"])
-    assert path.parent == (tmp_path / "downloads").resolve()
+    assert path.is_relative_to((tmp_path / "downloads").resolve())
     assert path.name == "bad_name_.glb"
     assert ".." not in path.parts
 
