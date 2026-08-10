@@ -131,12 +131,12 @@ Recorded counts, pinned by `registry_test.py::test_the_visible_tool_count_of_eve
 
 | Role | Tools | |
 |---|---|---|
-| `blockout` | 15 | includes texture create/update/apply |
-| `refine` | 14 | includes texture create/update/apply |
+| `blockout` | 16 | includes texture operations and model import |
+| `refine` | 15 | includes texture operations and model import |
 | `repair` | 8 | |
 | `align` | 7 | |
-| `detail` | 7 | detail tools plus texture create/update/apply |
-| `polish` | 5 | UV/bake tools plus texture create/update/apply |
+| `detail` | 8 | detail and texture tools plus model import |
+| `polish` | 6 | UV/bake and texture tools plus model import |
 | `inspect` | 11 | **over 8** — measurement, session, and texture discovery tools |
 | `export` | 2 | |
 | `admin` | 2 | |

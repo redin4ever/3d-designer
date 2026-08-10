@@ -305,6 +305,16 @@ def build_handlers(*, include_raw: bool = True) -> HandlerRegistry:
         "unwrap_and_bake": "unwrap_and_bake",
     })
 
+    try:
+        from importing import IMPORT_OPERATION_KIND, import_model_file
+
+        # Already speaks the scene handler convention; adapting it would incorrectly
+        # unpack the Operation into keyword arguments and bypass its opaque boundary.
+        registry[IMPORT_OPERATION_KIND] = import_model_file
+    except Exception as exc:  # noqa: BLE001
+        MISSING_MODULES.append("importing")
+        log.warning("importing unavailable, its file operation is absent: %s", exc)
+
     def phase_promotion(engine: EngineProtocol, op: Operation) -> OperationResult:
         """Record a phase transition. Changes no geometry.
 

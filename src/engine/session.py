@@ -22,6 +22,7 @@ from contracts import EngineProtocol
 
 from .exporting import ExportingMixin
 from .mesh import MeshOpsMixin
+from .model_io import ModelIOMixin
 from .modifiers import ModifierOpsMixin
 from .raw import RawOpsMixin
 from .replacing import MeshReplaceMixin
@@ -35,6 +36,7 @@ class BlenderEngine(
     MeshReplaceMixin,
     ModifierOpsMixin,
     SurfacingMixin,
+    ModelIOMixin,
     ExportingMixin,
     RawOpsMixin,
 ):

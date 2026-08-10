@@ -73,7 +73,7 @@ function defaultDownload(documentImpl, href, filename) {
   const anchor = documentImpl.createElement('a');
   anchor.href = href;
   anchor.download = filename;
-  anchor.click();
+  anchor.click?.();
 }
 
 function responsePayload(response) {

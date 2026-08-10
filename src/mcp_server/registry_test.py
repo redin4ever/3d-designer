@@ -31,12 +31,14 @@ TOOL_COUNTS_BY_ROLE: dict[str, int] = {
     # blockout and refine both gained the seven direct edits added at Q-14 — move, rotate,
     # scale, delete, duplicate, rename, set material. Updated deliberately, which is the
     # measurement Gate B 3.3 asked for; not capped, which is the one response ruled out.
-    "blockout": 15,
-    "refine": 14,
+    # +1 in each modelling phase: local model import is useful from blockout through
+    # polish and remains one opaque, undoable operation.
+    "blockout": 16,
+    "refine": 15,
     "repair": 8,
     "align": 7,
-    "detail": 7,
-    "polish": 5,
+    "detail": 8,
+    "polish": 6,
     # +1: get_operator_context (Q-03) — the tool that returns an annotation image,
     # which an ActionReport is text and cannot carry.
     "inspect": 11,

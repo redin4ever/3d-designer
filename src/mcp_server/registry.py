@@ -37,6 +37,7 @@ from ops import OP_SPECS
 from raw import RAW_TOOL_SPEC
 
 from .export_specs import EXPORT_TOOL_SPECS
+from .import_specs import IMPORT_TOOL_SPECS
 from .session_specs import SESSION_SPECS
 
 _LOG = logging.getLogger(__name__)
@@ -87,6 +88,7 @@ def _sources(*, include_raw: bool) -> list[tuple[str, tuple[ToolSpec, ...]]]:
     sources: list[tuple[str, tuple[ToolSpec, ...]]] = [
         ("ops", OP_SPECS),
         ("export", EXPORT_TOOL_SPECS),
+        ("import", IMPORT_TOOL_SPECS),
         ("session", SESSION_SPECS),
     ]
     for module_name, attr_name in _OPTIONAL_SOURCES:

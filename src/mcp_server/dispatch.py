@@ -10,6 +10,7 @@ from typing import Any
 
 from contracts import Operation, Phase, ToolError, ToolRole, ToolSpec, roles_for_phase
 from raw import RAW_TOOL_SPEC
+from importing import IMPORT_OPERATION_KIND
 
 from .authorize import authorize
 from .context import context_for
@@ -142,7 +143,7 @@ def dispatch(
         params=dict(params),
         phase=phase.value,
         author=f"mcp:{acting_role}:{getattr(lease, 'holder', '')}",
-        opaque=(name == RAW_TOOL_SPEC.name),
+        opaque=(name in {RAW_TOOL_SPEC.name, IMPORT_OPERATION_KIND}),
     )
     report = orchestrator.perform(op, lease)
     return to_jsonable(report)
