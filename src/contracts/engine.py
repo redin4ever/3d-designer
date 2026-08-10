@@ -26,16 +26,29 @@ from .geometry import AABB, MeshSnapshot, Transform, Vec3
 
 __all__ = [
     "RepairOutcome",
+    "ModelImportResult",
+    "SUPPORTED_MODEL_EXTENSIONS",
     "MeshOps",
     "ModifierOps",
     "MaterialOps",
     "UVBakeOps",
+    "ImportOps",
     "ExportOps",
     "RawOps",
     "EngineProtocol",
     "EngineError",
     "EngineUnavailable",
 ]
+
+
+SUPPORTED_MODEL_EXTENSIONS: tuple[str, ...] = (
+    ".glb", ".gltf", ".fbx", ".obj", ".stl", ".ply", ".usd", ".usda", ".usdc",
+)
+"""Interchange formats supported by the installed Blender 5.2 adapter.
+
+``.blend`` is deliberately absent: a forge3d project is a versioned ``.forge3d`` package,
+while opening an arbitrary Blender working file would replace process-level scene state.
+"""
 
 
 class EngineError(RuleError):
@@ -85,6 +98,20 @@ class RepairOutcome:
     @property
     def complete(self) -> bool:
         return self.skipped == 0
+
+
+@dataclass(frozen=True, slots=True)
+class ModelImportResult:
+    """Meshes created by one atomic import and any non-fatal omissions."""
+
+    object_ids: tuple[str, ...]
+    warnings: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.object_ids:
+            raise ValueError("a successful model import must create at least one mesh")
+        if len(set(self.object_ids)) != len(self.object_ids):
+            raise ValueError("a model import cannot report the same object twice")
 
 
 @runtime_checkable
@@ -275,7 +302,40 @@ class UVBakeOps(Protocol):
 
 
 @runtime_checkable
+class ImportOps(Protocol):
+    def import_model(
+        self,
+        path: str,
+        *,
+        source_up: str = "AUTO",
+        unit_scale: float = 1.0,
+        flatten: bool = True,
+    ) -> ModelImportResult:
+        """Import one supported model atomically.
+
+        Implementations keep mesh geometry and materials, deterministically rename incoming
+        collisions, and report ignored non-mesh content through ``warnings``. ``source_up``
+        is ``AUTO``, ``X``, ``Y`` or ``Z``; the result is always internal metres and Z-up.
+        """
+        ...
+
+
+@runtime_checkable
 class ExportOps(Protocol):
+    def export_model(
+        self,
+        object_ids: Sequence[str],
+        path: str,
+        *,
+        y_up: bool,
+        mirror_x: bool = False,
+        negate_rotation: bool = False,
+        scale: float = 1.0,
+        apply_modifiers: bool = True,
+    ) -> str:
+        """Write a supported interchange format inferred from ``path`` and return it."""
+        ...
+
     def export_gltf(
         self,
         object_ids: Sequence[str],
@@ -334,7 +394,9 @@ class RawOps(Protocol):
 
 
 @runtime_checkable
-class EngineProtocol(MeshOps, ModifierOps, MaterialOps, UVBakeOps, ExportOps, RawOps, Protocol):
+class EngineProtocol(
+    MeshOps, ModifierOps, MaterialOps, UVBakeOps, ImportOps, ExportOps, RawOps, Protocol
+):
     """The complete engine surface. ``src/engine/`` implements it against bpy; the test
     fake implements it in pure Python."""
 

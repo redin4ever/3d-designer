@@ -91,6 +91,17 @@ _GENERAL_BUDGETS: dict[AssetClass, int] = {
 
 
 PROFILES: dict[str, ExportProfile] = {
+    "generic": ExportProfile(
+        name="generic",
+        up_axis=UpAxis.Y,
+        handedness=Handedness.RIGHT,
+        metres_per_unit=1.0,
+        unit_name="m",
+        flip_x=False,
+        negate_rotation=False,
+        budgets=dict(_GENERAL_BUDGETS),
+        notes="Editor-safe glTF convention: metres, Y-up, right-handed.",
+    ),
     "roblox": ExportProfile(
         name="roblox",
         up_axis=UpAxis.Y,

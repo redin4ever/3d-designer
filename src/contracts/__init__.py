@@ -30,11 +30,14 @@ from .engine import (
     EngineProtocol,
     EngineUnavailable,
     ExportOps,
+    ImportOps,
     MaterialOps,
     MeshOps,
     ModifierOps,
     RawOps,
     RepairOutcome,
+    ModelImportResult,
+    SUPPORTED_MODEL_EXTENSIONS,
     UVBakeOps,
 )
 from .export_profiles import (
@@ -137,7 +140,8 @@ __all__ = [
     "AABB", "MeshSnapshot", "Quat", "Transform", "Vec3", "WORLD_UP",
     # engine
     "EngineProtocol", "EngineError", "EngineUnavailable", "RepairOutcome",
-    "MeshOps", "ModifierOps", "MaterialOps", "UVBakeOps", "ExportOps", "RawOps",
+    "ModelImportResult", "SUPPORTED_MODEL_EXTENSIONS",
+    "MeshOps", "ModifierOps", "MaterialOps", "UVBakeOps", "ImportOps", "ExportOps", "RawOps",
     # measurement
     "MetricKind", "DefectClass", "Severity", "DEFAULT_SEVERITY", "Comparison",
     "Measurement", "Defect", "MeasurementReport", "AcceptanceQuery", "AcceptanceResult",
