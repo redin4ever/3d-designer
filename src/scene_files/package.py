@@ -19,6 +19,7 @@ from typing import Any, Iterable
 
 from scene import Scene
 from scene.geometry_snapshot import capture, is_geometry_snapshot
+from importing import IMPORT_OPERATION_KIND
 
 from . import (
     MissingDependencyError,
@@ -361,7 +362,7 @@ def save_scene(scene: Any, path: str | Path) -> PackageSaveResult:
         document = json.loads(document_path.read_text(encoding="utf-8"))
         replacements: dict[str, str] = {}
         for operation in document.get("operations", []):
-            if operation.get("kind") != "import_model":
+            if operation.get("kind") not in {IMPORT_OPERATION_KIND, "import_model"}:
                 continue
             for raw in _iter_strings(operation.get("params", {}), _SOURCE_KEYS):
                 entry = _path_replacement(raw, kind="sources", assets_by_digest=assets_by_digest, assets=assets, missing=missing)
