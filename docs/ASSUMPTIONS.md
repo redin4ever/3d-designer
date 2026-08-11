@@ -257,3 +257,86 @@ reversible option; each is recorded here rather than asked, because the gate had
 - **Why:** this bounds accidental memory and browser-transfer cost while covering ordinary 4K PBR maps.
 - **Blast radius:** import validation only; existing managed assets remain readable.
 - **Reversal:** change one limit constant and its validation tests.
+
+## A-023 — Gable roof is the first semantic roof family
+
+- **Feature:** architectural-quality
+- **Assumed:** ship an axis-aligned gable roof operation first; hip, gambrel, mansard and
+  curved roofs remain future typed operations.
+- **Why:** the incident involved a gable assembled from rotated cubes, and one well-verified
+  family is more accurate than a style enum whose branches are only partly correct.
+- **Blast radius:** `src/ops/` roof handler, schema and tests.
+- **Reversal:** additive — later roof families can be separate operations.
+
+## A-024 — Gable ridges support both world horizontal axes
+
+- **Feature:** architectural-quality
+- **Assumed:** `ridge_axis` accepts `x` or `y`; arbitrary yaw is deferred.
+- **Why:** this covers rectangular buildings in either grid orientation without introducing
+  quaternion input into an architectural tool.
+- **Blast radius:** roof geometry and schema.
+- **Reversal:** add a direction vector later while retaining the axis values.
+
+## A-025 — Landing stairs are additive
+
+- **Feature:** architectural-quality
+- **Assumed:** preserve `add_staircase` exactly and add `add_staircase_to_landing`.
+- **Why:** saved operation logs replay by operation kind, so changing the existing handler
+  would alter old geometry during undo/reload.
+- **Blast radius:** new ops handler and registry entry only.
+- **Reversal:** deprecate the old operation after a versioned migration exists.
+
+## A-026 — Landing bounds derive stair placement
+
+- **Feature:** architectural-quality
+- **Assumed:** the caller supplies the bottom start point, landing id, tread count and width;
+  the tool derives direction, rise and run from live landing bounds.
+- **Why:** this moves spatial arithmetic out of the model while keeping the design choice of
+  where the stair starts with the model.
+- **Blast radius:** landing-stair handler and acceptance queries.
+- **Reversal:** add explicit override parameters without changing the default.
+
+## A-027 — Railings remain separate
+
+- **Feature:** architectural-quality
+- **Assumed:** landing stairs include stringers but not railings.
+- **Why:** `add_railing` is already the verified typed operation for plumb posts, corners and
+  clear baluster spacing; duplicating it would create two competing implementations.
+- **Blast radius:** stair output only.
+- **Reversal:** add a convenience orchestration recipe, not duplicate geometry logic.
+
+## A-028 — Architectural contact stays explicit joinery
+
+- **Feature:** architectural-quality
+- **Assumed:** any intentional trim or support penetration is recorded as
+  `JoineryIntent`; geometric proximity never implies permission.
+- **Why:** the existing clipping model cannot distinguish a socket from a mistake.
+- **Blast radius:** operation metadata wiring.
+- **Reversal:** none planned; this is an existing product invariant.
+
+## A-029 — No whole-house generator
+
+- **Feature:** architectural-quality
+- **Assumed:** fix the missing middle-grain operations rather than adding `build_house`.
+- **Why:** ADR-004 records lower execution accuracy for over-composite calls and the user
+  explicitly asked to restore the app's purpose.
+- **Blast radius:** product scope only.
+- **Reversal:** a future high-level recipe can orchestrate the same typed operations.
+
+## A-030 — Real-Blender architectural smoke proof
+
+- **Feature:** architectural-quality
+- **Assumed:** geometry contracts run on `FakeEngine`, with one `needs_blender` smoke test
+  confirming the same operations render through the real adapter.
+- **Why:** fake geometry proves dimensions and topology but not the actual Blender scene path.
+- **Blast radius:** ops test suite only.
+- **Reversal:** the smoke can move to a broader integration suite later.
+
+## A-031 — Existing staircase replay remains bit-for-bit
+
+- **Feature:** architectural-quality
+- **Assumed:** old `add_staircase` parameters and produced ids do not change.
+- **Why:** operation logs are the source of truth and silently changing replayed geometry is
+  worse than keeping the legacy operation available.
+- **Blast radius:** compatibility tests pin the old handler.
+- **Reversal:** requires a versioned scene migration.

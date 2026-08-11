@@ -6,7 +6,8 @@
       "file": "src/ops/registry.py",
       "line": 70,
       "anchor": "OPS: HandlerRegistry = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02, Q-17",
       "what": "registers every replayable construction operation",
       "evidence": "add_railing and add_staircase are both reachable only through this registry",
       "asks": "should the roof and landing-connected stair be distinct typed operations rather than a whole-house composite?"
@@ -16,7 +17,8 @@
       "file": "src/ops/registry.py",
       "line": 230,
       "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-05, Q-08, Q-16",
       "what": "defines the names and parameters an agent actually sees",
       "evidence": "the existing staircase schema exposes no direction or landing target, and there is no roof spec",
       "asks": "which architectural choices must be explicit in the agent-visible schemas?"
@@ -26,7 +28,8 @@
       "file": "src/ops/validation.py",
       "line": 184,
       "anchor": "    elif kind == \"add_staircase\":",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-06, Q-11",
       "what": "rejects impossible construction parameters before geometry is created",
       "evidence": "the current staircase validates positive numbers only; it cannot reject a run that misses its landing",
       "asks": "should bad architectural attachment fail atomically or be created with a warning?"
@@ -36,7 +39,8 @@
       "file": "src/ops/_acceptance.py",
       "line": 17,
       "anchor": "def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, ...]:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01, Q-12",
       "what": "declares each operation's re-runnable definition of done",
       "evidence": "the function has no production caller, and several subjects are not valid evaluator subjects",
       "asks": "should operation-specific acceptance become a hard phase-promotion requirement?"
@@ -46,7 +50,8 @@
       "file": "src/ops/__init__.py",
       "line": 24,
       "anchor": "__all__ = [",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-07",
       "what": "is the only supported import surface for construction operations",
       "evidence": "the local module rules prohibit consumers from importing implementation files directly",
       "asks": "should both new architectural operations be public and replayable?"
@@ -56,7 +61,8 @@
       "file": "src/mcp_server/dispatch.py",
       "line": 140,
       "anchor": "    op = Operation(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-12, Q-14",
       "what": "turns a validated tool call into the persisted operation",
       "evidence": "it currently leaves Operation.acceptance and Operation.joinery empty even though both are persisted contract fields",
       "asks": "should dispatch attach typed operation acceptance and declared architectural joinery automatically?"
@@ -66,7 +72,8 @@
       "file": "src/orchestration/phases.py",
       "line": 75,
       "anchor": "    def can_promote(self) -> tuple[bool, tuple[AcceptanceResult, ...]]:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01, Q-13",
       "what": "decides whether a scene may advance to the next quality phase",
       "evidence": "it collects logged joinery but ignores every logged operation acceptance query",
       "asks": "should a scene remain unfinished while any construction operation's own definition of done fails?"
@@ -76,7 +83,8 @@
       "file": "src/orchestration/_phase_acceptance.py",
       "line": 206,
       "anchor": "def evaluate_phase(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-13, Q-15",
       "what": "evaluates hard geometric facts for phase promotion",
       "evidence": "it evaluates only generic manifold/gap checks, not semantic roof or stair attachment checks",
       "asks": "how should operation-specific queries be combined with generic phase checks without weakening either?"
@@ -86,7 +94,8 @@
       "file": "src/app/handlers.py",
       "line": 251,
       "anchor": "        from ops import OPS",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-18, Q-19",
       "what": "connects ops handlers to the live scene and replay path",
       "evidence": "new OPS entries are composed automatically, but the wiring must be covered by the app-level registry test",
       "asks": "should the app continue auto-composing architectural handlers from OPS?"
@@ -96,7 +105,8 @@
       "file": "README.md",
       "line": 48,
       "anchor": "| **Build** | primitives, walls, floors, openings, staircases, railings, arrays along curves, LOD chains, grid-aligned modular kits |",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-16, Q-20",
       "what": "tells users and agents what semantic construction tools exist",
       "evidence": "roofing and landing-connected stairs are absent from the published capability list",
       "asks": "should the documented workflow explicitly forbid improvised cube roofs when a semantic roof tool applies?"
