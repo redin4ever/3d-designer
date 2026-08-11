@@ -91,13 +91,13 @@
     },
     {
       "id": "application-handler-composition",
-      "file": "src/app/handlers.py",
-      "line": 251,
-      "anchor": "        from ops import OPS",
+      "file": "src/app/app_test.py",
+      "line": 69,
+      "anchor": "def test_every_operation_module_reaches_the_registry() -> None:",
       "status": "wired",
       "decision": "Q-18, Q-19",
       "what": "connects ops handlers to the live scene and replay path",
-      "evidence": "new OPS entries are composed automatically, but the wiring must be covered by the app-level registry test",
+      "evidence": "new OPS entries are composed automatically, and this app-level test is the explicit proof they reached the live handler registry",
       "asks": "should the app continue auto-composing architectural handlers from OPS?"
     },
     {

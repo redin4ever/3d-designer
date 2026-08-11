@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Architectural quality: detailed house roofs, correctly attached stairs, and house-specific quality validation",
   "slug": "architectural-quality",
-  "phase": 3,
+  "phase": 4,
   "baseSha": "ba2b72c3c6de3fd7e9c834b2b4b2409f5a7d3d64",
   "branch": "feat/architectural-quality",
   "docsDir": "docs/features/architectural-quality",
