@@ -1,5 +1,9 @@
 """Blender 5.2 interchange model import/export.
 
+All advertised GLB/glTF, FBX, OBJ, STL, PLY, USD, USDA, and USDC suffixes are exercised
+against their real Blender operators. The ``wm`` exporters use Blender 5's long-form axis
+enums while FBX retains its legacy axis keyword family.
+
 This file deliberately contains no composition-root changes.  ``ModelIOMixin`` is the
 engine-side implementation of the frozen ``ImportOps``/``ExportOps`` contract and is
 mixed into the concrete engine by the integration change that owns ``session.py``.
