@@ -1,248 +1,127 @@
 {
-  "feature": "Import and export scene files",
+  "feature": "Architectural quality",
   "seams": [
     {
-      "id": "editor-file-entry",
-      "file": "frontend/index.html",
-      "line": 17,
-      "anchor": "<header class=\"topbar\">",
-      "status": "wired",
-      "decision": "Q-08,Q-09,Q-25",
-      "what": "the persistent editor chrome where a Blender-like File entry can be reached",
-      "evidence": "the top bar is always visible, while object-specific actions live in the sidebar and viewport tools live on the left shelf",
-      "asks": "should file actions live in a Blender-style File menu, as separate top-bar buttons, or in editor settings?"
-    },
-    {
-      "id": "frontend-composition",
-      "file": "frontend/src/main.js",
-      "line": 31,
-      "anchor": "import { attachConnectButton } from './connect-ui.js';",
-      "status": "wired",
-      "decision": "Q-02,Q-09,Q-10,Q-15,Q-18,Q-22",
-      "what": "the only frontend composition point that may wire DOM modules and live scene state together",
-      "evidence": "Connect and the texture inspector both expose attach functions and are composed here; export scope needs current selection and file actions need status reporting",
-      "asks": "should import/export status stay in its dialog, enter the action log, or appear in both?"
-    },
-    {
-      "id": "frontend-test-discovery",
-      "file": "frontend/tests/index.js",
-      "line": 21,
-      "anchor": "import './connect.test.js';",
-      "status": "wired",
-      "decision": "Q-02",
-      "what": "the explicit unit-test discovery list required by this Windows Node setup",
-      "evidence": "frontend/CLAUDE.md states every new *.test.js must be imported here or npm run test:frontend silently skips it",
-      "asks": "no product choice; this seam will wire the file-flow tests into the required suite"
-    },
-    {
-      "id": "browser-journey-registration",
-      "file": "frontend/tests-browser/smoke.test.js",
-      "line": 41,
-      "anchor": "import { registerConnectTests } from './connect.browser.mjs';",
-      "status": "wired",
-      "decision": "Q-10,Q-18",
-      "what": "the real-browser journey suite where file picker, download, focus, and dialog behavior can be verified",
-      "evidence": "Connect and gizmo browser journeys are registered from this single smoke-test entry point",
-      "asks": "should completed exports automatically download, or show a ready row that the user clicks?"
-    },
-    {
-      "id": "live-http-api",
-      "file": "src/app/live.py",
-      "line": 103,
-      "anchor": "def do_GET(self) -> None:",
-      "status": "wired",
-      "decision": "Q-17,Q-22,Q-24,Q-30,Q-31,Q-32",
-      "what": "the same-origin upload/download boundary used by the static editor",
-      "evidence": "texture uploads already use bounded POST bodies and managed temporary files here; client setup and texture assets use named allowlisted routes",
-      "asks": "which formats and maximum upload size should the editor accept, and should multi-file formats arrive as a bundle?"
-    },
-    {
-      "id": "live-app-binding",
-      "file": "src/app/live.py",
-      "line": 276,
-      "anchor": "def serve_frontend(port: int, directory: Path, app: Any = None) -> http.server.ThreadingHTTPServer:",
-      "status": "wired",
-      "decision": "Q-19",
-      "what": "the point where the HTTP server must receive a safe capability for the live scene instead of only a static directory",
-      "evidence": "serve_frontend currently exposes only managed_texture_root; import needs the running orchestrator/scene and export needs the engine",
-      "asks": "must imports require the build to be paused, while exports remain available during a run?"
-    },
-    {
-      "id": "app-runtime-graph",
-      "file": "src/app/__init__.py",
-      "line": 34,
-      "anchor": "class App:",
-      "status": "wired",
-      "decision": "Q-11,Q-25",
-      "what": "the live graph holding engine, scene, orchestrator, registry, and viewer references",
-      "evidence": "opening a native project may replace scene state and must keep all five references coherent; importing an asset can use the existing scene",
-      "asks": "should Open replace the current project in-place while keeping the agent/browser session connected, or restart the live session?"
-    },
-    {
-      "id": "engine-file-contract",
-      "file": "src/contracts/engine.py",
-      "line": 305,
-      "anchor": "class ImportOps(Protocol):",
-      "status": "wired",
-      "decision": "Q-01,Q-04,Q-06,Q-14",
-      "what": "the frozen engine boundary that currently exposes GLB/glTF export but no import capability",
-      "evidence": "all non-Blender code and the fake engine compile against EngineProtocol; Blender 5.2 locally exposes glTF, FBX, OBJ, PLY, STL, and USD import/export operators",
-      "asks": "which interchange formats belong in the supported public contract for this version?"
-    },
-    {
-      "id": "blender-engine-composition",
-      "file": "src/engine/session.py",
-      "line": 33,
-      "anchor": "class BlenderEngine(",
-      "status": "wired",
-      "decision": "Q-04,Q-07,Q-12,Q-13,Q-14,Q-21",
-      "what": "the concrete Blender engine composition where file-import behavior must become reachable",
-      "evidence": "BlenderEngine composes MeshOps, surfacing, and ExportingMixin; a new import responsibility must be mixed in here",
-      "asks": "on import, should hierarchy be flattened to world transforms and non-mesh objects be ignored with a report, or should hierarchy/cameras/lights be preserved?"
-    },
-    {
-      "id": "fake-engine-file-io",
-      "file": "src/testing/fake_surfacing.py",
-      "line": 142,
-      "anchor": "def import_model(",
-      "status": "wired",
-      "decision": "Q-04,Q-12",
-      "what": "the bpy-free engine implementation every backend and integration suite depends on",
-      "evidence": "it records the full export conversion today; import must gain deterministic fake behavior so the feature is testable without Blender",
-      "asks": "no product choice; the fake will mirror the chosen public import/export contract"
-    },
-    {
-      "id": "export-policy",
-      "file": "src/export/writer.py",
-      "line": 67,
-      "anchor": "def export_scene(",
-      "status": "wired",
-      "decision": "Q-15,Q-16,Q-29",
-      "what": "the existing export policy that checks geometry, applies target conversion, writes, and returns a warning report",
-      "evidence": "it always writes despite defects and currently delegates only export_gltf",
-      "asks": "should editor export keep the existing warn-and-continue policy, and should it export the current selection or the whole scene by default?"
-    },
-    {
-      "id": "export-profile-default",
-      "file": "src/contracts/export_profiles.py",
-      "line": 94,
-      "anchor": "\"generic\": ExportProfile(",
-      "status": "wired",
-      "decision": "Q-16,Q-29",
-      "what": "the current agent export default, which converts metres to Roblox studs",
-      "evidence": "an editor Save/Export action using this default would unexpectedly rescale a generic GLB; Godot is currently the closest generic glTF profile but is not named that way",
-      "asks": "should the editor default to generic glTF metres with optional Roblox/Unity/Unreal/Godot profiles, or inherit Roblox?"
-    },
-    {
-      "id": "agent-export-specs",
-      "file": "src/export/registry.py",
-      "line": 16,
-      "anchor": "EXPORT_SPECS: tuple[ToolSpec, ...] = (",
-      "status": "declined",
-      "reason": "The existing agent export tool intentionally remains Polish-only and backward compatible; model import is declared separately in importing/registry.py.",
-      "decision": "Q-02,Q-27,Q-29",
-      "what": "the public agent-facing file tool declarations",
-      "evidence": "export_scene and check_export_budget are declared here, then rebound to live handlers without changing their schemas",
-      "asks": "should agents receive a matching import_scene_file tool, and should the existing export_scene schema gain a format option without breaking current calls?"
-    },
-    {
-      "id": "agent-file-handlers",
-      "file": "src/mcp_server/export_specs.py",
-      "line": 175,
-      "anchor": "_HANDLERS = {",
-      "status": "declined",
-      "reason": "Import changes geometry and therefore cannot use the direct side-effect-only export handler route; it is wired through the operation log instead.",
-      "decision": "Q-28,Q-29",
-      "what": "the direct MCP execution route for file operations that do not belong in the ordinary export log path",
-      "evidence": "export runs outside scene history because it mutates no geometry; import must instead enter shared history and report produced objects",
-      "asks": "may agents import any local path under the existing unrestricted-local trust model, while browser uploads remain managed and allowlisted?"
-    },
-    {
       "id": "operation-handler-registry",
+      "file": "src/ops/registry.py",
+      "line": 70,
+      "anchor": "OPS: HandlerRegistry = {",
+      "status": "open",
+      "what": "registers every replayable construction operation",
+      "evidence": "add_railing and add_staircase are both reachable only through this registry",
+      "asks": "should the roof and landing-connected stair be distinct typed operations rather than a whole-house composite?"
+    },
+    {
+      "id": "operation-tool-specs",
+      "file": "src/ops/registry.py",
+      "line": 230,
+      "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
+      "status": "open",
+      "what": "defines the names and parameters an agent actually sees",
+      "evidence": "the existing staircase schema exposes no direction or landing target, and there is no roof spec",
+      "asks": "which architectural choices must be explicit in the agent-visible schemas?"
+    },
+    {
+      "id": "operation-validation",
+      "file": "src/ops/validation.py",
+      "line": 184,
+      "anchor": "    elif kind == \"add_staircase\":",
+      "status": "open",
+      "what": "rejects impossible construction parameters before geometry is created",
+      "evidence": "the current staircase validates positive numbers only; it cannot reject a run that misses its landing",
+      "asks": "should bad architectural attachment fail atomically or be created with a warning?"
+    },
+    {
+      "id": "operation-acceptance",
+      "file": "src/ops/_acceptance.py",
+      "line": 17,
+      "anchor": "def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, ...]:",
+      "status": "open",
+      "what": "declares each operation's re-runnable definition of done",
+      "evidence": "the function has no production caller, and several subjects are not valid evaluator subjects",
+      "asks": "should operation-specific acceptance become a hard phase-promotion requirement?"
+    },
+    {
+      "id": "operation-public-surface",
+      "file": "src/ops/__init__.py",
+      "line": 24,
+      "anchor": "__all__ = [",
+      "status": "open",
+      "what": "is the only supported import surface for construction operations",
+      "evidence": "the local module rules prohibit consumers from importing implementation files directly",
+      "asks": "should both new architectural operations be public and replayable?"
+    },
+    {
+      "id": "mcp-operation-construction",
+      "file": "src/mcp_server/dispatch.py",
+      "line": 140,
+      "anchor": "    op = Operation(",
+      "status": "open",
+      "what": "turns a validated tool call into the persisted operation",
+      "evidence": "it currently leaves Operation.acceptance and Operation.joinery empty even though both are persisted contract fields",
+      "asks": "should dispatch attach typed operation acceptance and declared architectural joinery automatically?"
+    },
+    {
+      "id": "promotion-collects-operation-intent",
+      "file": "src/orchestration/phases.py",
+      "line": 75,
+      "anchor": "    def can_promote(self) -> tuple[bool, tuple[AcceptanceResult, ...]]:",
+      "status": "open",
+      "what": "decides whether a scene may advance to the next quality phase",
+      "evidence": "it collects logged joinery but ignores every logged operation acceptance query",
+      "asks": "should a scene remain unfinished while any construction operation's own definition of done fails?"
+    },
+    {
+      "id": "phase-acceptance-evaluator",
+      "file": "src/orchestration/_phase_acceptance.py",
+      "line": 206,
+      "anchor": "def evaluate_phase(",
+      "status": "open",
+      "what": "evaluates hard geometric facts for phase promotion",
+      "evidence": "it evaluates only generic manifold/gap checks, not semantic roof or stair attachment checks",
+      "asks": "how should operation-specific queries be combined with generic phase checks without weakening either?"
+    },
+    {
+      "id": "application-handler-composition",
       "file": "src/app/handlers.py",
-      "line": 313,
-      "anchor": "registry[IMPORT_OPERATION_KIND] = import_model_file",
-      "status": "wired",
-      "decision": "Q-11,Q-20,Q-21",
-      "what": "the replay registry every geometry-changing operation must reach",
-      "evidence": "browser edits and agent operations share this registry; an imported asset must be replayable or explicitly opaque to keep undo honest",
-      "asks": "should one import be one undo step, with the source copied into managed project storage so replay remains deterministic?"
+      "line": 251,
+      "anchor": "        from ops import OPS",
+      "status": "open",
+      "what": "connects ops handlers to the live scene and replay path",
+      "evidence": "new OPS entries are composed automatically, but the wiring must be covered by the app-level registry test",
+      "asks": "should the app continue auto-composing architectural handlers from OPS?"
     },
     {
-      "id": "operator-edit-history",
-      "file": "src/orchestration/reporting.py",
-      "line": 284,
-      "anchor": "def apply_operator_edit(self, op: Operation) -> ActionReport:",
-      "status": "wired",
-      "decision": "Q-19,Q-20",
-      "what": "the browser-originated write path that logs edits, takes a short lease, publishes reports, and keeps one shared history",
-      "evidence": "direct engine writes are explicitly rejected here as a second timeline; import from the editor has the same consequence",
-      "asks": "should import use this shared operation path and remain undoable, while Open Project deliberately replaces history after confirmation?"
-    },
-    {
-      "id": "native-project-persistence",
-      "file": "src/scene/persistence.py",
-      "line": 123,
-      "anchor": "class PersistenceMixin:",
-      "status": "wired",
-      "decision": "Q-01,Q-03,Q-05,Q-23,Q-24,Q-26",
-      "what": "the existing but UI-inaccessible forge3d JSON operation-log save/load capability",
-      "evidence": "save preserves operations, head, checkpoints, barriers, and metadata; load returns a new Scene and requires replay, while texture/import source assets are currently external paths",
-      "asks": "does 'the file' include a native editable forge3d project package, or only ordinary 3D interchange files?"
-    },
-    {
-      "id": "durable-geometry-assets",
-      "file": "src/scene/geometry_snapshot.py",
-      "line": 83,
-      "anchor": "def capture(engine: EngineProtocol, path: str) -> str:",
-      "status": "declined",
-      "reason": "The existing capture/restore format already carries UV and material definitions; the new scene_files package wraps it and embeds referenced assets without changing this stable serializer.",
-      "decision": "Q-03,Q-05,Q-23,Q-32",
-      "what": "the current all-geometry serializer used for undo barriers, including UVs and managed material definitions",
-      "evidence": "captures are temporary session files and deliberately not durable projects; a self-contained project package needs explicit asset packing rather than silently reusing temp paths",
-      "asks": "should native project files be self-contained packages with imported models and texture maps embedded, or reference files beside the project?"
-    },
-    {
-      "id": "phase-visibility",
-      "file": "src/contracts/phases.py",
-      "line": 66,
-      "anchor": "PHASE_ROLES: dict[Phase, tuple[ToolRole, ...]] = {",
-      "status": "declined",
-      "reason": "Import visibility is declared directly on its ToolSpec for Blockout, Refine, Detail, and Polish, so the global phase-role mapping does not need a new role or policy change.",
-      "decision": "Q-27",
-      "what": "the phase gate that currently makes EXPORT tools visible only during Polish",
-      "evidence": "a mutating import assigned only to the EXPORT role would be unavailable during Blockout, when bringing in reference or base geometry is most useful",
-      "asks": "in which phases should agents be allowed to import models, and should browser import be available whenever the operator pauses?"
-    },
-    {
-      "id": "export-report-visibility",
-      "file": "src/viewer/report.py",
-      "line": 77,
-      "anchor": "def report_export(self, report: ExportReport) -> None:",
-      "status": "declined",
-      "reason": "The existing report_export public method already has the required wire behavior; app/file_operations.py now calls it after editor exports without changing the viewer contract.",
-      "decision": "Q-18",
-      "what": "the existing viewer path for export completion and warnings",
-      "evidence": "the frontend already handles EXPORT_REPORT, but the current MCP export handler never calls this method, so agent exports are invisible in the editor",
-      "asks": "should file completion and warnings appear in both the file dialog and action log for browser and agent exports?"
+      "id": "capability-documentation",
+      "file": "README.md",
+      "line": 48,
+      "anchor": "| **Build** | primitives, walls, floors, openings, staircases, railings, arrays along curves, LOD chains, grid-aligned modular kits |",
+      "status": "open",
+      "what": "tells users and agents what semantic construction tools exist",
+      "evidence": "roofing and landing-connected stairs are absent from the published capability list",
+      "asks": "should the documented workflow explicitly forbid improvised cube roofs when a semantic roof tool applies?"
     }
   ],
   "dismissed": [
     {
-      "path": "src/contracts/wire.py",
-      "reason": "no new WebSocket message is required if browser import uploads over same-origin HTTP and then uses the existing operator-edit operation path; export is a same-origin HTTP download"
+      "path": "src/mcp_server/registry.py",
+      "reason": "imports OP_SPECS as a collection, so new operation specs are included without a new registry seam"
     },
     {
-      "path": "src/app/texture_assets.py",
-      "reason": "its resolver is deliberately image-only; scene file upload/download needs a separate allowlist and must not weaken the texture route"
+      "path": "src/scene/op_codec.py",
+      "reason": "already round-trips Operation.acceptance and Operation.joinery generically; no new shape is required"
     },
     {
-      "path": "package.json",
-      "reason": "the browser already has File/Blob/download APIs and Python has zip/tempfile support; no runtime dependency is required"
+      "path": "src/contracts/operations.py",
+      "reason": "Operation already has the acceptance and joinery fields the fix needs"
     },
     {
-      "path": "database and account permissions",
-      "reason": "the product is a loopback-only local process with no accounts or database; visibility is controlled by local process access and MCP roles"
+      "path": "frontend/",
+      "reason": "the viewer renders arbitrary mesh updates and needs no roof- or stair-specific UI"
+    },
+    {
+      "path": "src/export/",
+      "reason": "export consumes finished engine geometry generically; the new operations require no format change"
     }
   ]
 }

@@ -1,13 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Import and export scene files",
-  "slug": "scene-file-io",
-  "phase": 5,
-  "baseSha": "385731a644cb684b536ca30c7c82500af15574e5",
-  "branch": "feat/scene-file-io",
-  "docsDir": "docs/features/scene-file-io",
-  "startedAt": "2026-08-10",
-  "status": "complete",
-  "completedAt": "2026-08-11"
+  "feature": "Architectural quality: detailed house roofs, correctly attached stairs, and house-specific quality validation",
+  "slug": "architectural-quality",
+  "phase": 2,
+  "baseSha": "ba2b72c3c6de3fd7e9c834b2b4b2409f5a7d3d64",
+  "branch": "feat/architectural-quality",
+  "docsDir": "docs/features/architectural-quality",
+  "startedAt": "2026-08-12",
+  "status": "running"
 }
