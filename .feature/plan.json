@@ -54,7 +54,7 @@
       "dependsOn": ["ops-wiring", "promotion-acceptance"],
       "seams": ["capability-documentation"],
       "decisions": ["Q-15", "Q-18", "Q-20"],
-      "status": "planned"
+      "status": "red"
     }
   ]
 }
