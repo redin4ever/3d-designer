@@ -13,7 +13,7 @@ __all__ = ["add_gable_roof"]
 
 
 def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
-    """Build two exact-pitch slabs plus ridge, rake trim and eave fascia.
+    """Build two exact-pitch slabs plus continuous ridge, rake and eave trim.
 
     ``origin`` is the centre of the building footprint at the wall-top bearing plane.
     ``width`` and ``depth`` are the wall footprint; overhang is added outside both. The
@@ -89,10 +89,30 @@ def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
             )
         )
 
+    # Rake and fascia profiles otherwise meet at only one mathematical point: their square
+    # ends are perpendicular to different paths. A small chamfered cover overlaps both
+    # profiles at each perimeter corner, turning that fragile point contact into a finished
+    # continuous junction without changing the caller's architectural dimensions.
+    corner_ids = []
+    corner_radius = trim_width * 0.75
+    corner_z = eave_z + thickness / 2.0
+    for along_sign, gable_label in ((-1.0, "neg"), (1.0, "pos")):
+        along = along_sign * (half_length + trim_width / 4.0)
+        for cross_sign, eave_label in ((-1.0, "neg"), (1.0, "pos")):
+            cross = cross_sign * (half_roof + trim_width / 4.0)
+            corner_ids.append(
+                engine.create_mesh(
+                    f"{prefix}_gable_{gable_label}_eave_{eave_label}_cap",
+                    *_chamfered_corner_mesh(
+                        origin, axis, cross, along, corner_z, corner_radius, trim_depth
+                    ),
+                )
+            )
+
     return OperationResult(
         op_id=op.op_id,
         ok=True,
-        produced_objects=(neg_id, pos_id, ridge_id, *gable_ids, *eave_ids),
+        produced_objects=(neg_id, pos_id, ridge_id, *gable_ids, *eave_ids, *corner_ids),
     )
 
 
@@ -159,6 +179,38 @@ def _mitered_v_mesh(
             )
         )
     return verts, faces
+
+
+def _chamfered_corner_mesh(
+    origin: Vec3,
+    axis: str,
+    cross: float,
+    along: float,
+    center_z: float,
+    radius: float,
+    depth: float,
+) -> tuple[list[Vec3], list[tuple[int, ...]]]:
+    """Closed octagonal cover joining one rake end to one fascia end."""
+    sides = 8
+    rings: list[Vec3] = []
+    for z in (center_z - depth / 2.0, center_z + depth / 2.0):
+        for index in range(sides):
+            angle = 2.0 * math.pi * index / sides
+            dx = radius * math.cos(angle)
+            dy = radius * math.sin(angle)
+            if axis == "y":
+                rings.append(_point(origin, axis, cross + dx, along + dy, z))
+            else:
+                rings.append(_point(origin, axis, cross + dy, along + dx, z))
+    faces: list[tuple[int, ...]] = [
+        tuple(reversed(range(sides))),
+        tuple(range(sides, sides * 2)),
+    ]
+    faces.extend(
+        (index, (index + 1) % sides, sides + (index + 1) % sides, sides + index)
+        for index in range(sides)
+    )
+    return rings, faces
 
 
 def _panel_mesh(

@@ -29,7 +29,7 @@ def acceptance_for(
     output_prefix = op_id or object_id
 
     if kind == "add_gable_roof":
-        joints = (
+        joints = [
             (f"{object_id}_slope_neg", f"{object_id}_slope_pos", "sloped panels meet"),
             (f"{object_id}_ridge_cap", f"{object_id}_slope_neg", "ridge cap meets left panel"),
             (f"{object_id}_ridge_cap", f"{object_id}_slope_pos", "ridge cap meets right panel"),
@@ -41,7 +41,16 @@ def acceptance_for(
                 f"{object_id}_ridge_cap", f"{object_id}_gable_pos_trim",
                 "ridge cap meets back rake trim",
             ),
-        )
+        ]
+        for gable in ("neg", "pos"):
+            for eave in ("neg", "pos"):
+                cap = f"{object_id}_gable_{gable}_eave_{eave}_cap"
+                joints.extend(
+                    (
+                        (cap, f"{object_id}_gable_{gable}_trim", "corner cap meets rake trim"),
+                        (cap, f"{object_id}_eave_{eave}_fascia", "corner cap meets eave fascia"),
+                    )
+                )
         return tuple(
             AcceptanceQuery(
                 query_id=f"{output_prefix}_roof_joint_{index}",

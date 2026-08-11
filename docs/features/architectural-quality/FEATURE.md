@@ -5,7 +5,9 @@ forced an agent to guess raw geometry:
 
 - `add_gable_roof` builds two closed pitch-derived panels, a ridge cap, front/back rake
   trim and both eave fascias. Each rake is one continuous mitered shell; its apex meets a
-  flush, overlapping ridge cap instead of two disconnected boards stopping short. Its
+  flush, overlapping ridge cap instead of two disconnected boards stopping short. Four
+  subtle chamfered caps overlap the rake and fascia at every perimeter corner, replacing
+  fragile point contacts with visibly continuous trim. Its
   `origin` is the footprint centre at the wall-top bearing plane; `width` is the gable span
   and `depth` is the ridge length.
 - `add_staircase_to_landing` reads a live porch/deck/floor, derives the approach direction,
@@ -13,8 +15,9 @@ forced an agent to guess raw geometry:
   `add_staircase` remains unchanged for callers that intentionally provide raw run math.
 
 Both tools reject impossible input before creating geometry. Their MCP operations persist
-re-runnable acceptance: roof panels and ridge cap must meet, and the highest tread must meet
-the named landing. Stair stringer/tread intersections are persisted as explicit joinery,
+re-runnable acceptance: roof panels, ridge cap and every trim corner must meet, and the
+highest tread must meet the named landing. Roof cover and stair support intersections are
+persisted as explicit joinery,
 never inferred from overlap. Phase promotion evaluates these active operation checks beside
 the generic scene checks and ignores undone operations.
 

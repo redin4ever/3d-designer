@@ -20,7 +20,7 @@ def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
             0.0,
             params["thickness"] / 2.0 + params["trim_depth"] - miter_depth,
         )
-        return tuple(
+        intents = [
             JoineryIntent(
                 object_id=f"{prefix}_ridge_cap",
                 into_object_id=f"{prefix}_slope_{side}",
@@ -29,7 +29,29 @@ def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
                 reason="ridge cap intentionally overlaps the roof panel to cover the seam",
             )
             for side in ("neg", "pos")
-        )
+        ]
+        for gable in ("neg", "pos"):
+            for eave in ("neg", "pos"):
+                cap = f"{prefix}_gable_{gable}_eave_{eave}_cap"
+                intents.extend(
+                    (
+                        JoineryIntent(
+                            object_id=cap,
+                            into_object_id=f"{prefix}_gable_{gable}_trim",
+                            depth=params["trim_depth"],
+                            axis="z",
+                            reason="corner cap intentionally overlaps the rake trim",
+                        ),
+                        JoineryIntent(
+                            object_id=cap,
+                            into_object_id=f"{prefix}_eave_{eave}_fascia",
+                            depth=params["trim_depth"],
+                            axis="z",
+                            reason="corner cap intentionally overlaps the eave fascia",
+                        ),
+                    )
+                )
+        return tuple(intents)
 
     if kind == "add_staircase_to_landing":
         depth = params["tread_thickness"]
