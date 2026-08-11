@@ -7,6 +7,7 @@ import math
 from contracts import EngineProtocol, Operation, OperationResult, Vec3
 
 from ._geom import oriented_box_between
+from .validation import validate_params
 
 __all__ = ["add_gable_roof"]
 
@@ -19,7 +20,7 @@ def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
     pitch is measured from horizontal over half the *wall* span, so adding overhang lowers
     the outer eave without moving the ridge — the relationship a real roof keeps.
     """
-    p = op.params
+    p = validate_params("add_gable_roof", op.params)
     prefix = p["object_id"]
     origin = p["origin"]
     axis = p["ridge_axis"]

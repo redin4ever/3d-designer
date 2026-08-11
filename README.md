@@ -45,7 +45,7 @@ exercise the system, never enough to produce an asset.
 
 | | |
 |---|---|
-| **Build** | primitives, walls, floors, openings, staircases, railings, arrays along curves, LOD chains, grid-aligned modular kits |
+| **Build** | primitives, walls, floors, openings, detailed gable roofs, landing-derived supported staircases, railings, arrays along curves, LOD chains, grid-aligned modular kits |
 | **Fix** | boundary holes, non-manifold edges and vertices, loose and duplicate vertices, flipped normals, disconnected shells, visual gaps between parts |
 | **Align** | parallel, perpendicular, coplanar, plumb, flush, grid snap, exact angles — quaternion-composed, so hundreds of small agent edits do not accumulate gimbal error |
 | **Detail** | heuristic bevels on edges that would plausibly catch light, panel lines, greebles with deliberate rest zones, roughness variation, physically-plausible albedo |

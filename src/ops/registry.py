@@ -28,6 +28,8 @@ from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
 from .primitives import add_primitive
 from .railing import add_railing
+from .roof import add_gable_roof
+from .landing_stairs import add_staircase_to_landing
 from .stairs import add_staircase
 from .transform import (
     delete_object,
@@ -71,8 +73,10 @@ OPS: HandlerRegistry = {
     "add_primitive": add_primitive,
     "add_wall": add_wall,
     "add_floor": add_floor,
+    "add_gable_roof": add_gable_roof,
     "add_opening": add_opening,
     "add_staircase": add_staircase,
+    "add_staircase_to_landing": add_staircase_to_landing,
     "add_railing": add_railing,
     "array_along": array_along,
     "add_lod_chain": add_lod_chain,
@@ -232,9 +236,9 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         name="add_primitive",
         description=(
             "Place one named, validated primitive mesh (cube, cylinder, sphere, plane, "
-            "cone, torus). Not the default tool — the other eight operations in this "
-            "library are themselves built from primitives; reach for one of those first "
-            "(ADR-004)."
+            "cone, torus). Not the default tool — use a semantic construction operation "
+            "when one describes the intended object; those operations are themselves "
+            "built from primitives and preserve architectural relationships (ADR-004)."
         ),
         roles=(ToolRole.BLOCKOUT,),
         input_schema={
@@ -337,6 +341,39 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         mutating=True,
     ),
     ToolSpec(
+        name="add_gable_roof",
+        description=(
+            "Build a complete gable roof assembly from architectural dimensions: two "
+            "sloped panels, ridge cap, rake trim and eave fascia. Use this for a house "
+            "roof instead of approximating roof planes with a rotated cube. The origin "
+            "is the footprint centre at the wall-top bearing plane."
+        ),
+        roles=(ToolRole.BLOCKOUT,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "depth": {"type": "number", "exclusiveMinimum": 0},
+                "pitch_degrees": {
+                    "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 80,
+                },
+                "thickness": {"type": "number", "exclusiveMinimum": 0},
+                "overhang": {"type": "number", "minimum": 0},
+                "trim_width": {"type": "number", "exclusiveMinimum": 0},
+                "trim_depth": {"type": "number", "exclusiveMinimum": 0},
+                "ridge_axis": {"type": "string", "enum": ["x", "y"]},
+            },
+            "required": [
+                "object_id", "origin", "width", "depth", "pitch_degrees", "thickness",
+                "overhang", "trim_width", "trim_depth", "ridge_axis",
+            ],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
         name="add_staircase",
         description="A straight run of treads at a given rise, run and width.",
         roles=(ToolRole.REFINE,),
@@ -351,6 +388,35 @@ OP_SPECS: tuple[ToolSpec, ...] = (
                 "origin": _VEC3_SCHEMA,
             },
             "required": ["object_id", "treads", "rise", "run", "width"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_staircase_to_landing",
+        description=(
+            "Build supported entry stairs from a bottom start to an existing landing. "
+            "The live landing bounds determine direction, run and rise, preventing the "
+            "fixed-world-axis and guessed-height errors of a raw staircase. Produces thin "
+            "treads and two side stringers; add a railing separately when needed."
+        ),
+        roles=(ToolRole.REFINE,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "landing_id": {"type": "string"},
+                "start": _VEC3_SCHEMA,
+                "treads": {"type": "integer", "exclusiveMinimum": 0},
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "tread_thickness": {"type": "number", "exclusiveMinimum": 0},
+                "stringer_width": {"type": "number", "exclusiveMinimum": 0},
+                "stringer_depth": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": [
+                "object_id", "landing_id", "start", "treads", "width",
+                "tread_thickness", "stringer_width", "stringer_depth",
+            ],
             "additionalProperties": False,
         },
         mutating=True,

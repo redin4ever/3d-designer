@@ -5,6 +5,7 @@ from __future__ import annotations
 from contracts import EPSILON, EngineProtocol, Operation, OperationResult, ToolError, Vec3
 
 from ._geom import oriented_box_between
+from .validation import validate_params
 
 __all__ = ["add_staircase_to_landing"]
 
@@ -16,7 +17,7 @@ def add_staircase_to_landing(engine: EngineProtocol, op: Operation) -> Operation
     landing's live bounds, finds the near edge on the line to its centre, and derives the
     direction, run and rise. No camera-space or fixed-axis guess enters the geometry.
     """
-    p = op.params
+    p = validate_params("add_staircase_to_landing", op.params)
     prefix = p["object_id"]
     landing_id = p["landing_id"]
     if not engine.exists(landing_id):

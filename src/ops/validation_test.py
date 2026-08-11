@@ -40,6 +40,12 @@ _MINIMAL_VALID_PARAMS: dict[str, dict] = {
         "thickness": 0.2,
     },
     "add_floor": {"object_id": "floor", "width": 4.0, "depth": 3.0, "thickness": 0.15},
+    "add_gable_roof": {
+        "object_id": "roof", "origin": Vec3(0, 0, 2.4), "width": 4.0,
+        "depth": 5.0, "pitch_degrees": 30.0, "thickness": 0.16,
+        "overhang": 0.3, "trim_width": 0.12, "trim_depth": 0.16,
+        "ridge_axis": "y",
+    },
     "add_opening": {
         "object_id": "opening",
         "wall_id": "wall",
@@ -48,6 +54,11 @@ _MINIMAL_VALID_PARAMS: dict[str, dict] = {
         "height": 2.0,
     },
     "add_staircase": {"object_id": "stair", "treads": 6, "rise": 0.18, "run": 0.28, "width": 1.0},
+    "add_staircase_to_landing": {
+        "object_id": "entry", "landing_id": "landing", "start": Vec3(0, -2, 0),
+        "treads": 6, "width": 1.0, "tread_thickness": 0.05,
+        "stringer_width": 0.1, "stringer_depth": 0.18,
+    },
     "add_railing": {
         "object_id": "rail",
         "path": [Vec3(0, 0, 0), Vec3(4, 0, 0)],

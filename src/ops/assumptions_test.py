@@ -55,6 +55,12 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "thickness": 0.2,
     },
     "add_floor": {"object_id": "floor", "width": 4.0, "depth": 3.0, "thickness": 0.15},
+    "add_gable_roof": {
+        "object_id": "roof", "origin": Vec3(0, 0, 2.4), "width": 4.0,
+        "depth": 5.0, "pitch_degrees": 30.0, "thickness": 0.16,
+        "overhang": 0.3, "trim_width": 0.12, "trim_depth": 0.16,
+        "ridge_axis": "y",
+    },
     "add_opening": {
         "object_id": "opening",
         "wall_id": "wall",
@@ -63,6 +69,11 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "height": 2.0,
     },
     "add_staircase": {"object_id": "stair", "treads": 6, "rise": 0.18, "run": 0.28, "width": 1.0},
+    "add_staircase_to_landing": {
+        "object_id": "entry", "landing_id": "landing", "start": Vec3(0, -2, 0),
+        "treads": 6, "width": 1.0, "tread_thickness": 0.05,
+        "stringer_width": 0.1, "stringer_depth": 0.18,
+    },
     "add_railing": {
         "object_id": "rail",
         "path": [Vec3(0, 0, 0), Vec3(4, 0, 0)],
@@ -84,7 +95,7 @@ _MINIMAL_PARAMS: dict[str, dict] = {
 
 def _seed(engine) -> None:
     """The objects the target-taking operations need to already exist."""
-    from ops import add_primitive, add_wall
+    from ops import add_floor, add_primitive, add_wall
 
     add_wall(
         engine,
@@ -109,6 +120,17 @@ def _seed(engine) -> None:
                 params={"object_id": name, "kind": "cube", "size": Vec3(0.4, 0.4, 0.4)},
             ),
         )
+    add_floor(
+        engine,
+        Operation(
+            op_id="seed_landing",
+            kind="add_floor",
+            params={
+                "object_id": "landing", "width": 2.0, "depth": 1.5,
+                "thickness": 0.2, "origin": Vec3(0, 0, 1.0),
+            },
+        ),
+    )
     # The direct edits added at Q-14 target existing things rather than creating them, so the
     # sweep needs a material to exist as well as an object.
     engine.create_material("seed_paint", (0.5, 0.5, 0.5))

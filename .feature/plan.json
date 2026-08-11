@@ -27,7 +27,7 @@
       "dependsOn": ["gable-roof", "landing-stairs"],
       "seams": ["operation-handler-registry", "operation-tool-specs", "operation-validation", "operation-public-surface", "application-handler-composition", "capability-documentation"],
       "decisions": ["Q-02", "Q-05", "Q-11", "Q-16", "Q-17", "Q-20"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "operation-metadata",

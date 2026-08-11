@@ -30,8 +30,8 @@ RECORDED_TOOL_COUNTS: dict[str, int] = {
     # blockout and refine both gained the seven direct edits added at Q-14 — move, rotate,
     # scale, delete, duplicate, rename, set material. Updated deliberately, which is the
     # measurement Gate B 3.3 asked for; not capped, which is the one response ruled out.
-    "blockout": 16,
-    "refine": 15,
+    "blockout": 17,
+    "refine": 16,
     "repair": 8,
     "align": 7,
     "detail": 8,
@@ -72,6 +72,8 @@ def test_every_operation_module_reaches_the_registry() -> None:
     handlers = build_handlers()
     for kind in (
         "add_railing",        # ops
+        "add_gable_roof",     # semantic architectural blockout
+        "add_staircase_to_landing",  # relation-derived architectural refine
         "repair",             # gaps
         "make_plumb",         # align
         "apply_edge_treatment",  # detail

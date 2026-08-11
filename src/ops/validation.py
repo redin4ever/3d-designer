@@ -33,8 +33,10 @@ _KNOWN_KINDS = (
     "add_primitive",
     "add_wall",
     "add_floor",
+    "add_gable_roof",
     "add_opening",
     "add_staircase",
+    "add_staircase_to_landing",
     "add_railing",
     "array_along",
     "add_lod_chain",
@@ -171,6 +173,26 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
         _positive(depth, "depth", kind)
         _positive(thickness, "thickness", kind)
 
+    elif kind == "add_gable_roof":
+        _require(params, "origin", kind)
+        for name in ("width", "depth", "thickness", "trim_width", "trim_depth"):
+            _positive(_require(params, name, kind), name, kind)
+        _non_negative(_require(params, "overhang", kind), "overhang", kind)
+        pitch = _require(params, "pitch_degrees", kind)
+        if not 0 < pitch < 80:
+            raise ToolError(
+                "ops.bad_pitch",
+                f"{kind}: pitch_degrees is {pitch}, must be between 0 and 80",
+                "pass a roof pitch greater than 0 and less than 80 degrees",
+            )
+        ridge_axis = _require(params, "ridge_axis", kind)
+        if ridge_axis not in ("x", "y"):
+            raise ToolError(
+                "ops.bad_ridge_axis",
+                f"{kind}: ridge_axis is {ridge_axis!r}, must be 'x' or 'y'",
+                "pass ridge_axis='x' or ridge_axis='y'",
+            )
+
     elif kind == "add_opening":
         _require(params, "wall_id", kind)
         _require(params, "position", kind)
@@ -190,6 +212,19 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
         _positive(rise, "rise", kind)
         _positive(run, "run", kind)
         _positive(width, "width", kind)
+
+    elif kind == "add_staircase_to_landing":
+        _require(params, "landing_id", kind)
+        _require(params, "start", kind)
+        treads = _require(params, "treads", kind)
+        if treads <= 0:
+            raise ToolError(
+                "ops.non_positive_count",
+                f"{kind}: treads is {treads}, must be >= 1",
+                "pass treads >= 1",
+            )
+        for name in ("width", "tread_thickness", "stringer_width", "stringer_depth"):
+            _positive(_require(params, name, kind), name, kind)
 
     elif kind == "add_railing":
         path = _require_path(params, kind)
