@@ -51,3 +51,51 @@ def test_agent_import_is_recorded_as_one_opaque_undo_step(tmp_path) -> None:
     assert operation.kind == IMPORT_OPERATION_KIND
     assert operation.opaque is True
     assert len(app.scene.document.barriers) == 1
+
+
+def test_live_http_routes_create_poll_and_download_a_project_job(tmp_path) -> None:
+    """The browser controller's same-origin endpoints must reach the live App, not 404."""
+    import json
+    import socket
+    import time
+    import urllib.request
+    import zipfile
+
+    from app import build_app
+    from app.live import FRONTEND_DIR, serve_frontend
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    app = build_app(prefer_blender=False, attach_viewer=False)
+    server = serve_frontend(port, FRONTEND_DIR, app)
+    try:
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/file-io/jobs",
+            data=b'{"action":"save-project","filename":"live.forge3d"}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            started = json.load(response)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/api/file-io/jobs/{started['job_id']}",
+                timeout=5,
+            ) as response:
+                status = json.load(response)
+            if status["status"] in {"complete", "failed"}:
+                break
+            time.sleep(0.01)
+        assert status["status"] == "complete", status
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}{status['download_url']}", timeout=5
+        ) as response:
+            project = response.read()
+        target = tmp_path / "live.forge3d"
+        target.write_bytes(project)
+        assert zipfile.is_zipfile(target)
+    finally:
+        server.shutdown()
+        server.server_close()
