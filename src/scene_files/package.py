@@ -3,6 +3,8 @@
 The package layer deliberately stops before replay.  ``Scene.load`` reconstructs the
 document and target ledger without touching the engine; the caller can validate the
 returned scene and choose when to restore/replay it into a prepared engine.
+Imported source discovery follows the registered operation kind shared with the browser
+and MCP paths, while retaining legacy ``import_model`` documents for forward migration.
 """
 
 from __future__ import annotations
