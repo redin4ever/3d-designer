@@ -72,6 +72,24 @@ def test_export_for_roblox_passes_the_stud_scale_and_no_mirroring(engine) -> Non
     assert scale == pytest.approx(1.0 / roblox.metres_per_unit)
 
 
+def test_non_gltf_editor_export_uses_the_generic_model_boundary(engine) -> None:
+    """OBJ/FBX/STL/PLY/USD must not be silently routed through the glTF writer."""
+    engine.create_primitive("box", "cube", Vec3(1, 1, 1))
+
+    report = export_scene(
+        engine,
+        ["box"],
+        "out/box.obj",
+        profile_name="generic",
+        format_name="obj",
+    )
+
+    calls = [call for call in engine.calls if call[0] == "export_model"]
+    assert len(calls) == 1
+    assert calls[0][1][1].endswith("box.obj")
+    assert report.profile == "generic"
+
+
 # ------------------------------------------------------------------------- happy path
 
 
