@@ -49,6 +49,13 @@ def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
                             axis="z",
                             reason="corner cap intentionally overlaps the eave fascia",
                         ),
+                        JoineryIntent(
+                            object_id=cap,
+                            into_object_id=f"{prefix}_slope_{eave}",
+                            depth=params["trim_depth"],
+                            axis="z",
+                            reason="corner cap intentionally overlaps the roof panel edge",
+                        ),
                     )
                 )
         return tuple(intents)
