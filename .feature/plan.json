@@ -45,7 +45,7 @@
       "dependsOn": ["operation-metadata"],
       "seams": ["promotion-collects-operation-intent", "phase-acceptance-evaluator"],
       "decisions": ["Q-01", "Q-13", "Q-15"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "architectural-smoke",

@@ -209,6 +209,7 @@ def evaluate_phase(
     objects: tuple[str, ...],
     pairs: tuple[tuple[str, str], ...] = (),
     joinery: tuple[JoineryIntent, ...] = (),
+    extra_queries: tuple[AcceptanceQuery, ...] = (),
 ) -> tuple[AcceptanceResult, ...]:
     """Run every query this phase demands against live geometry, right now.
 
@@ -220,7 +221,7 @@ def evaluate_phase(
     import measure
 
     results: list[AcceptanceResult] = [_scene_has_geometry(phase, objects)]
-    for query in queries_for(phase, objects, pairs, joinery):
+    for query in (*queries_for(phase, objects, pairs, joinery), *extra_queries):
         try:
             results.append(_enrich(query, measure.evaluate(engine, query)))
         except Exception as exc:  # noqa: BLE001
