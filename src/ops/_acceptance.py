@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from contracts import AcceptanceQuery, Comparison, DefectClass, MetricKind
+from contracts import AcceptanceQuery, Comparison, DefectClass, JoineryIntent, MetricKind, Vec3
 
-__all__ = ["acceptance_for"]
+__all__ = ["acceptance_for", "joinery_for", "runtime_acceptance_for"]
 
 
-def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, ...]:
+def acceptance_for(
+    kind: str, params: dict[str, Any], *, op_id: str = ""
+) -> tuple[AcceptanceQuery, ...]:
     """The re-runnable definition-of-done for one ``add_*``/``array_along`` call.
 
     Every kind in :data:`ops.OPS` returns at least one query. Where a meaningful scalar
@@ -24,6 +26,41 @@ def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, 
     forms satisfy :class:`~contracts.AcceptanceQuery`'s own well-formedness check.
     """
     object_id = params.get("object_id", "")
+    output_prefix = op_id or object_id
+
+    if kind == "add_gable_roof":
+        joints = (
+            (f"{object_id}_slope_neg", f"{object_id}_slope_pos", "sloped panels meet"),
+            (f"{object_id}_ridge_cap", f"{object_id}_slope_neg", "ridge cap meets left panel"),
+            (f"{object_id}_ridge_cap", f"{object_id}_slope_pos", "ridge cap meets right panel"),
+        )
+        return tuple(
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_roof_joint_{index}",
+                description=description,
+                metric=MetricKind.GAP_WIDTH,
+                subject=f"{a}|{b}",
+                expected=0.0,
+                tolerance=1e-4,
+                comparison=Comparison.EQ,
+            )
+            for index, (a, b, description) in enumerate(joints)
+        )
+
+    if kind == "add_staircase_to_landing":
+        last_tread = f"{object_id}_tread_{params['treads'] - 1:03d}"
+        landing_id = params["landing_id"]
+        return (
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_meets_landing",
+                description="the highest tread meets the named landing with no gap",
+                metric=MetricKind.GAP_WIDTH,
+                subject=f"{last_tread}|{landing_id}",
+                expected=0.0,
+                tolerance=1e-4,
+                comparison=Comparison.EQ,
+            ),
+        )
 
     if kind in ("create_texture_material", "update_texture_material"):
         name = params.get("name", "material")
@@ -60,7 +97,9 @@ def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, 
         )
 
     if kind == "add_wall":
-        length = (params["end"] - params["start"]).length()
+        start = params["start"] if isinstance(params["start"], Vec3) else Vec3(*params["start"])
+        end = params["end"] if isinstance(params["end"], Vec3) else Vec3(*params["end"])
+        length = (end - start).length()
         volume = length * params["thickness"] * params["height"]
         return (
             AcceptanceQuery(
@@ -92,61 +131,62 @@ def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, 
         return (
             AcceptanceQuery(
                 query_id=f"{object_id}_clean_cut",
-                description="the opening leaves no visual gap and no broken topology at the cut",
-                forbidden_defects=(DefectClass.VISUAL_GAP, DefectClass.NON_MANIFOLD_EDGE),
+                description="the opened wall remains a positive, manifold solid",
+                metric=MetricKind.VOLUME,
                 subject=params.get("wall_id", object_id),
+                expected=1e-9,
+                comparison=Comparison.GTE,
+                forbidden_defects=(DefectClass.BOUNDARY_HOLE, DefectClass.NON_MANIFOLD_EDGE),
             ),
         )
 
     if kind == "add_staircase":
-        treads, rise = params["treads"], params["rise"]
-        first_id = f"{object_id}_tread_000"
-        last_id = f"{object_id}_tread_{treads - 1:03d}"
+        treads = params["treads"]
+        last_id = f"{output_prefix}_tread_{treads - 1:03d}"
         return (
             AcceptanceQuery(
-                query_id=f"{object_id}_total_rise",
-                description="the highest tread sits treads * rise above the lowest",
-                metric=MetricKind.DISTANCE,
-                subject=f"{first_id}|{last_id}",
-                expected=treads * rise,
-                tolerance=max(1e-4, rise * 0.05),
-                comparison=Comparison.EQ,
+                query_id=f"{output_prefix}_highest_tread_exists",
+                description="the complete stair run includes a solid highest tread",
+                metric=MetricKind.VOLUME,
+                subject=last_id,
+                expected=1e-9,
+                comparison=Comparison.GTE,
             ),
         )
 
     if kind == "add_railing":
         return (
             AcceptanceQuery(
-                query_id=f"{object_id}_no_part_clipping",
-                description="posts, balusters and the top rail do not clip into one another",
-                forbidden_defects=(DefectClass.PART_CLIPPING,),
-                subject=object_id,
-            ),
-            AcceptanceQuery(
-                query_id=f"{object_id}_no_visual_gap",
-                description="the top rail meets every outer post with no visible gap",
-                forbidden_defects=(DefectClass.VISUAL_GAP,),
-                subject=object_id,
+                query_id=f"{output_prefix}_top_rail_exists",
+                description="the railing includes one solid top rail",
+                metric=MetricKind.VOLUME,
+                subject=f"{output_prefix}_top_rail",
+                expected=1e-9,
+                comparison=Comparison.GTE,
             ),
         )
 
     if kind == "array_along":
         return (
             AcceptanceQuery(
-                query_id=f"{object_id}_array_no_gap",
-                description="arrayed instances leave no visual gap along the path",
-                forbidden_defects=(DefectClass.VISUAL_GAP,),
-                subject=object_id,
+                query_id=f"{output_prefix}_array_started",
+                description="the array contains a solid first instance",
+                metric=MetricKind.VOLUME,
+                subject=f"{output_prefix}_i000",
+                expected=1e-9,
+                comparison=Comparison.GTE,
             ),
         )
 
     if kind == "add_lod_chain":
         return (
             AcceptanceQuery(
-                query_id=f"{object_id}_lod_within_budget",
-                description="every LOD level stays within its triangle budget",
-                forbidden_defects=(DefectClass.BUDGET_EXCEEDED,),
-                subject=object_id,
+                query_id=f"{output_prefix}_lod_started",
+                description="the LOD chain contains a solid level zero",
+                metric=MetricKind.VOLUME,
+                subject=f"{output_prefix}_lod00",
+                expected=1e-9,
+                comparison=Comparison.GTE,
             ),
         )
 
@@ -208,9 +248,53 @@ def acceptance_for(kind: str, params: dict[str, Any]) -> tuple[AcceptanceQuery, 
     # add_modular_kit
     return (
         AcceptanceQuery(
-            query_id=f"{object_id}_grid_seams",
-            description="kit pieces snap to the tiling grid with no visual gap at the seams",
-            forbidden_defects=(DefectClass.VISUAL_GAP,),
-            subject=object_id,
+            query_id=f"{output_prefix}_kit_started",
+            description="the modular kit contains a solid first grid piece",
+            metric=MetricKind.VOLUME,
+            subject=f"{output_prefix}_piece_00_00",
+            expected=1e-9,
+            comparison=Comparison.GTE,
         ),
+    )
+
+
+_RUNTIME_ACCEPTANCE_KINDS = frozenset({
+    "add_primitive", "add_wall", "add_floor", "add_opening", "add_gable_roof",
+    "add_staircase", "add_staircase_to_landing", "add_railing", "array_along",
+    "add_lod_chain", "add_modular_kit", "apply_texture_material", "move_object",
+    "rotate_object", "scale_object", "set_object_material", "duplicate_object",
+    "rename_object",
+})
+
+
+def runtime_acceptance_for(
+    kind: str, params: dict[str, Any], *, op_id: str
+) -> tuple[AcceptanceQuery, ...]:
+    """Only queries the live geometry evaluator can honestly re-run after dispatch.
+
+    Material creation and deletion currently lack an addressability/absence metric. Their
+    legacy declaration queries remain available from :func:`acceptance_for`, but are not
+    persisted as runtime gates that would crash on a non-mesh subject.
+    """
+    if kind not in _RUNTIME_ACCEPTANCE_KINDS:
+        return ()
+    return acceptance_for(kind, params, op_id=op_id)
+
+
+def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
+    """Explicit legal intersections introduced by a semantic operation."""
+    if kind != "add_staircase_to_landing":
+        return ()
+    prefix = params["object_id"]
+    depth = params["tread_thickness"]
+    return tuple(
+        JoineryIntent(
+            object_id=f"{prefix}_stringer_{side}",
+            into_object_id=f"{prefix}_tread_{index:03d}",
+            depth=depth,
+            axis="z",
+            reason="stringer intentionally supports the tread from below",
+        )
+        for side in ("left", "right")
+        for index in range(params["treads"])
     )

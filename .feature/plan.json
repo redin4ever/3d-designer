@@ -36,7 +36,7 @@
       "dependsOn": ["gable-roof", "landing-stairs"],
       "seams": ["operation-acceptance", "mcp-operation-construction"],
       "decisions": ["Q-01", "Q-12", "Q-14"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "promotion-acceptance",

@@ -21,7 +21,7 @@ from .roof import add_gable_roof
 from .registry import OP_SPECS, OPS
 from .stairs import add_staircase
 from .landing_stairs import add_staircase_to_landing
-from .validation import acceptance_for, validate_params
+from .validation import acceptance_for, joinery_for, runtime_acceptance_for, validate_params
 
 __all__ = [
     "OPS",
@@ -39,4 +39,6 @@ __all__ = [
     "add_modular_kit",
     "validate_params",
     "acceptance_for",
+    "runtime_acceptance_for",
+    "joinery_for",
 ]

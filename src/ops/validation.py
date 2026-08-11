@@ -20,11 +20,11 @@ from typing import Any
 
 from contracts import EPSILON, ToolError, Vec3
 
-from ._acceptance import acceptance_for
+from ._acceptance import acceptance_for, joinery_for, runtime_acceptance_for
 from ._geom import path_arc_length
 from ._shapes import as_pair, check_distinct, check_path, normalised_points
 
-__all__ = ["validate_params", "acceptance_for"]
+__all__ = ["validate_params", "acceptance_for", "joinery_for", "runtime_acceptance_for"]
 
 #: The nine kinds this library declares (registry_test.py pins the count). Kept as a local
 #: literal rather than importing ``registry.OPS`` to avoid a module import cycle:
