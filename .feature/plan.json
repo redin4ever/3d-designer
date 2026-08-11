@@ -8,7 +8,7 @@
       "dependsOn": [],
       "seams": ["operation-handler-registry", "operation-tool-specs", "operation-validation", "operation-public-surface"],
       "decisions": ["Q-03", "Q-04", "Q-05", "Q-06", "Q-16"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "landing-stairs",
