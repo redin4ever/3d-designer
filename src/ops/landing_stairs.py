@@ -100,10 +100,15 @@ def add_staircase_to_landing(engine: EngineProtocol, op: Operation) -> Operation
     support_z0 = start.z + rise - tread_thickness - stringer_depth / 2.0
     support_z1 = landing_top - tread_thickness - stringer_depth / 2.0
     for side, sign in (("left", 1.0), ("right", -1.0)):
-        a = start + forward * (run / 2.0) + lateral * (sign * support_offset)
-        b = attach - forward * (run / 2.0) + lateral * (sign * support_offset)
-        a = Vec3(a.x, a.y, support_z0)
-        b = Vec3(b.x, b.y, support_z1)
+        # The support line is defined through the first/last tread centres, then extended
+        # by half a run at both ends. Ending it at those centres left the angled end cap
+        # 8.6 mm short of the highest tread in Blender even though AABB checks looked
+        # correct. Extrapolating the same rise/run slope keeps every tread physically
+        # seated on the stringer, including both end treads.
+        a = start + lateral * (sign * support_offset)
+        b = attach + lateral * (sign * support_offset)
+        a = Vec3(a.x, a.y, support_z0 - rise / 2.0)
+        b = Vec3(b.x, b.y, support_z1 + rise / 2.0)
         produced.append(
             engine.create_mesh(
                 f"{prefix}_stringer_{side}",
