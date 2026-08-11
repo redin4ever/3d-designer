@@ -149,3 +149,29 @@ def test_every_rake_to_eave_corner_has_one_chamfered_cover_touching_both_boards(
             assert gap_width(engine, cap, f"roof_eave_{eave}_fascia").value == pytest.approx(
                 0.0, abs=EPSILON
             )
+
+
+def test_corner_covers_still_reach_the_rakes_on_a_shallow_small_porch_roof(engine) -> None:
+    """The full-size 30-degree roof can hide a cover that is a few millimetres short on
+    the same shallow 20-degree porch proportions used by the demonstration house."""
+    params = {
+        **_op().params,
+        "object_id": "porch_roof",
+        "origin": Vec3(0.0, -5.15, 2.85),
+        "width": 3.5,
+        "depth": 1.8,
+        "pitch_degrees": 20.0,
+        "thickness": 0.14,
+        "overhang": 0.3,
+        "trim_width": 0.13,
+        "trim_depth": 0.15,
+    }
+    add_gable_roof(
+        engine, Operation(op_id="porch-roof-op", kind="add_gable_roof", params=params)
+    )
+
+    for gable in ("neg", "pos"):
+        for eave in ("neg", "pos"):
+            cap = f"porch_roof_gable_{gable}_eave_{eave}_cap"
+            trim = f"porch_roof_gable_{gable}_trim"
+            assert gap_width(engine, cap, trim).value == pytest.approx(0.0, abs=EPSILON)
