@@ -62,7 +62,7 @@ def test_replace_with_adopts_a_prepared_project_in_place_and_resyncs(tmp_path) -
 
     assert returned is live
     assert live.document.scene_id == "opened-project"
-    assert live.engine.list_objects() == ("opened",)
+    assert tuple(live.engine.list_objects()) == ("opened",)
     assert events[-1].kind is ChangeKind.FULL_RESYNC
     assert events[-1].object_ids == ("opened",)
 
