@@ -18,7 +18,7 @@
       "dependsOn": [],
       "seams": ["operation-handler-registry", "operation-tool-specs", "operation-validation", "operation-public-surface"],
       "decisions": ["Q-07", "Q-08", "Q-09", "Q-10", "Q-11", "Q-19"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "ops-wiring",

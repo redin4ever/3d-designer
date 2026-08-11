@@ -20,6 +20,7 @@ from .railing import add_railing
 from .roof import add_gable_roof
 from .registry import OP_SPECS, OPS
 from .stairs import add_staircase
+from .landing_stairs import add_staircase_to_landing
 from .validation import acceptance_for, validate_params
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     "add_floor",
     "add_opening",
     "add_staircase",
+    "add_staircase_to_landing",
     "add_railing",
     "add_gable_roof",
     "array_along",
