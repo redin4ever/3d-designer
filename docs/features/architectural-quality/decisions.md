@@ -51,3 +51,26 @@ accuracy and restores the product's detailed, relationship-driven purpose.
 - Automatic doors, windows, interiors, landscaping or a whole-house layout generator.
 - Folding railings into the stair operation.
 - A numeric aesthetic or realism score; ADR-005 assigns appearance to visual review.
+
+## Question record
+
+- **Q-01:** Prove the root fix on future builds, not only the triggering scene.
+- **Q-02:** Keep typed middle-grain architectural operations.
+- **Q-03:** Ship gable roofs first (A-023).
+- **Q-04:** Include panels, ridge cap, rake trim and eave fascia.
+- **Q-05:** Keep footprint, bearing height, pitch, thickness, overhang and trim explicit.
+- **Q-06:** Support ridge axes X and Y (A-024).
+- **Q-07:** Preserve legacy `add_staircase` and add a new operation (A-025).
+- **Q-08:** Derive stair geometry from bottom start and live landing bounds (A-026).
+- **Q-09:** Build thin treads on two side stringers.
+- **Q-10:** Keep railings as the dedicated existing operation (A-027).
+- **Q-11:** Refuse impossible landing relationships atomically.
+- **Q-12:** Have dispatch attach operation acceptance automatically.
+- **Q-13:** Re-run every active operation query during promotion.
+- **Q-14:** Record intentional support intersections as `JoineryIntent` (A-028).
+- **Q-15:** Measure hard geometry and visually review appearance.
+- **Q-16:** Tell agents to prefer the semantic roof over rotated cubes.
+- **Q-17:** Do not add a monolithic whole-house generator (A-029).
+- **Q-18:** Verify with fake-engine tests and a real-Blender render (A-030).
+- **Q-19:** Replay old staircase operations bit-for-bit (A-031).
+- **Q-20:** Publish the semantic workflow through detail and polish.
