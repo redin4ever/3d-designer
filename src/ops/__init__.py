@@ -17,6 +17,7 @@ from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
 from .primitives import add_primitive
 from .railing import add_railing
+from .roof import add_gable_roof
 from .registry import OP_SPECS, OPS
 from .stairs import add_staircase
 from .validation import acceptance_for, validate_params
@@ -30,6 +31,7 @@ __all__ = [
     "add_opening",
     "add_staircase",
     "add_railing",
+    "add_gable_roof",
     "array_along",
     "add_lod_chain",
     "add_modular_kit",
