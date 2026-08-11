@@ -99,7 +99,7 @@ def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
     for along_sign, gable_label in ((-1.0, "neg"), (1.0, "pos")):
         along = along_sign * (half_length + trim_width / 4.0)
         for cross_sign, eave_label in ((-1.0, "neg"), (1.0, "pos")):
-            cross = cross_sign * (half_roof + trim_width / 4.0)
+            cross = cross_sign * (half_roof + trim_width * 0.15)
             corner_ids.append(
                 engine.create_mesh(
                     f"{prefix}_gable_{gable_label}_eave_{eave_label}_cap",
