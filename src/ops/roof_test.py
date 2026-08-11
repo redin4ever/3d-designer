@@ -11,6 +11,22 @@ from measure import gap_width, inspect
 from ops import add_gable_roof
 
 
+def _triangle_shell_count(engine, object_id: str) -> int:
+    """Connected triangle components by shared vertex index."""
+    triangles = engine.snapshot(object_id).triangles
+    remaining = set(range(len(triangles)))
+    shells = 0
+    while remaining:
+        shells += 1
+        stack = [remaining.pop()]
+        while stack:
+            vertices = set(triangles[stack.pop()])
+            neighbours = {i for i in remaining if vertices & set(triangles[i])}
+            remaining -= neighbours
+            stack.extend(neighbours)
+    return shells
+
+
 def _op(*, axis: str = "y") -> Operation:
     return Operation(
         op_id="roof-op",
@@ -82,3 +98,16 @@ def test_every_roof_part_is_closed_and_individually_valid(engine) -> None:
     for object_id in result.produced_objects:
         defects = inspect(engine, object_id)
         assert not defects, (object_id, [d.describe() for d in defects])
+
+
+def test_white_roof_trim_forms_one_clean_mitered_line_through_the_ridge(engine) -> None:
+    """The two rake boards must share a real apex and meet the ridge cap; joining two
+    disconnected boxes leaves the visible white outline rough and 86 mm short."""
+    add_gable_roof(engine, _op())
+
+    for label in ("neg", "pos"):
+        trim = f"roof_gable_{label}_trim"
+        assert _triangle_shell_count(engine, trim) == 1
+        assert gap_width(engine, "roof_ridge_cap", trim).value == pytest.approx(
+            0.0, abs=EPSILON
+        )

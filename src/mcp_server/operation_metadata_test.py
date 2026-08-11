@@ -33,7 +33,7 @@ def test_dispatch_persists_gable_roof_joint_acceptance(
     )
 
     logged = fake_scene.document.operations[-1]
-    assert len(logged.acceptance) == 3
+    assert len(logged.acceptance) == 5
     assert all("|" in query.subject for query in logged.acceptance)
 
 
@@ -55,4 +55,3 @@ def test_dispatch_persists_stair_stringer_joinery_and_landing_acceptance(
     logged = fake_scene.document.operations[-1]
     assert logged.acceptance[0].subject == "entry_tread_005|porch"
     assert len(logged.joinery) == 12
-

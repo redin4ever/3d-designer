@@ -34,6 +34,8 @@ def test_gable_roof_acceptance_remeasures_every_critical_roof_joint(engine) -> N
         "roof_slope_neg|roof_slope_pos",
         "roof_ridge_cap|roof_slope_neg",
         "roof_ridge_cap|roof_slope_pos",
+        "roof_ridge_cap|roof_gable_neg_trim",
+        "roof_ridge_cap|roof_gable_pos_trim",
     }
     assert all(evaluate(engine, query).passed for query in queries)
 
@@ -72,4 +74,3 @@ def test_landing_stair_joinery_explicitly_declares_each_supported_tread_contact(
         f"entry_tread_{i:03d}" for i in range(6)
     }
     assert all(intent.axis == "z" and intent.reason for intent in intents)
-
