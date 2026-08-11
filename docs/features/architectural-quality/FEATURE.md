@@ -4,8 +4,10 @@ House-scale builds now use semantic operations for the two relationships that pr
 forced an agent to guess raw geometry:
 
 - `add_gable_roof` builds two closed pitch-derived panels, a ridge cap, front/back rake
-  trim and both eave fascias. Its `origin` is the footprint centre at the wall-top bearing
-  plane; `width` is the gable span and `depth` is the ridge length.
+  trim and both eave fascias. Each rake is one continuous mitered shell; its apex meets a
+  flush, overlapping ridge cap instead of two disconnected boards stopping short. Its
+  `origin` is the footprint centre at the wall-top bearing plane; `width` is the gable span
+  and `depth` is the ridge length.
 - `add_staircase_to_landing` reads a live porch/deck/floor, derives the approach direction,
   run and rise from its bounds, and builds thin treads on two side stringers. The legacy
   `add_staircase` remains unchanged for callers that intentionally provide raw run math.

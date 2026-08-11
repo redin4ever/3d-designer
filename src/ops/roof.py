@@ -25,7 +25,8 @@ def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
     origin = p["origin"]
     axis = p["ridge_axis"]
     width, depth = p["width"], p["depth"]
-    pitch = math.tan(math.radians(p["pitch_degrees"]))
+    pitch_radians = math.radians(p["pitch_degrees"])
+    pitch = math.tan(pitch_radians)
     thickness, overhang = p["thickness"], p["overhang"]
     trim_width, trim_depth = p["trim_width"], p["trim_depth"]
 
@@ -48,8 +49,16 @@ def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
         *_panel_mesh(origin, axis, 0.0, half_roof, half_length, ridge_z, pitch, thickness),
     )
 
-    ridge_a = _point(origin, axis, 0.0, -half_length, ridge_z + thickness + trim_depth / 2.0)
-    ridge_b = _point(origin, axis, 0.0, half_length, ridge_z + thickness + trim_depth / 2.0)
+    # Finish the ridge cap at the same visible height as the rake's vertical miter. The
+    # previous cap merely touched the miter at its bottom corner and projected 183 mm
+    # above it, which rendered as a square block perched on the white V. Lowering it by
+    # the derived overlap makes the three boards read as one continuous trim system.
+    rake_miter_depth = trim_depth / (2.0 * math.cos(pitch_radians))
+    ridge_center_z = (
+        ridge_z + thickness / 2.0 + rake_miter_depth - trim_depth / 2.0
+    )
+    ridge_a = _point(origin, axis, 0.0, -half_length, ridge_center_z)
+    ridge_b = _point(origin, axis, 0.0, half_length, ridge_center_z)
     ridge_id = engine.create_mesh(
         f"{prefix}_ridge_cap", *oriented_box_between(ridge_a, ridge_b, trim_width, trim_depth)
     )
@@ -62,17 +71,10 @@ def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
             _point(origin, axis, 0.0, along, ridge_z + thickness / 2.0),
             _point(origin, axis, half_roof, along, eave_z + thickness / 2.0),
         )
-        left_end = points[1] - (points[1] - points[0]).normalized() * (trim_depth / 2.0)
-        right_start = points[1] + (points[2] - points[1]).normalized() * (trim_depth / 2.0)
         trim_id = engine.create_mesh(
             f"{prefix}_gable_{label}_trim",
-            *oriented_box_between(points[0], left_end, trim_width, trim_depth),
+            *_mitered_v_mesh(points, trim_width, trim_depth),
         )
-        extra_id = engine.create_mesh(
-            f"{prefix}_gable_{label}_trim_part",
-            *oriented_box_between(right_start, points[2], trim_width, trim_depth),
-        )
-        engine.join(trim_id, [extra_id])
         gable_ids.append(trim_id)
 
     eave_ids = []
@@ -98,6 +100,65 @@ def _point(origin: Vec3, axis: str, cross: float, along: float, z: float) -> Vec
     if axis == "y":
         return Vec3(origin.x + cross, origin.y + along, z)
     return Vec3(origin.x + along, origin.y + cross, z)
+
+
+def _mitered_v_mesh(
+    points: tuple[Vec3, Vec3, Vec3], width: float, depth: float
+) -> tuple[list[Vec3], list[tuple[int, ...]]]:
+    """One closed rake-trim mesh with a shared, vertical miter at the ridge.
+
+    Two separately swept boxes leave disconnected shells and need their square end caps
+    shortened, which produced the visible 86 mm break below the ridge cap. This sweep has
+    one apex ring. Its vertical offset is enlarged by ``1 / cos(pitch)`` so each leg keeps
+    the requested perpendicular depth after the miter.
+    """
+    p0, apex, p2 = points
+    forward_a = (apex - p0).normalized()
+    forward_b = (p2 - apex).normalized()
+    world_up = Vec3(0.0, 0.0, 1.0)
+
+    side_a = forward_a.cross(world_up).normalized()
+    side_b = forward_b.cross(world_up).normalized()
+    up_a = side_a.cross(forward_a).normalized()
+    up_b = side_b.cross(forward_b).normalized()
+
+    # Keep profile ordering consistent when a future roof orientation reverses the
+    # cross-product basis. A flipped ring would twist the four connecting side faces.
+    if side_a.dot(side_b) < 0.0:
+        side_b = side_b * -1.0
+        up_b = up_b * -1.0
+
+    miter_side = (side_a + side_b).normalized()
+    miter_up = (up_a + up_b).normalized()
+    half_width = width / 2.0
+    half_depth = depth / 2.0
+    miter_width = half_width / max(abs(miter_side.dot(side_a)), 1e-9)
+    miter_depth = half_depth / max(abs(miter_up.dot(up_a)), 1e-9)
+
+    def ring(point: Vec3, side: Vec3, up: Vec3, hw: float, hd: float) -> list[Vec3]:
+        return [
+            point - side * hw - up * hd,
+            point + side * hw - up * hd,
+            point + side * hw + up * hd,
+            point - side * hw + up * hd,
+        ]
+
+    verts = [
+        *ring(p0, side_a, up_a, half_width, half_depth),
+        *ring(apex, miter_side, miter_up, miter_width, miter_depth),
+        *ring(p2, side_b, up_b, half_width, half_depth),
+    ]
+    faces: list[tuple[int, ...]] = [(0, 1, 2, 3), (11, 10, 9, 8)]
+    for start, end in ((0, 4), (4, 8)):
+        faces.extend(
+            (
+                (start, end, end + 1, start + 1),
+                (start + 1, end + 1, end + 2, start + 2),
+                (start + 2, end + 2, end + 3, start + 3),
+                (start + 3, end + 3, end, start),
+            )
+        )
+    return verts, faces
 
 
 def _panel_mesh(

@@ -20,7 +20,8 @@ from typing import Any
 
 from contracts import EPSILON, ToolError, Vec3
 
-from ._acceptance import acceptance_for, joinery_for, runtime_acceptance_for
+from ._acceptance import acceptance_for, runtime_acceptance_for
+from ._joinery import joinery_for
 from ._geom import path_arc_length
 from ._shapes import as_pair, check_distinct, check_path, normalised_points
 

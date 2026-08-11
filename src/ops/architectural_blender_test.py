@@ -60,6 +60,12 @@ def test_roof_and_supported_entry_stairs_hold_their_contract_in_real_blender() -
         )
         assert all(evaluate(engine, query).passed for query in queries)
 
+        roof_intents = joinery_for("add_gable_roof", roof_params)
+        roof_pairs = tuple(
+            (intent.object_id, intent.into_object_id) for intent in roof_intents
+        )
+        assert find_clipping(engine, roof_pairs, roof_intents) == ()
+
         intents = joinery_for("add_staircase_to_landing", stair_params)
         pairs = tuple((intent.object_id, intent.into_object_id) for intent in intents)
         assert all(gap_width(engine, a, b).value <= 1e-4 for a, b in pairs)

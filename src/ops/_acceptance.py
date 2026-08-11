@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from contracts import AcceptanceQuery, Comparison, DefectClass, JoineryIntent, MetricKind, Vec3
+from contracts import AcceptanceQuery, Comparison, DefectClass, MetricKind, Vec3
 
-__all__ = ["acceptance_for", "joinery_for", "runtime_acceptance_for"]
+__all__ = ["acceptance_for", "runtime_acceptance_for"]
 
 
 def acceptance_for(
@@ -33,6 +33,14 @@ def acceptance_for(
             (f"{object_id}_slope_neg", f"{object_id}_slope_pos", "sloped panels meet"),
             (f"{object_id}_ridge_cap", f"{object_id}_slope_neg", "ridge cap meets left panel"),
             (f"{object_id}_ridge_cap", f"{object_id}_slope_pos", "ridge cap meets right panel"),
+            (
+                f"{object_id}_ridge_cap", f"{object_id}_gable_neg_trim",
+                "ridge cap meets front rake trim",
+            ),
+            (
+                f"{object_id}_ridge_cap", f"{object_id}_gable_pos_trim",
+                "ridge cap meets back rake trim",
+            ),
         )
         return tuple(
             AcceptanceQuery(
@@ -279,22 +287,3 @@ def runtime_acceptance_for(
     if kind not in _RUNTIME_ACCEPTANCE_KINDS:
         return ()
     return acceptance_for(kind, params, op_id=op_id)
-
-
-def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
-    """Explicit legal intersections introduced by a semantic operation."""
-    if kind != "add_staircase_to_landing":
-        return ()
-    prefix = params["object_id"]
-    depth = params["tread_thickness"]
-    return tuple(
-        JoineryIntent(
-            object_id=f"{prefix}_stringer_{side}",
-            into_object_id=f"{prefix}_tread_{index:03d}",
-            depth=depth,
-            axis="z",
-            reason="stringer intentionally supports the tread from below",
-        )
-        for side in ("left", "right")
-        for index in range(params["treads"])
-    )
