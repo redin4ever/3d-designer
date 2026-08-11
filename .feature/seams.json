@@ -125,8 +125,8 @@
     {
       "id": "export-profile-default",
       "file": "src/contracts/export_profiles.py",
-      "line": 169,
-      "anchor": "DEFAULT_PROFILE = \"roblox\"",
+      "line": 94,
+      "anchor": "\"generic\": ExportProfile(",
       "status": "wired",
       "decision": "Q-16,Q-29",
       "what": "the current agent export default, which converts metres to Roblox studs",
