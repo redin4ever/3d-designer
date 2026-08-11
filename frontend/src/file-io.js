@@ -15,7 +15,7 @@ export const FILE_ACTIONS = Object.freeze([
 
 const PROJECT_EXTENSIONS = new Set(['forge3d', 'json']);
 const MODEL_EXTENSIONS = new Set(['glb', 'gltf', 'obj', 'fbx', 'stl', 'ply', 'usd', 'usda', 'usdc']);
-const FORMATS = new Set(['glb', 'gltf', 'obj', 'fbx', 'stl', 'ply', 'usd']);
+const FORMATS = new Set(['glb', 'gltf', 'obj', 'fbx', 'stl', 'ply', 'usd', 'usda', 'usdc']);
 const PROFILES = new Set(['generic', 'roblox', 'unity', 'unreal']);
 
 function extensionOf(name) {
@@ -347,6 +347,7 @@ export function attachFileMenu(root, options = {}) {
   const sourceUpInput = root.querySelector('[data-file-source-up]');
   const unitScaleInput = root.querySelector('[data-file-unit-scale]');
   const flattenInput = root.querySelector('[data-file-flatten]');
+  const advancedImport = root.querySelector('[data-file-import-settings]');
   const controller = options.controller ?? createFileController({
     ...options,
     documentImpl,
@@ -378,6 +379,7 @@ export function attachFileMenu(root, options = {}) {
       fileInput.value = '';
       fileInput.accept = action === 'import-model' ? '.glb,.gltf,.obj,.fbx,.stl,.ply,.usd,.usda,.usdc' : '.forge3d,.json';
     }
+    if (advancedImport) advancedImport.hidden = action !== 'import-model';
     if (dialog?.showModal && !dialog.open) dialog.showModal();
     if ((action === 'open-project' || action === 'import-model') && fileInput) {
       if (fileInput.showPicker) fileInput.showPicker();

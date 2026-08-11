@@ -121,6 +121,8 @@
   border-radius: var(--radius-md);
 }
 
+.file-io-advanced[hidden] { display: none; }
+
 .file-io-advanced select,
 .file-io-advanced input[type='number'] {
   min-block-size: var(--touch-target);

@@ -19,7 +19,7 @@
       "dependsOn": ["file-contracts"],
       "seams": ["blender-engine-composition", "fake-engine-file-io", "export-policy"],
       "decisions": ["Q-04", "Q-07", "Q-12", "Q-13", "Q-14", "Q-21"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "scene-file-package",
@@ -29,7 +29,7 @@
       "dependsOn": ["file-contracts"],
       "seams": ["native-project-persistence", "durable-geometry-assets"],
       "decisions": ["Q-01", "Q-03", "Q-05", "Q-11", "Q-23", "Q-24", "Q-26", "Q-32"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "frontend-file-flow",
@@ -39,7 +39,7 @@
       "dependsOn": [],
       "seams": ["editor-file-entry", "frontend-composition", "frontend-test-discovery", "browser-journey-registration", "export-report-visibility"],
       "decisions": ["Q-08", "Q-09", "Q-10", "Q-15", "Q-16", "Q-17", "Q-18", "Q-19", "Q-22", "Q-25"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "live-file-api",
@@ -49,7 +49,7 @@
       "dependsOn": ["engine-model-io", "scene-file-package"],
       "seams": ["live-http-api", "live-app-binding", "app-runtime-graph"],
       "decisions": ["Q-11", "Q-17", "Q-18", "Q-19", "Q-21", "Q-22", "Q-24", "Q-25", "Q-30", "Q-31", "Q-32"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "agent-file-operations",
@@ -59,7 +59,7 @@
       "dependsOn": ["file-contracts", "engine-model-io"],
       "seams": ["agent-export-specs", "agent-file-handlers", "operation-handler-registry", "operator-edit-history", "phase-visibility"],
       "decisions": ["Q-02", "Q-20", "Q-21", "Q-27", "Q-28", "Q-29"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "scene-file-integration",
@@ -68,7 +68,7 @@
       "dependsOn": ["engine-model-io", "scene-file-package", "frontend-file-flow", "live-file-api", "agent-file-operations"],
       "seams": ["editor-file-entry", "frontend-composition", "frontend-test-discovery", "browser-journey-registration", "live-http-api", "live-app-binding", "app-runtime-graph", "engine-file-contract", "blender-engine-composition", "fake-engine-file-io", "export-policy", "export-profile-default", "agent-export-specs", "agent-file-handlers", "operation-handler-registry", "operator-edit-history", "native-project-persistence", "durable-geometry-assets", "phase-visibility", "export-report-visibility"],
       "decisions": ["Q-01", "Q-02", "Q-04", "Q-08", "Q-11", "Q-15", "Q-18", "Q-19", "Q-20", "Q-21", "Q-27", "Q-29"],
-      "status": "planned"
+      "status": "green"
     }
   ]
 }

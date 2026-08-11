@@ -100,9 +100,9 @@ def _open(app: Any, context: FileJobContext) -> FileOperationResult:
 def _zip_gltf_outputs(root: Path, filename: str) -> Path:
     archive_path = root / f"{Path(filename).stem}-gltf.zip"
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(root.iterdir()):
+        for path in sorted(root.rglob("*")):
             if path.is_file() and path != archive_path:
-                archive.write(path, path.name)
+                archive.write(path, path.relative_to(root).as_posix())
     return archive_path
 
 
