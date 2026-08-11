@@ -111,3 +111,16 @@ def test_white_roof_trim_forms_one_clean_mitered_line_through_the_ridge(engine) 
         assert gap_width(engine, "roof_ridge_cap", trim).value == pytest.approx(
             0.0, abs=EPSILON
         )
+
+
+def test_ridge_cap_finishes_flush_with_the_rake_miter_instead_of_perching_above_it(
+    engine,
+) -> None:
+    """Matching only at one bottom corner still renders as a blunt square block. Their
+    visible top planes must finish together so the three white lines read continuously."""
+    add_gable_roof(engine, _op())
+
+    ridge_top = engine.world_bounds("roof_ridge_cap").maximum.z
+    for label in ("neg", "pos"):
+        trim_top = engine.world_bounds(f"roof_gable_{label}_trim").maximum.z
+        assert ridge_top == pytest.approx(trim_top, abs=EPSILON)
