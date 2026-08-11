@@ -32,6 +32,7 @@ def test_gable_roof_schema_exposes_every_visual_design_dimension() -> None:
     }
     assert spec.input_schema["properties"]["ridge_axis"]["enum"] == ["x", "y"]
     assert "rotated cube" in spec.description.lower()
+    assert "corner" in spec.description.lower()
 
 
 def test_landing_stair_schema_names_the_relationship_instead_of_raw_run_math() -> None:

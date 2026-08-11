@@ -59,6 +59,10 @@ def test_gable_roof_builds_panels_ridge_and_all_visible_fascia(engine) -> None:
         "roof_gable_pos_trim",
         "roof_eave_neg_fascia",
         "roof_eave_pos_fascia",
+        "roof_gable_neg_eave_neg_cap",
+        "roof_gable_neg_eave_pos_cap",
+        "roof_gable_pos_eave_neg_cap",
+        "roof_gable_pos_eave_pos_cap",
     )
 
 
@@ -124,3 +128,24 @@ def test_ridge_cap_finishes_flush_with_the_rake_miter_instead_of_perching_above_
     for label in ("neg", "pos"):
         trim_top = engine.world_bounds(f"roof_gable_{label}_trim").maximum.z
         assert ridge_top == pytest.approx(trim_top, abs=EPSILON)
+
+
+def test_every_rake_to_eave_corner_has_one_chamfered_cover_touching_both_boards(
+    engine,
+) -> None:
+    """A zero-width point contact still renders as two blunt, misaligned board ends.
+    Every perimeter corner needs one smooth solid that overlaps both adjacent trims."""
+    result = add_gable_roof(engine, _op())
+
+    for gable in ("neg", "pos"):
+        for eave in ("neg", "pos"):
+            cap = f"roof_gable_{gable}_eave_{eave}_cap"
+            assert cap in result.produced_objects
+            assert len(engine.snapshot(cap).triangles) > 12
+            assert _triangle_shell_count(engine, cap) == 1
+            assert gap_width(engine, cap, f"roof_gable_{gable}_trim").value == pytest.approx(
+                0.0, abs=EPSILON
+            )
+            assert gap_width(engine, cap, f"roof_eave_{eave}_fascia").value == pytest.approx(
+                0.0, abs=EPSILON
+            )

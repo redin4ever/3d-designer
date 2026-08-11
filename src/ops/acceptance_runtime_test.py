@@ -36,6 +36,14 @@ def test_gable_roof_acceptance_remeasures_every_critical_roof_joint(engine) -> N
         "roof_ridge_cap|roof_slope_pos",
         "roof_ridge_cap|roof_gable_neg_trim",
         "roof_ridge_cap|roof_gable_pos_trim",
+        "roof_gable_neg_eave_neg_cap|roof_gable_neg_trim",
+        "roof_gable_neg_eave_neg_cap|roof_eave_neg_fascia",
+        "roof_gable_neg_eave_pos_cap|roof_gable_neg_trim",
+        "roof_gable_neg_eave_pos_cap|roof_eave_pos_fascia",
+        "roof_gable_pos_eave_neg_cap|roof_gable_pos_trim",
+        "roof_gable_pos_eave_neg_cap|roof_eave_neg_fascia",
+        "roof_gable_pos_eave_pos_cap|roof_gable_pos_trim",
+        "roof_gable_pos_eave_pos_cap|roof_eave_pos_fascia",
     }
     assert all(evaluate(engine, query).passed for query in queries)
 
@@ -79,8 +87,17 @@ def test_landing_stair_joinery_explicitly_declares_each_supported_tread_contact(
 def test_roof_joinery_declares_the_ridge_cap_overlap_that_blends_the_white_trim() -> None:
     intents = joinery_for("add_gable_roof", _roof_params())
 
-    assert {intent.object_id for intent in intents} == {"roof_ridge_cap"}
+    assert len(intents) == 10
+    assert {intent.object_id for intent in intents} == {
+        "roof_ridge_cap",
+        "roof_gable_neg_eave_neg_cap",
+        "roof_gable_neg_eave_pos_cap",
+        "roof_gable_pos_eave_neg_cap",
+        "roof_gable_pos_eave_pos_cap",
+    }
     assert {intent.into_object_id for intent in intents} == {
         "roof_slope_neg", "roof_slope_pos",
+        "roof_gable_neg_trim", "roof_gable_pos_trim",
+        "roof_eave_neg_fascia", "roof_eave_pos_fascia",
     }
     assert all(intent.axis == "z" and intent.depth > 0 and intent.reason for intent in intents)

@@ -52,7 +52,7 @@ def test_roof_and_supported_entry_stairs_hold_their_contract_in_real_blender() -
             Operation(op_id="entry-op", kind="add_staircase_to_landing", params=stair_params),
         )
 
-        assert len(roof.produced_objects) == 7
+        assert len(roof.produced_objects) == 11
         assert len(stairs.produced_objects) == 8
         queries = (
             *acceptance_for("add_gable_roof", roof_params, op_id="roof-op"),
