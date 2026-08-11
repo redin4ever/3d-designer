@@ -64,13 +64,19 @@ test('controller uploads local files as binary and sends the requested import ac
     pollInterval: 0,
   });
 
-  const result = await controller.importModel(file('chair.glb', 8, 'model/gltf-binary'));
+  const result = await controller.importModel(
+    file('chair.glb', 8, 'model/gltf-binary'),
+    { sourceUp: 'Y', unitScale: 0.01, flatten: false },
+  );
 
   assert.equal(result.ok, true);
   assert.equal(calls[0].url, '/api/file-io/jobs');
   assert.equal(calls[0].init.method, 'POST');
   assert.equal(calls[0].init.headers['x-forge3d-action'], 'import-model');
   assert.equal(calls[0].init.headers['x-forge3d-filename'], 'chair.glb');
+  assert.equal(calls[0].init.headers['x-forge3d-source-up'], 'Y');
+  assert.equal(calls[0].init.headers['x-forge3d-unit-scale'], '0.01');
+  assert.equal(calls[0].init.headers['x-forge3d-flatten'], 'false');
   assert.ok(calls[0].init.body instanceof ArrayBuffer);
 });
 

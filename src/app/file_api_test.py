@@ -70,6 +70,30 @@ def test_operation_failure_is_structured_in_status(tmp_path: Path) -> None:
     manager.close()
 
 
+def test_binary_import_carries_advanced_axis_and_unit_overrides(tmp_path: Path) -> None:
+    seen = {}
+
+    def import_model(context):
+        seen.update(context.payload)
+
+    manager = FileJobManager(tmp_path, operations={"import-model": import_model})
+    started = manager.submit(
+        {
+            "content-type": "model/obj",
+            "x-forge3d-action": "import-model",
+            "x-forge3d-filename": "part.obj",
+            "x-forge3d-source-up": "Y",
+            "x-forge3d-unit-scale": "0.01",
+            "x-forge3d-flatten": "false",
+        },
+        b"v 0 0 0\n",
+    )
+
+    assert _eventually(manager, started["job_id"], "complete")
+    assert seen == {"source_up": "Y", "unit_scale": 0.01, "flatten": False}
+    manager.close()
+
+
 def test_rejects_oversize_and_non_local_binary_requests(tmp_path: Path) -> None:
     manager = FileJobManager(tmp_path, max_upload_bytes=4)
 
