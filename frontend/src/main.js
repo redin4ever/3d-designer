@@ -30,6 +30,7 @@ import { attachControls, buildRequestFullSceneMessage } from './controls.js';
 import { attachPointing } from './point-ui.js';
 import { attachConnectButton } from './connect-ui.js';
 import { attachTextureInspector } from './texture-inspector.js';
+import { attachFileMenu } from './file-io.js';
 
 function resolveSocketUrl() {
   const override = new URLSearchParams(location.search).get('ws');
@@ -54,6 +55,8 @@ function main() {
   const viewportState = createViewportState();
   const actionLog = createActionLog();
   const transcript = createTranscript();
+  // A live session begins as an unsaved project, even when it was seeded with geometry.
+  let sceneDirty = true;
 
   renderer.start();
 
@@ -119,6 +122,7 @@ function main() {
         pushLog(`full scene — ${message.meshes?.length ?? 0} objects`, 'status');
         break;
       case ServerMessageType.MESH_UPSERT:
+        sceneDirty = true;
         applyMeshUpsert(viewportState, message, renderer);
         // The server sends `transforms` alongside `meshes` on every MESH_UPSERT
         // (src/viewer/translate.py builds both from the same snapshot), and
@@ -131,10 +135,12 @@ function main() {
         pointing.reconcileTransforms(message.transforms);
         break;
       case ServerMessageType.TRANSFORM_UPDATE:
+        sceneDirty = true;
         applyTransformUpdate(viewportState, message, renderer);
         pointing.reconcileTransforms(message.transforms);
         break;
       case ServerMessageType.OBJECTS_REMOVED:
+        sceneDirty = true;
         applyObjectsRemoved(viewportState, message, renderer);
         break;
       case ServerMessageType.HIGHLIGHT:
@@ -206,6 +212,20 @@ function main() {
 
   textureInspector = attachTextureInspector(controlsRoot, {
     send: (message) => socket.send(message),
+  });
+
+  attachFileMenu(document, {
+    selectedIds: () => pointing.selectedIds(),
+    isDirty: () => sceneDirty,
+    onStatus: (status) => {
+      if (status.phase === 'complete') pushLog(`file: ${status.message || 'complete'}`, 'log');
+      if (status.phase === 'error') pushLog(`file error: ${status.message}`, 'error');
+    },
+    onResult: (result, action) => {
+      if (!result?.ok || result.status === 'cancelled') return;
+      if (['save-project', 'save-as', 'open-project'].includes(action)) sceneDirty = false;
+      if (action === 'import-model') sceneDirty = true;
+    },
   });
 
   attachControls(controlsRoot, {

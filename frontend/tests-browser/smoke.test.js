@@ -160,7 +160,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         mainHasContent: document.querySelector('main')?.querySelector('canvas') !== null,
         liveRegions: [...document.querySelectorAll('[aria-live]')].map((el) => el.id),
         labelledInputs: [...document.querySelectorAll('input, select')].every(
-          (el) => document.querySelector(`label[for="${el.id}"]`) !== null,
+          (el) => el.closest('label') !== null
+            || (el.id && document.querySelector(`label[for="${el.id}"]`) !== null),
         ),
       }));
 
@@ -485,13 +486,15 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
           };
         });
 
-      // The 3D view is the first stop, and that is deliberate: it is a control now, not
-      // decoration. Arrow keys orbit it and +/- zoom, so a keyboard user who could never
-      // reach it could never look at the thing this product exists to build. It used to be
-      // skipped entirely because a <canvas> is not focusable without tabindex.
+      // File is first because persistent Blender-style application chrome precedes the
+      // workspace. The 3D view remains the next stop and fully keyboard-operable.
+      await s.page.keyboard.press('Tab');
+      const fileMenu = await describeFocus();
+      assert.equal(fileMenu.id, 'file-menu-button');
+
       await s.page.keyboard.press('Tab');
       const viewport = await describeFocus();
-      assert.equal(viewport.id, 'viewport-canvas', `first Tab must reach the 3D view, reached ${JSON.stringify(viewport)}`);
+      assert.equal(viewport.id, 'viewport-canvas', `Tab after File must reach the 3D view, reached ${JSON.stringify(viewport)}`);
       assert.notEqual(viewport.outlineStyle, 'none', ':focus-visible must draw a ring on the view too');
 
       await s.page.keyboard.press('Tab');

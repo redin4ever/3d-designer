@@ -184,6 +184,25 @@ class FileJobManager:
             action = normalized.get("x-forge3d-action", "").strip().lower()
             payload = {}
 
+        if action == "import-model" and not is_json:
+            source_up = normalized.get("x-forge3d-source-up", "AUTO").upper()
+            if source_up not in {"AUTO", "X", "Y", "Z"}:
+                raise FileApiError("invalid_source_up", "Source up must be AUTO, X, Y, or Z.")
+            try:
+                unit_scale = float(normalized.get("x-forge3d-unit-scale", "1"))
+            except ValueError as exc:
+                raise FileApiError("invalid_unit_scale", "Unit scale must be a positive number.") from exc
+            if unit_scale <= 0:
+                raise FileApiError("invalid_unit_scale", "Unit scale must be a positive number.")
+            flatten_raw = normalized.get("x-forge3d-flatten", "true").lower()
+            if flatten_raw not in {"true", "false"}:
+                raise FileApiError("invalid_flatten", "Flatten must be true or false.")
+            payload = {
+                "source_up": source_up,
+                "unit_scale": unit_scale,
+                "flatten": flatten_raw == "true",
+            }
+
         if action not in FILE_ACTIONS:
             raise FileApiError("unsupported_action", f"Unsupported file action {action!r}.")
         if action in _BINARY_ACTIONS and is_json:

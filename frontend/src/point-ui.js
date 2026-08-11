@@ -609,6 +609,10 @@ export function attachPointing(root, io) {
   renderSelection();
 
   return {
+    /** Current object selection for selection-aware editor export. */
+    selectedIds() {
+      return [...state.selection];
+    },
     /** The server is the authority on focus — see annotate.js's applyServerFocus. */
     applyFocus(objectIds) {
       applyServerFocus(state, objectIds);

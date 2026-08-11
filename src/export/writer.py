@@ -72,6 +72,7 @@ def export_scene(
     profile_name: str = "roblox",
     asset_class: AssetClass | None = None,
     force: bool = False,
+    format_name: str | None = None,
 ) -> ExportReport:
     """Convert every object in ``object_ids`` through ``profile_name`` and write it via
     ``EngineProtocol.export_gltf``, passing every conversion field the profile carries —
@@ -110,14 +111,17 @@ def export_scene(
 
     triangle_count = sum(engine.snapshot(object_id).triangle_count for object_id in object_ids)
 
-    engine.export_gltf(
-        object_ids,
-        path,
-        y_up=profile.up_axis is UpAxis.Y,
-        mirror_x=profile.flip_x,
-        negate_rotation=profile.negate_rotation,
-        scale=profile.to_target_units(1.0),
-    )
+    conversion = {
+        "y_up": profile.up_axis is UpAxis.Y,
+        "mirror_x": profile.flip_x,
+        "negate_rotation": profile.negate_rotation,
+        "scale": profile.to_target_units(1.0),
+    }
+    chosen_format = (format_name or "").lower().lstrip(".")
+    if chosen_format and chosen_format not in {"glb", "gltf"}:
+        engine.export_model(object_ids, path, **conversion)
+    else:
+        engine.export_gltf(object_ids, path, **conversion)
 
     return ExportReport(
         path=path,

@@ -12,12 +12,34 @@
   <link rel="stylesheet" href="src/connect.css" />
   <link rel="stylesheet" href="src/point.css" />
   <link rel="stylesheet" href="src/texture-inspector.css" />
+  <link rel="stylesheet" href="src/file-io.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand-lockup">
       <h1 class="topbar-title">forge3d</h1>
       <span class="workspace-label">Live editor</span>
+    </div>
+    <div class="file-menu">
+      <button type="button" id="file-menu-button" class="file-menu-button" data-action="file-menu"
+          aria-haspopup="menu" aria-expanded="false">File</button>
+      <div class="file-menu-panel" data-file-menu-panel role="menu" hidden>
+        <button type="button" class="file-menu-item" data-file-action="open-project" role="menuitem">
+          <span>Open Project</span><span class="file-menu-shortcut">Ctrl O</span>
+        </button>
+        <button type="button" class="file-menu-item" data-file-action="save-project" role="menuitem">
+          <span>Save Project</span><span class="file-menu-shortcut">Ctrl S</span>
+        </button>
+        <button type="button" class="file-menu-item" data-file-action="save-as" role="menuitem">
+          <span>Save As</span><span class="file-menu-shortcut">Ctrl Shift S</span>
+        </button>
+        <button type="button" class="file-menu-item" data-file-action="import-model" role="menuitem">
+          <span>Import Model</span>
+        </button>
+        <button type="button" class="file-menu-item" data-file-action="export-model" role="menuitem">
+          <span>Export Model</span>
+        </button>
+      </div>
     </div>
     <span id="connection-status" class="status-pill" data-status="connecting" role="status" aria-live="polite">
       Connecting…
@@ -236,6 +258,65 @@
     <div id="connect-dialog-body" class="connect-dialog-body" role="status" aria-live="polite"></div>
     <div class="connect-dialog-actions">
       <button type="button" class="btn" data-action="connect-cancel">Close</button>
+    </div>
+  </dialog>
+
+  <dialog id="file-io-dialog" class="file-io-dialog" data-file-dialog
+      aria-labelledby="file-io-title">
+    <h2 id="file-io-title" class="file-io-dialog-title" data-file-dialog-title>File</h2>
+    <div class="file-io-dialog-body">
+      <label class="file-io-field" for="file-io-input">Local file</label>
+        <input id="file-io-input" data-file-input type="file" />
+      <label class="file-io-field" for="file-io-filename">Download name</label>
+        <input id="file-io-filename" data-file-filename value="scene.forge3d" autocomplete="off" />
+      <label class="file-io-field" for="file-io-profile">Target profile</label>
+        <select id="file-io-profile" data-file-profile>
+          <option value="generic">Generic metres</option>
+          <option value="roblox">Roblox</option>
+          <option value="unity">Unity</option>
+          <option value="unreal">Unreal</option>
+        </select>
+      <label class="file-io-field" for="file-io-format">Format</label>
+        <select id="file-io-format" data-file-format>
+          <option value="glb">GLB</option>
+          <option value="gltf">glTF</option>
+          <option value="fbx">FBX</option>
+          <option value="obj">OBJ</option>
+          <option value="stl">STL</option>
+          <option value="ply">PLY</option>
+          <option value="usd">USD</option>
+        </select>
+      <details class="file-io-advanced">
+        <summary>Import settings</summary>
+        <label class="file-io-field" for="file-io-source-up">Source up axis</label>
+        <select id="file-io-source-up" data-file-source-up>
+          <option value="AUTO">Auto detect</option>
+          <option value="X">X up</option>
+          <option value="Y">Y up</option>
+          <option value="Z">Z up</option>
+        </select>
+        <label class="file-io-field" for="file-io-unit-scale">Metres per source unit</label>
+        <input id="file-io-unit-scale" data-file-unit-scale type="number" min="0.000001" step="0.01" value="1" />
+        <label class="file-io-check" for="file-io-flatten">
+          <input id="file-io-flatten" data-file-flatten type="checkbox" checked />
+          Flatten hierarchy to world transforms
+        </label>
+      </details>
+      <progress class="file-io-progress" data-file-progress max="100" value="0"></progress>
+      <output class="file-io-status" data-file-status aria-live="polite">Ready.</output>
+      <section class="file-io-unsaved" data-file-unsaved hidden>
+        <strong>Save changes before continuing?</strong>
+        <div class="file-io-dialog-actions">
+          <button type="button" data-file-unsaved-save>Save</button>
+          <button type="button" data-file-unsaved-discard>Discard</button>
+          <button type="button" data-file-unsaved-cancel>Cancel</button>
+        </div>
+      </section>
+    </div>
+    <div class="file-io-dialog-actions">
+      <button type="button" data-file-cancel>Cancel Job</button>
+      <button type="button" data-file-close>Close</button>
+      <button type="button" data-file-confirm>Confirm</button>
     </div>
   </dialog>
 

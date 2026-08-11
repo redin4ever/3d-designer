@@ -53,6 +53,23 @@ def test_live_callbacks_save_import_and_export_the_current_scene(tmp_path) -> No
     project_path.write_bytes(project)
     assert zipfile.is_zipfile(project_path)
 
+    live_scene = app.scene
+    app.engine.create_primitive("later", "cube", Vec3(1, 1, 1))
+    opened = _complete(
+        manager,
+        manager.submit(
+            {
+                "content-type": "application/vnd.forge3d+zip",
+                "x-forge3d-action": "open-project",
+                "x-forge3d-filename": "house.forge3d",
+            },
+            project,
+        ),
+    )
+    assert opened["status"] == "complete"
+    assert app.scene is live_scene
+    assert tuple(app.engine.list_objects()) == ("cube",)
+
     imported = _complete(
         manager,
         manager.submit(

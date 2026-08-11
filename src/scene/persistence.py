@@ -70,6 +70,7 @@ from contracts import (
 
 from .barriers import SnapshotLedger
 from .op_codec import V1_DROPPED_FIELDS, operation_from_dict, operation_to_dict
+from .targets import TargetLedger
 
 if TYPE_CHECKING:
     from . import Scene
@@ -153,8 +154,13 @@ class PersistenceMixin:
             rollback = Path(temp) / "current.json"
             capture(self._engine, str(rollback))
             try:
-                if not restore(self._engine, geometry_path):
-                    raise ValueError("the project geometry snapshot could not be restored")
+                if geometry_path:
+                    if not restore(self._engine, geometry_path):
+                        raise ValueError("the project geometry snapshot could not be restored")
+                else:
+                    replay = prepared.replay()
+                    if not replay.complete:
+                        raise ValueError(replay.describe())
                 self._document = prepared._document
                 self._handlers = dict(prepared._handlers)
                 self._cache = dict(prepared._cache)
@@ -176,6 +182,9 @@ class PersistenceMixin:
                 raise
 
         object_ids = tuple(self._engine.list_objects())
+        # The packed current snapshot is authoritative and may include legitimate
+        # pre-existing/seeded geometry that has no construction operation in the log.
+        self._targets = TargetLedger(object_ids)
         self._emit(
             SceneChangeEvent(
                 kind=ChangeKind.FULL_RESYNC,

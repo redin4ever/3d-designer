@@ -40,6 +40,7 @@ import socket
 import sys
 import threading
 import tempfile
+import shutil
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -100,6 +101,33 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler's own naming
+        route = self.path.split("?", 1)[0]
+        if route.startswith("/api/file-io/jobs/"):
+            from app.file_api import FileApiError
+
+            try:
+                self._json(200, self.server.file_jobs.get(route.rsplit("/", 1)[-1]))
+            except FileApiError as exc:
+                self._json(exc.status, {"error": exc.message, "code": exc.code})
+            return
+        if route.startswith("/api/file-io/downloads/"):
+            from app.file_api import FileApiError
+
+            try:
+                body, filename, content_type = self.server.file_jobs.read_download(
+                    route.rsplit("/", 1)[-1]
+                )
+            except FileApiError as exc:
+                self._json(exc.status, {"error": exc.message, "code": exc.code})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.split("?", 1)[0] == "/api/textures":
             from textures import TextureLibrary
 
@@ -134,6 +162,41 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
+        route = self.path.split("?", 1)[0]
+        if route == "/api/file-io/jobs":
+            from app.file_api import FileApiError, MAX_UPLOAD_BYTES
+
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length < 0:
+                    raise FileApiError("invalid_size", "The request size is invalid.")
+                if length > MAX_UPLOAD_BYTES:
+                    raise FileApiError(
+                        "upload_too_large", "Files must be 512 MiB or smaller.", status=413
+                    )
+                payload = self.server.file_jobs.submit(
+                    dict(self.headers.items()), self.rfile.read(length)
+                )
+            except (TypeError, ValueError) as exc:
+                self._json(400, {"error": f"The request size is invalid: {exc}"})
+                return
+            except FileApiError as exc:
+                response = {"error": exc.message, "code": exc.code}
+                details = exc.payload["error"].get("details")
+                if details is not None:
+                    response["details"] = details
+                self._json(exc.status, response)
+                return
+            self._json(202, payload)
+            return
+        if route.startswith("/api/file-io/jobs/") and route.endswith("/cancel"):
+            from app.file_api import FileApiError
+
+            try:
+                self._json(200, self.server.file_jobs.cancel(route.split("/")[-2]))
+            except FileApiError as exc:
+                self._json(exc.status, {"error": exc.message, "code": exc.code})
+            return
         if self.path.split("?", 1)[0] == "/api/textures":
             from textures import TextureLibrary, TextureTransform
 
@@ -199,11 +262,32 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
                          "note": CLIENTS[client]["note"]})
 
 
-def serve_frontend(port: int, directory: Path) -> http.server.ThreadingHTTPServer:
+class _FrontendServer(http.server.ThreadingHTTPServer):
+    """Own background jobs and managed files with the HTTP listener."""
+
+    def server_close(self) -> None:
+        try:
+            self.file_jobs.close()
+        finally:
+            super().server_close()
+            shutil.rmtree(self.file_work_root, ignore_errors=True)
+
+
+def serve_frontend(port: int, directory: Path, app: Any = None) -> http.server.ThreadingHTTPServer:
     """Serve ``directory`` on loopback, on a daemon thread, and return the server."""
     _QuietHandler.managed_texture_root = directory.parent / ".forge3d" / "textures"
     handler = functools.partial(_QuietHandler, directory=str(directory))
-    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+    from app.file_api import FileJobManager
+    from app.file_operations import build_file_operations
+
+    work_root = Path(tempfile.mkdtemp(prefix="forge3d-live-files-"))
+    httpd = _FrontendServer(("127.0.0.1", port), handler)
+    httpd.file_work_root = work_root
+    httpd.file_jobs = FileJobManager(
+        work_root, operations=build_file_operations(app) if app is not None else {}
+    )
+    if app is not None:
+        app.file_jobs = httpd.file_jobs
     threading.Thread(target=httpd.serve_forever, name="forge3d-web", daemon=True).start()
     return httpd
 
@@ -257,7 +341,7 @@ def run_live(
         print(f"  frontend: missing at {FRONTEND_DIR} — the live view will not load", file=sys.stderr)
         web = None
     else:
-        web = serve_frontend(ports["web"], FRONTEND_DIR)
+        web = serve_frontend(ports["web"], FRONTEND_DIR, app)
         print(f"  frontend: http://127.0.0.1:{ports['web']}/index.html", file=sys.stderr)
 
     url = f"http://127.0.0.1:{ports['web']}/index.html"
@@ -290,4 +374,5 @@ def run_live(
     finally:
         if web is not None:
             web.shutdown()
+            web.server_close()
     return 0

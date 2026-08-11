@@ -34,6 +34,13 @@ export async function startStaticServer(rootDir) {
 
   const server = createServer(async (req, res) => {
     const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    if (urlPath === '/api/textures') {
+      requests.push({ path: urlPath, status: 200 });
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end('{"materials":[]}');
+      return;
+    }
     const relative = normalize(urlPath).replace(/^([/\\])+/, '');
     const target = resolve(join(root, relative === '' ? 'index.html' : relative));
 

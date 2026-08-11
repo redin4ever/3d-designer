@@ -27,6 +27,12 @@ function failure(error, extra = {}) {
   return { ok: false, error, ...extra };
 }
 
+function errorText(value, fallback) {
+  if (typeof value === 'string' && value) return value;
+  if (value && typeof value.message === 'string') return value.message;
+  return fallback;
+}
+
 /** Validate a browser File without ever accepting a path or URL string. */
 export function validateLocalFile(file, { kind = 'any' } = {}) {
   if (!file || typeof file !== 'object' || typeof file.arrayBuffer !== 'function') {
@@ -110,7 +116,7 @@ export function createFileController(options = {}) {
       return failure(`Could not reach the file service: ${error?.message ?? String(error)}`);
     }
     const payload = await responsePayload(response);
-    if (!response.ok) return failure(payload.error ?? `File service answered ${response.status}.`, { payload });
+    if (!response.ok) return failure(errorText(payload.error, `File service answered ${response.status}.`), { payload });
     return { ok: true, ...payload };
   }
 
@@ -155,8 +161,9 @@ export function createFileController(options = {}) {
         return { ok: true, ...result, status: 'cancelled' };
       }
       if (status === 'failed' || status === 'error') {
-        emit({ action, phase: 'error', status: 'error', progress, message: result.error ?? result.message ?? 'File job failed.' });
-        return failure(result.error ?? result.message ?? 'File job failed.', { ...result });
+        const message = errorText(result.error, result.message ?? 'File job failed.');
+        emit({ action, phase: 'error', status: 'error', progress, message });
+        return failure(message, { ...result });
       }
       emit({ action, phase: 'progress', status, progress, message: result.message ?? '' });
       if (job.cancelRequested) {
@@ -167,7 +174,7 @@ export function createFileController(options = {}) {
     }
   }
 
-  async function start(action, { payload = {}, file = null, download = false } = {}) {
+  async function start(action, { payload = {}, file = null, download = false, headers = {} } = {}) {
     if (!FILE_ACTIONS.includes(action)) return failure(`Unsupported file action "${action}".`);
     let init;
     if (file) {
@@ -186,6 +193,7 @@ export function createFileController(options = {}) {
           'x-forge3d-action': action,
           'x-forge3d-filename': file.name,
           'x-forge3d-size': String(file.size),
+          ...headers,
         },
         body: binary,
       };
@@ -241,11 +249,18 @@ export function createFileController(options = {}) {
     return start('open-project', { file });
   }
 
-  async function importModel(file) {
+  async function importModel(file, { sourceUp = 'AUTO', unitScale = 1, flatten = true } = {}) {
     const gateResult = await gate('import-model');
     if (gateResult.cancelled) return { ok: true, status: 'cancelled' };
     if (!gateResult.ok) return gateResult;
-    return start('import-model', { file });
+    return start('import-model', {
+      file,
+      headers: {
+        'x-forge3d-source-up': String(sourceUp).toUpperCase(),
+        'x-forge3d-unit-scale': String(unitScale),
+        'x-forge3d-flatten': String(Boolean(flatten)),
+      },
+    });
   }
 
   async function saveProject({ filename = 'scene.forge3d', internal = false } = {}) {
@@ -311,7 +326,7 @@ function actionMethod(controller, action, context) {
   if (action === 'open-project') return controller.openProject(context.file);
   if (action === 'save-project') return controller.saveProject({ filename: context.filename });
   if (action === 'save-as') return controller.saveAs({ filename: context.filename });
-  if (action === 'import-model') return controller.importModel(context.file);
+  if (action === 'import-model') return controller.importModel(context.file, context);
   return controller.exportModel(context);
 }
 
@@ -329,6 +344,9 @@ export function attachFileMenu(root, options = {}) {
   const profileInput = root.querySelector('[data-file-profile]');
   const formatInput = root.querySelector('[data-file-format]');
   const unsavedNode = root.querySelector('[data-file-unsaved]');
+  const sourceUpInput = root.querySelector('[data-file-source-up]');
+  const unitScaleInput = root.querySelector('[data-file-unit-scale]');
+  const flattenInput = root.querySelector('[data-file-flatten]');
   const controller = options.controller ?? createFileController({
     ...options,
     documentImpl,
@@ -358,7 +376,7 @@ export function attachFileMenu(root, options = {}) {
     if (title) title.textContent = action.replaceAll('-', ' ');
     if (fileInput) {
       fileInput.value = '';
-      fileInput.accept = action === 'import-model' ? '.glb,.gltf,.obj,.fbx,.stl,.ply,.usd' : '.forge3d,.json';
+      fileInput.accept = action === 'import-model' ? '.glb,.gltf,.obj,.fbx,.stl,.ply,.usd,.usda,.usdc' : '.forge3d,.json';
     }
     if (dialog?.showModal && !dialog.open) dialog.showModal();
     if ((action === 'open-project' || action === 'import-model') && fileInput) {
@@ -375,6 +393,9 @@ export function attachFileMenu(root, options = {}) {
       profile: profileInput?.value || DEFAULT_PROFILE,
       format: formatInput?.value || DEFAULT_FORMAT,
       selectedIds: options.selectedIds?.() ?? [],
+      sourceUp: sourceUpInput?.value || 'AUTO',
+      unitScale: Number(unitScaleInput?.value || 1),
+      flatten: flattenInput?.checked ?? true,
     };
     if ((activeAction === 'open-project' || activeAction === 'import-model') && !context.file) {
       if (statusNode) statusNode.textContent = 'Choose a local file first.';

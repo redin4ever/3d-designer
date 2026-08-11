@@ -102,8 +102,8 @@
   font-size: var(--text-caption);
 }
 
-.file-io-field input,
-.file-io-field select {
+.file-io-dialog-body > input,
+.file-io-dialog-body > select {
   min-block-size: var(--touch-target);
   min-inline-size: 0;
   padding-inline: var(--space-sm);
@@ -112,6 +112,27 @@
   background: var(--surface-1);
   color: var(--ink);
 }
+
+.file-io-advanced {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: var(--hairline-size) solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+.file-io-advanced select,
+.file-io-advanced input[type='number'] {
+  min-block-size: var(--touch-target);
+  min-inline-size: 0;
+  padding-inline: var(--space-sm);
+  border: var(--hairline-size) solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--ink);
+}
+
+.file-io-check { color: var(--ink-muted); font-size: var(--text-caption); }
 
 .file-io-status {
   min-block-size: var(--touch-target);

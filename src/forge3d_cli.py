@@ -110,6 +110,7 @@ def start_viewer(app: Any, host: str, port: int) -> str:
         import viewer as viewer_module
 
         server = viewer_module.serve(app.scene, app.orchestrator, host=host, port=port)
+        app.viewer = server.bridge
 
         # The arrow the whole live view was missing. `ViewerBridge.report_action` already
         # knew how to turn an ActionReport into HIGHLIGHT / LOG / PROBLEMS messages and
