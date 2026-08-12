@@ -73,6 +73,7 @@ def test_every_operation_module_reaches_the_registry() -> None:
     for kind in (
         "add_railing",        # ops
         "add_gable_roof",     # semantic architectural blockout
+        "add_chimney",        # complete architectural roof penetration
         "add_staircase_to_landing",  # relation-derived architectural refine
         "repair",             # gaps
         "make_plumb",         # align

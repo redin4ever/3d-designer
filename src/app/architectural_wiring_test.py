@@ -6,10 +6,11 @@ from contracts import Operation
 from app import build_handlers
 
 
-def test_live_handler_registry_contains_both_architectural_operations() -> None:
+def test_live_handler_registry_contains_all_architectural_operations() -> None:
     """OPS entries must survive composition into the replay registry used by the live app."""
     handlers = build_handlers(include_raw=False)
     assert "add_gable_roof" in handlers
+    assert "add_chimney" in handlers
     assert "add_staircase_to_landing" in handlers
 
 
