@@ -350,7 +350,8 @@ reversible option; each is recorded here rather than asked, because the gate had
   a chimney read as designed; this neutral assembly is style-agnostic and material choice
   remains with the caller.
 - **Blast radius:** new semantic chimney operation, schema, acceptance and demonstration.
-- **Reversal:** all visible dimensions and the flue count are explicit operation parameters.
+- **Reversal:** all visible dimensions, flue count, and flue wall thickness are explicit
+  operation parameters.
 
 ## A-033 — Handrail bends share one miter ring
 

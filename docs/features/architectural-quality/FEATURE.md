@@ -14,7 +14,8 @@ forced an agent to guess raw geometry:
   run and rise from its bounds, and builds thin treads on two side stringers. The legacy
   `add_staircase` remains unchanged for callers that intentionally provide raw run math.
 - `add_chimney` builds the masonry shaft, tapered roof flashing, overhanging crown, and
-  one to four rimmed flues as predictable parts. It refuses a flue layout that cannot fit
+  one to four hollow, rimmed flues as predictable parts. Flue wall thickness is explicit,
+  and the operation refuses a flue layout that cannot fit
   before creating any geometry; agents should use it instead of stretching a cube.
 - `add_railing` now sweeps the top rail as one closed shell. Every slope, landing, or plan
   corner shares a true miter ring, so hidden end caps cannot intersect and no joint can

@@ -48,24 +48,45 @@ def _flashing_mesh(
     return vertices, faces
 
 
-def _cylinder_mesh(
-    centre: Vec3, radius: float, z_min: float, z_max: float, sides: int = 24
+def _pipe_mesh(
+    centre: Vec3,
+    outer_radius: float,
+    inner_radius: float,
+    z_min: float,
+    z_max: float,
+    sides: int = 24,
 ) -> tuple[list[Vec3], list[tuple[int, ...]]]:
-    lower = [
+    outer_lower = [
         Vec3(
-            centre.x + radius * math.cos(2.0 * math.pi * i / sides),
-            centre.y + radius * math.sin(2.0 * math.pi * i / sides),
+            centre.x + outer_radius * math.cos(2.0 * math.pi * i / sides),
+            centre.y + outer_radius * math.sin(2.0 * math.pi * i / sides),
             z_min,
         )
         for i in range(sides)
     ]
-    upper = [Vec3(point.x, point.y, z_max) for point in lower]
-    faces: list[tuple[int, ...]] = [tuple(reversed(range(sides))), tuple(range(sides, 2 * sides))]
-    faces.extend(
-        (i, (i + 1) % sides, sides + (i + 1) % sides, sides + i)
+    outer_upper = [Vec3(point.x, point.y, z_max) for point in outer_lower]
+    inner_lower = [
+        Vec3(
+            centre.x + inner_radius * math.cos(2.0 * math.pi * i / sides),
+            centre.y + inner_radius * math.sin(2.0 * math.pi * i / sides),
+            z_min,
+        )
         for i in range(sides)
-    )
-    return lower + upper, faces
+    ]
+    inner_upper = [Vec3(point.x, point.y, z_max) for point in inner_lower]
+    vertices = outer_lower + outer_upper + inner_lower + inner_upper
+    faces: list[tuple[int, ...]] = []
+    for i in range(sides):
+        j = (i + 1) % sides
+        faces.extend(
+            (
+                (i, j, sides + j, sides + i),
+                (2 * sides + i, 3 * sides + i, 3 * sides + j, 2 * sides + j),
+                (i, 2 * sides + i, 2 * sides + j, j),
+                (sides + i, sides + j, 3 * sides + j, 3 * sides + i),
+            )
+        )
+    return vertices, faces
 
 
 def _flue_centres(
@@ -125,15 +146,20 @@ def add_chimney(engine: EngineProtocol, op: Operation) -> OperationResult:
     flue_top = flue_base + p["flue_height"] - p["rim_height"]
     rim_top = flue_base + p["flue_height"]
     centres = _flue_centres(origin, width, depth, crown_overhang, p["flue_count"])
+    inner_radius = p["flue_radius"] - p["flue_wall_thickness"]
     for index, centre in enumerate(centres):
         flue_id = engine.create_mesh(
             f"{prefix}_flue_{index:03d}",
-            *_cylinder_mesh(centre, p["flue_radius"], flue_base, flue_top),
+            *_pipe_mesh(centre, p["flue_radius"], inner_radius, flue_base, flue_top),
         )
         rim_id = engine.create_mesh(
             f"{prefix}_flue_{index:03d}_rim",
-            *_cylinder_mesh(
-                centre, p["flue_radius"] + p["rim_overhang"], flue_top, rim_top
+            *_pipe_mesh(
+                centre,
+                p["flue_radius"] + p["rim_overhang"],
+                inner_radius,
+                flue_top,
+                rim_top,
             ),
         )
         produced.extend((flue_id, rim_id))

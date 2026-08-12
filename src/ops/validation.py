@@ -199,7 +199,8 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
         _require(params, "origin", kind)
         for name in (
             "width", "depth", "shaft_height", "flashing_overhang", "flashing_height",
-            "crown_overhang", "crown_height", "flue_radius", "flue_height",
+            "crown_overhang", "crown_height", "flue_radius", "flue_wall_thickness",
+            "flue_height",
             "rim_overhang", "rim_height",
         ):
             _positive(_require(params, name, kind), name, kind)
@@ -208,6 +209,12 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
             raise ToolError(
                 "ops.bad_count", f"{kind}: flue_count is {count!r}, must be an integer 1..4",
                 "pass flue_count as 1, 2, 3, or 4",
+            )
+        if params["flue_wall_thickness"] >= params["flue_radius"]:
+            raise ToolError(
+                "ops.bad_dimension",
+                f"{kind}: flue_wall_thickness must be smaller than flue_radius",
+                "reduce flue_wall_thickness or increase flue_radius",
             )
         if params["rim_height"] >= params["flue_height"]:
             raise ToolError(

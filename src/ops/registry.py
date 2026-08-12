@@ -399,6 +399,7 @@ OP_SPECS: tuple[ToolSpec, ...] = (
                 "crown_height": {"type": "number", "exclusiveMinimum": 0},
                 "flue_count": {"type": "integer", "minimum": 1, "maximum": 4},
                 "flue_radius": {"type": "number", "exclusiveMinimum": 0},
+                "flue_wall_thickness": {"type": "number", "exclusiveMinimum": 0},
                 "flue_height": {"type": "number", "exclusiveMinimum": 0},
                 "rim_overhang": {"type": "number", "exclusiveMinimum": 0},
                 "rim_height": {"type": "number", "exclusiveMinimum": 0},
@@ -406,7 +407,8 @@ OP_SPECS: tuple[ToolSpec, ...] = (
             "required": [
                 "object_id", "origin", "width", "depth", "shaft_height",
                 "flashing_overhang", "flashing_height", "crown_overhang",
-                "crown_height", "flue_count", "flue_radius", "flue_height",
+                "crown_height", "flue_count", "flue_radius", "flue_wall_thickness",
+                "flue_height",
                 "rim_overhang", "rim_height",
             ],
             "additionalProperties": False,
