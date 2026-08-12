@@ -18,6 +18,7 @@ import pytest
 
 from contracts import EPSILON, Operation, Vec3
 from ops import add_railing
+from testing import connected_components
 
 
 def _posts(result) -> list[str]:
@@ -164,6 +165,35 @@ def test_top_rail_endpoints_coincide_with_first_and_last_post_centrelines(engine
 
     assert rail_bounds.minimum.x == pytest.approx(first_post_x, abs=EPSILON)
     assert rail_bounds.maximum.x == pytest.approx(last_post_x, abs=EPSILON)
+
+
+def test_top_rail_is_one_connected_shell_through_a_slope_to_landing_bend(engine) -> None:
+    """A stair handrail cannot be assembled from closed boxes that merely occupy the same
+    corner. Their hidden end caps intersect, the shells remain disconnected, and a small
+    numerical or bevel change opens a visible crack exactly where a hand crosses from the
+    rake onto the landing. The bend must share one mitered vertex ring instead."""
+    op = Operation(
+        op_id="landing_rail",
+        kind="add_railing",
+        params={
+            "object_id": "landing_rail",
+            "path": [Vec3(0, 0, 0), Vec3(3.0, 0, 1.8), Vec3(4.2, 0, 1.8)],
+            "height": 0.9,
+            "post_spacing": 1.0,
+            "baluster_gap": 0.1,
+            "rail_size": (0.09, 0.07),
+        },
+    )
+
+    result = add_railing(engine, op)
+
+    rail_id = next(pid for pid in result.produced_objects if pid.endswith("_top_rail"))
+    mesh = engine.snapshot(rail_id)
+    shells = connected_components(len(mesh.vertices), mesh.triangles)
+    assert len(shells) == 1, (
+        "the sloped handrail and landing handrail must share a mitered bend, not remain "
+        f"as {len(shells)} disconnected box shells"
+    )
 
 
 def test_baluster_clear_gap_is_surface_to_surface_not_centre_pitch(engine) -> None:
