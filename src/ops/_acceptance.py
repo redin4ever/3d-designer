@@ -64,6 +64,28 @@ def acceptance_for(
             for index, (a, b, description) in enumerate(joints)
         )
 
+    if kind == "add_chimney":
+        joints = [
+            (f"{object_id}_flashing", f"{object_id}_shaft", "flashing closes around shaft"),
+            (f"{object_id}_shaft", f"{object_id}_crown", "shaft supports crown"),
+        ]
+        for index in range(params["flue_count"]):
+            flue = f"{object_id}_flue_{index:03d}"
+            joints.extend(
+                ((flue, f"{object_id}_crown", "flue meets crown"),
+                 (f"{flue}_rim", flue, "flue rim meets flue body"))
+            )
+        return tuple(
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_chimney_joint_{index}",
+                description=description,
+                metric=MetricKind.GAP_WIDTH,
+                subject=f"{a}|{b}", expected=0.0, tolerance=1e-4,
+                comparison=Comparison.EQ,
+            )
+            for index, (a, b, description) in enumerate(joints)
+        )
+
     if kind == "add_staircase_to_landing":
         last_tread = f"{object_id}_tread_{params['treads'] - 1:03d}"
         landing_id = params["landing_id"]
@@ -180,6 +202,11 @@ def acceptance_for(
                 subject=f"{output_prefix}_top_rail",
                 expected=1e-9,
                 comparison=Comparison.GTE,
+                forbidden_defects=(
+                    DefectClass.BOUNDARY_HOLE,
+                    DefectClass.NON_MANIFOLD_EDGE,
+                    DefectClass.SELF_INTERSECTION,
+                ),
             ),
         )
 
@@ -276,7 +303,7 @@ def acceptance_for(
 
 
 _RUNTIME_ACCEPTANCE_KINDS = frozenset({
-    "add_primitive", "add_wall", "add_floor", "add_opening", "add_gable_roof",
+    "add_primitive", "add_wall", "add_floor", "add_opening", "add_gable_roof", "add_chimney",
     "add_staircase", "add_staircase_to_landing", "add_railing", "array_along",
     "add_lod_chain", "add_modular_kit", "apply_texture_material", "move_object",
     "rotate_object", "scale_object", "set_object_material", "duplicate_object",

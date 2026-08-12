@@ -26,6 +26,7 @@ from contracts import HandlerRegistry, ToolRole, ToolSpec
 
 from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
+from .chimney import add_chimney
 from .primitives import add_primitive
 from .railing import add_railing
 from .roof import add_gable_roof
@@ -74,6 +75,7 @@ OPS: HandlerRegistry = {
     "add_wall": add_wall,
     "add_floor": add_floor,
     "add_gable_roof": add_gable_roof,
+    "add_chimney": add_chimney,
     "add_opening": add_opening,
     "add_staircase": add_staircase,
     "add_staircase_to_landing": add_staircase_to_landing,
@@ -369,6 +371,43 @@ OP_SPECS: tuple[ToolSpec, ...] = (
             "required": [
                 "object_id", "origin", "width", "depth", "pitch_degrees", "thickness",
                 "overhang", "trim_width", "trim_depth", "ridge_axis",
+            ],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_chimney",
+        description=(
+            "Build a complete masonry chimney from explicit architectural dimensions: "
+            "shaft, tapered roof flashing, overhanging crown, and finished rimmed flues. "
+            "Use this for a house chimney instead of a tall cube. Origin is the centre of "
+            "the shaft footprint at its base."
+        ),
+        roles=(ToolRole.BLOCKOUT,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "depth": {"type": "number", "exclusiveMinimum": 0},
+                "shaft_height": {"type": "number", "exclusiveMinimum": 0},
+                "flashing_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "flashing_height": {"type": "number", "exclusiveMinimum": 0},
+                "crown_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "crown_height": {"type": "number", "exclusiveMinimum": 0},
+                "flue_count": {"type": "integer", "minimum": 1, "maximum": 4},
+                "flue_radius": {"type": "number", "exclusiveMinimum": 0},
+                "flue_height": {"type": "number", "exclusiveMinimum": 0},
+                "rim_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "rim_height": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": [
+                "object_id", "origin", "width", "depth", "shaft_height",
+                "flashing_overhang", "flashing_height", "crown_overhang",
+                "crown_height", "flue_count", "flue_radius", "flue_height",
+                "rim_overhang", "rim_height",
             ],
             "additionalProperties": False,
         },

@@ -340,3 +340,23 @@ reversible option; each is recorded here rather than asked, because the gate had
   worse than keeping the legacy operation available.
 - **Blast radius:** compatibility tests pin the old handler.
 - **Reversal:** requires a versioned scene migration.
+
+## A-032 — Chimneys use a neutral masonry assembly
+
+- **Feature:** architectural-quality
+- **Assumed:** a house chimney consists of a rectangular masonry shaft, tapered roof
+  flashing, an overhanging crown, and one to four cylindrical flues with raised rims.
+- **Why:** the reported featureless cube omitted every junction and termination that makes
+  a chimney read as designed; this neutral assembly is style-agnostic and material choice
+  remains with the caller.
+- **Blast radius:** new semantic chimney operation, schema, acceptance and demonstration.
+- **Reversal:** all visible dimensions and the flue count are explicit operation parameters.
+
+## A-033 — Handrail bends share one miter ring
+
+- **Feature:** architectural-quality
+- **Assumed:** every top-rail direction change is a true shared miter in one closed shell.
+- **Why:** joined closed boxes retain hidden end caps, self-intersect at the bend, and can
+  reveal a crack after beveling or numerical changes.
+- **Blast radius:** `add_railing` top-rail geometry and persisted defect acceptance.
+- **Reversal:** none planned; disconnected rail shells are invalid construction.

@@ -27,7 +27,7 @@ from ._shapes import as_pair, check_distinct, check_path, normalised_points
 
 __all__ = ["validate_params", "acceptance_for", "joinery_for", "runtime_acceptance_for"]
 
-#: The nine kinds this library declares (registry_test.py pins the count). Kept as a local
+#: Construction kinds validated here (registry_test.py pins the public registry count).
 #: literal rather than importing ``registry.OPS`` to avoid a module import cycle:
 #: ``registry`` imports every handler module, and every handler module calls into this one.
 _KNOWN_KINDS = (
@@ -35,6 +35,7 @@ _KNOWN_KINDS = (
     "add_wall",
     "add_floor",
     "add_gable_roof",
+    "add_chimney",
     "add_opening",
     "add_staircase",
     "add_staircase_to_landing",
@@ -194,6 +195,37 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
                 "pass ridge_axis='x' or ridge_axis='y'",
             )
 
+    elif kind == "add_chimney":
+        _require(params, "origin", kind)
+        for name in (
+            "width", "depth", "shaft_height", "flashing_overhang", "flashing_height",
+            "crown_overhang", "crown_height", "flue_radius", "flue_height",
+            "rim_overhang", "rim_height",
+        ):
+            _positive(_require(params, name, kind), name, kind)
+        count = _require(params, "flue_count", kind)
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 4:
+            raise ToolError(
+                "ops.bad_count", f"{kind}: flue_count is {count!r}, must be an integer 1..4",
+                "pass flue_count as 1, 2, 3, or 4",
+            )
+        if params["rim_height"] >= params["flue_height"]:
+            raise ToolError(
+                "ops.bad_dimension",
+                f"{kind}: rim_height must be smaller than flue_height",
+                "reduce rim_height or increase flue_height",
+            )
+        rim_diameter = 2.0 * (params["flue_radius"] + params["rim_overhang"])
+        crown_width = params["width"] + 2.0 * params["crown_overhang"]
+        crown_depth = params["depth"] + 2.0 * params["crown_overhang"]
+        along, across = max(crown_width, crown_depth), min(crown_width, crown_depth)
+        if rim_diameter > across or count * rim_diameter > along:
+            raise ToolError(
+                "ops.chimney_flues_do_not_fit",
+                f"{kind}: {count} flue rim(s) of diameter {rim_diameter:.4f} m do not fit "
+                f"on the {crown_width:.4f} x {crown_depth:.4f} m crown",
+                "reduce flue_count, flue_radius, or rim_overhang; or enlarge the crown",
+            )
     elif kind == "add_opening":
         _require(params, "wall_id", kind)
         _require(params, "position", kind)

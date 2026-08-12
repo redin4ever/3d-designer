@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
+from .chimney import add_chimney
 from .primitives import add_primitive
 from .railing import add_railing
 from .roof import add_gable_roof
@@ -34,6 +35,7 @@ __all__ = [
     "add_staircase_to_landing",
     "add_railing",
     "add_gable_roof",
+    "add_chimney",
     "array_along",
     "add_lod_chain",
     "add_modular_kit",

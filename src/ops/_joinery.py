@@ -46,6 +46,17 @@ def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
         )
         return tuple(intents)
 
+    if kind == "add_chimney":
+        return (
+            JoineryIntent(
+                object_id=f"{prefix}_flashing",
+                into_object_id=f"{prefix}_shaft",
+                depth=params["flashing_height"],
+                axis="z",
+                reason="roof flashing intentionally collars the masonry shaft",
+            ),
+        )
+
     if kind == "add_staircase_to_landing":
         depth = params["tread_thickness"]
         return tuple(

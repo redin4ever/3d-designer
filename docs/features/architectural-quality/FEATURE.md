@@ -1,6 +1,6 @@
 # Architectural quality
 
-House-scale builds now use semantic operations for the two relationships that previously
+House-scale builds now use semantic operations for the relationships that previously
 forced an agent to guess raw geometry:
 
 - `add_gable_roof` builds two closed pitch-derived panels, a ridge cap, front/back rake
@@ -13,6 +13,12 @@ forced an agent to guess raw geometry:
 - `add_staircase_to_landing` reads a live porch/deck/floor, derives the approach direction,
   run and rise from its bounds, and builds thin treads on two side stringers. The legacy
   `add_staircase` remains unchanged for callers that intentionally provide raw run math.
+- `add_chimney` builds the masonry shaft, tapered roof flashing, overhanging crown, and
+  one to four rimmed flues as predictable parts. It refuses a flue layout that cannot fit
+  before creating any geometry; agents should use it instead of stretching a cube.
+- `add_railing` now sweeps the top rail as one closed shell. Every slope, landing, or plan
+  corner shares a true miter ring, so hidden end caps cannot intersect and no joint can
+  separate after beveling.
 
 Both tools reject impossible input before creating geometry. Their MCP operations persist
 re-runnable acceptance: roof panels, ridge cap and every trim corner must meet, and the
@@ -23,8 +29,8 @@ the generic scene checks and ignores undone operations.
 
 ## Agent workflow
 
-1. In blockout, build the slab and walls, then call `add_gable_roof`. Do not approximate a
-   house roof with rotated cubes.
+1. In blockout, build the slab and walls, then call `add_gable_roof` and `add_chimney`.
+   Do not approximate either assembly with transformed cubes.
 2. In refine, cut openings, create the porch/landing, then call
    `add_staircase_to_landing`. Add railings separately so their path and spacing remain
    independently editable.
@@ -36,7 +42,7 @@ the generic scene checks and ignores undone operations.
 
 ## Compatibility and proof
 
-The two additions are normal typed operations in `OPS`/`OP_SPECS`; saved operations use the
+The architectural additions are normal typed operations in `OPS`/`OP_SPECS`; saved operations use the
 existing scene schema. Existing staircase behavior is preserved. Fake-engine geometry,
 normal app composition, MCP persistence, phase gating and a real-Blender smoke test cover
 the complete path. The demonstration artifacts are `artifacts/architectural_house.blend`
