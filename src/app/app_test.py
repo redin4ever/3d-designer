@@ -30,7 +30,7 @@ RECORDED_TOOL_COUNTS: dict[str, int] = {
     # blockout and refine both gained the seven direct edits added at Q-14 — move, rotate,
     # scale, delete, duplicate, rename, set material. Updated deliberately, which is the
     # measurement Gate B 3.3 asked for; not capped, which is the one response ruled out.
-    "blockout": 17,
+    "blockout": 18,
     "refine": 16,
     "repair": 8,
     "align": 7,

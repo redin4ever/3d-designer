@@ -33,7 +33,7 @@ TOOL_COUNTS_BY_ROLE: dict[str, int] = {
     # measurement Gate B 3.3 asked for; not capped, which is the one response ruled out.
     # +1 in each modelling phase: local model import is useful from blockout through
     # polish and remains one opaque, undoable operation.
-    "blockout": 17,
+    "blockout": 18,
     "refine": 16,
     "repair": 8,
     "align": 7,

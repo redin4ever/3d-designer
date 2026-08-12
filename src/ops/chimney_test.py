@@ -12,7 +12,7 @@ from testing import connected_components
 def _operation(**overrides) -> Operation:
     params = {
         "object_id": "chimney",
-        "origin": Vec3(2.65, 0.55, 3.65),
+        "origin": Vec3(3.1, 1.1, 3.65),
         "width": 0.9,
         "depth": 1.1,
         "shaft_height": 1.5,

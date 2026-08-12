@@ -9,6 +9,7 @@ from engine import BlenderEngine
 from measure import evaluate, find_clipping, gap_width
 from ops import (
     acceptance_for,
+    add_chimney,
     add_floor,
     add_gable_roof,
     add_staircase_to_landing,
@@ -30,6 +31,17 @@ def test_roof_and_supported_entry_stairs_hold_their_contract_in_real_blender() -
         }
         roof = add_gable_roof(
             engine, Operation(op_id="roof-op", kind="add_gable_roof", params=roof_params)
+        )
+        chimney_params = {
+            "object_id": "chimney", "origin": Vec3(1.4, 0.8, 3.4),
+            "width": 0.8, "depth": 1.0, "shaft_height": 1.3,
+            "flashing_overhang": 0.18, "flashing_height": 0.16,
+            "crown_overhang": 0.1, "crown_height": 0.14, "flue_count": 2,
+            "flue_radius": 0.11, "flue_height": 0.5,
+            "rim_overhang": 0.03, "rim_height": 0.1,
+        }
+        chimney = add_chimney(
+            engine, Operation(op_id="chimney-op", kind="add_chimney", params=chimney_params)
         )
 
         add_floor(
@@ -53,9 +65,11 @@ def test_roof_and_supported_entry_stairs_hold_their_contract_in_real_blender() -
         )
 
         assert len(roof.produced_objects) == 7
+        assert len(chimney.produced_objects) == 7
         assert len(stairs.produced_objects) == 8
         queries = (
             *acceptance_for("add_gable_roof", roof_params, op_id="roof-op"),
+            *acceptance_for("add_chimney", chimney_params, op_id="chimney-op"),
             *acceptance_for("add_staircase_to_landing", stair_params, op_id="entry-op"),
         )
         assert all(evaluate(engine, query).passed for query in queries)
