@@ -7,7 +7,7 @@ import math
 import pytest
 
 from contracts import EPSILON, Operation, Vec3
-from measure import gap_width, inspect
+from measure import find_clipping, gap_width, inspect
 from ops import add_gable_roof
 
 
@@ -25,6 +25,17 @@ def _triangle_shell_count(engine, object_id: str) -> int:
             remaining -= neighbours
             stack.extend(neighbours)
     return shells
+
+
+def _shared_vertex_count(engine, a: str, b: str) -> int:
+    """Coincident world vertices prove a full miter face rather than a point contact."""
+    def points(object_id: str) -> set[tuple[float, float, float]]:
+        return {
+            tuple(round(value, 8) for value in vertex.as_tuple())
+            for vertex in engine.snapshot(object_id).world_vertices()
+        }
+
+    return len(points(a) & points(b))
 
 
 def _op(*, axis: str = "y") -> Operation:
@@ -59,10 +70,6 @@ def test_gable_roof_builds_panels_ridge_and_all_visible_fascia(engine) -> None:
         "roof_gable_pos_trim",
         "roof_eave_neg_fascia",
         "roof_eave_pos_fascia",
-        "roof_gable_neg_eave_neg_cap",
-        "roof_gable_neg_eave_pos_cap",
-        "roof_gable_pos_eave_neg_cap",
-        "roof_gable_pos_eave_pos_cap",
     )
 
 
@@ -130,30 +137,28 @@ def test_ridge_cap_finishes_flush_with_the_rake_miter_instead_of_perching_above_
         assert ridge_top == pytest.approx(trim_top, abs=EPSILON)
 
 
-def test_every_rake_to_eave_corner_has_one_chamfered_cover_touching_both_boards(
+def test_every_rake_to_eave_corner_is_one_shared_compound_miter_without_cover_blocks(
     engine,
 ) -> None:
-    """A zero-width point contact still renders as two blunt, misaligned board ends.
-    Every perimeter corner needs one smooth solid that overlaps both adjacent trims."""
+    """A clean roof joins the boards themselves along a full face. Connector blocks hide
+    the point contact but remain visibly bulky and are not an acceptable finished edge."""
     result = add_gable_roof(engine, _op())
 
+    assert not any("_cap" in object_id for object_id in result.produced_objects[3:])
+    pairs = []
     for gable in ("neg", "pos"):
         for eave in ("neg", "pos"):
-            cap = f"roof_gable_{gable}_eave_{eave}_cap"
-            assert cap in result.produced_objects
-            assert len(engine.snapshot(cap).triangles) > 12
-            assert _triangle_shell_count(engine, cap) == 1
-            assert gap_width(engine, cap, f"roof_gable_{gable}_trim").value == pytest.approx(
-                0.0, abs=EPSILON
-            )
-            assert gap_width(engine, cap, f"roof_eave_{eave}_fascia").value == pytest.approx(
-                0.0, abs=EPSILON
-            )
+            rake = f"roof_gable_{gable}_trim"
+            fascia = f"roof_eave_{eave}_fascia"
+            pairs.append((rake, fascia))
+            assert _shared_vertex_count(engine, rake, fascia) == 4
+            assert gap_width(engine, rake, fascia).value == pytest.approx(0.0, abs=EPSILON)
+    assert find_clipping(engine, pairs) == ()
 
 
-def test_corner_covers_still_reach_the_rakes_on_a_shallow_small_porch_roof(engine) -> None:
-    """The full-size 30-degree roof can hide a cover that is a few millimetres short on
-    the same shallow 20-degree porch proportions used by the demonstration house."""
+def test_compound_corner_miters_remain_full_face_on_a_shallow_small_porch_roof(engine) -> None:
+    """The compound miter must remain exact on the shallow 20-degree porch proportions
+    that exposed the connector cover's scale-dependent gap."""
     params = {
         **_op().params,
         "object_id": "porch_roof",
@@ -172,6 +177,7 @@ def test_corner_covers_still_reach_the_rakes_on_a_shallow_small_porch_roof(engin
 
     for gable in ("neg", "pos"):
         for eave in ("neg", "pos"):
-            cap = f"porch_roof_gable_{gable}_eave_{eave}_cap"
-            trim = f"porch_roof_gable_{gable}_trim"
-            assert gap_width(engine, cap, trim).value == pytest.approx(0.0, abs=EPSILON)
+            rake = f"porch_roof_gable_{gable}_trim"
+            fascia = f"porch_roof_eave_{eave}_fascia"
+            assert _shared_vertex_count(engine, rake, fascia) == 4
+            assert gap_width(engine, rake, fascia).value == pytest.approx(0.0, abs=EPSILON)

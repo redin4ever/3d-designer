@@ -33,8 +33,8 @@ def test_dispatch_persists_gable_roof_joint_acceptance(
     )
 
     logged = fake_scene.document.operations[-1]
-    assert len(logged.acceptance) == 13
-    assert len(logged.joinery) == 14
+    assert len(logged.acceptance) == 9
+    assert len(logged.joinery) == 2
     assert all("|" in query.subject for query in logged.acceptance)
 
 
