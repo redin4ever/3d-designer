@@ -83,9 +83,12 @@ def test_landing_stair_joinery_explicitly_declares_each_supported_tread_contact(
 def test_roof_joinery_declares_the_ridge_cap_overlap_that_blends_the_white_trim() -> None:
     intents = joinery_for("add_gable_roof", _roof_params())
 
-    assert len(intents) == 2
-    assert {intent.object_id for intent in intents} == {"roof_ridge_cap"}
+    assert len(intents) == 6
+    assert {intent.object_id for intent in intents} == {
+        "roof_ridge_cap", "roof_gable_neg_trim", "roof_gable_pos_trim",
+    }
     assert {intent.into_object_id for intent in intents} == {
         "roof_slope_neg", "roof_slope_pos",
+        "roof_eave_neg_fascia", "roof_eave_pos_fascia",
     }
     assert all(intent.axis == "z" and intent.depth > 0 and intent.reason for intent in intents)

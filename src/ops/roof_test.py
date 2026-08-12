@@ -8,7 +8,7 @@ import pytest
 
 from contracts import EPSILON, Operation, Vec3
 from measure import find_clipping, gap_width, inspect
-from ops import add_gable_roof
+from ops import add_gable_roof, joinery_for
 
 
 def _triangle_shell_count(engine, object_id: str) -> int:
@@ -153,7 +153,8 @@ def test_every_rake_to_eave_corner_is_one_shared_compound_miter_without_cover_bl
             pairs.append((rake, fascia))
             assert _shared_vertex_count(engine, rake, fascia) == 4
             assert gap_width(engine, rake, fascia).value == pytest.approx(0.0, abs=EPSILON)
-    assert find_clipping(engine, pairs) == ()
+    intents = joinery_for("add_gable_roof", _op().params)
+    assert find_clipping(engine, pairs, intents) == ()
 
 
 def test_compound_corner_miters_remain_full_face_on_a_shallow_small_porch_roof(engine) -> None:

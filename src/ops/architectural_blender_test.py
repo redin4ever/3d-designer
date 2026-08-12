@@ -71,7 +71,7 @@ def test_roof_and_supported_entry_stairs_hold_their_contract_in_real_blender() -
             for eave in ("neg", "pos")
         )
         assert all(gap_width(engine, a, b).value <= 1e-4 for a, b in corner_pairs)
-        assert find_clipping(engine, corner_pairs) == ()
+        assert find_clipping(engine, corner_pairs, roof_intents) == ()
 
         intents = joinery_for("add_staircase_to_landing", stair_params)
         pairs = tuple((intent.object_id, intent.into_object_id) for intent in intents)
