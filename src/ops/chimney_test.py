@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from contracts import EPSILON, Operation, ToolError, Vec3
@@ -22,6 +24,7 @@ def _operation(**overrides) -> Operation:
         "crown_height": 0.14,
         "flue_count": 2,
         "flue_radius": 0.12,
+        "flue_wall_thickness": 0.025,
         "flue_height": 0.56,
         "rim_overhang": 0.035,
         "rim_height": 0.12,
@@ -62,6 +65,28 @@ def test_add_chimney_respects_crown_overhang_and_vertical_stack(engine) -> None:
     assert crown.minimum.z == pytest.approx(shaft.maximum.z, abs=EPSILON)
     assert flue.minimum.z == pytest.approx(crown.maximum.z, abs=EPSILON)
     assert rim.minimum.z == pytest.approx(flue.maximum.z, abs=EPSILON)
+
+
+def test_add_chimney_flues_are_hollow_watertight_pots_not_capped_posts(engine) -> None:
+    add_chimney(engine, _operation())
+
+    mesh = engine.snapshot("chimney_flue_000_rim")
+    top = max(vertex.z for vertex in mesh.vertices)
+    centre_x = sum(vertex.x for vertex in mesh.vertices) / len(mesh.vertices)
+    centre_y = sum(vertex.y for vertex in mesh.vertices) / len(mesh.vertices)
+    top_radii = []
+    for triangle in mesh.triangles:
+        points = [mesh.vertices[index] for index in triangle]
+        if all(abs(point.z - top) <= EPSILON for point in points):
+            x = sum(point.x for point in points) / 3.0
+            y = sum(point.y for point in points) / 3.0
+            top_radii.append(math.hypot(x - centre_x, y - centre_y))
+
+    inner_radius = 0.12 - 0.025
+    assert top_radii
+    assert min(top_radii) >= inner_radius - EPSILON, (
+        "the top surface must be an annulus around an open flue, not a disc across it"
+    )
 
 
 def test_add_chimney_refuses_flues_that_do_not_fit_before_creating_geometry(engine) -> None:

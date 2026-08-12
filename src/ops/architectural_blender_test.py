@@ -37,7 +37,7 @@ def test_roof_and_supported_entry_stairs_hold_their_contract_in_real_blender() -
             "width": 0.8, "depth": 1.0, "shaft_height": 1.3,
             "flashing_overhang": 0.18, "flashing_height": 0.16,
             "crown_overhang": 0.1, "crown_height": 0.14, "flue_count": 2,
-            "flue_radius": 0.11, "flue_height": 0.5,
+            "flue_radius": 0.11, "flue_wall_thickness": 0.025, "flue_height": 0.5,
             "rim_overhang": 0.03, "rim_height": 0.1,
         }
         chimney = add_chimney(
