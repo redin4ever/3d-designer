@@ -344,7 +344,7 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         name="add_gable_roof",
         description=(
             "Build a complete gable roof assembly from architectural dimensions: two "
-            "sloped panels, ridge cap, rake trim, eave fascia and finished corner caps. "
+            "sloped panels, ridge cap and full-face compound-mitered rake/eave corner trim. "
             "Use this for a house "
             "roof instead of approximating roof planes with a rotated cube. The origin "
             "is the footprint centre at the wall-top bearing plane."

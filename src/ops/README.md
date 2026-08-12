@@ -26,7 +26,7 @@ OP_SPECS: tuple[ToolSpec, ...]  # MCP declarations, roles=(BLOCKOUT,) or (REFINE
 add_primitive(engine, op) -> OperationResult
 add_wall(engine, op)      -> OperationResult   # start, end, height, thickness
 add_floor(engine, op)     -> OperationResult   # width, depth, thickness
-add_gable_roof(engine, op) -> OperationResult  # panels, ridge, rake/eave trim, corner caps
+add_gable_roof(engine, op) -> OperationResult  # panels, ridge, compound-mitered rake/eave trim
 add_opening(engine, op)   -> OperationResult   # boolean a door/window out of a wall
 add_staircase(engine, op) -> OperationResult   # treads, rise, run, width
 add_staircase_to_landing(engine, op) -> OperationResult # derives direction/rise/run

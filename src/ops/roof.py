@@ -7,6 +7,7 @@ import math
 from contracts import EngineProtocol, Operation, OperationResult, Vec3
 
 from ._geom import oriented_box_between
+from ._roof_trim import perimeter_trim_meshes
 from .validation import validate_params
 
 __all__ = ["add_gable_roof"]
@@ -63,56 +64,29 @@ def add_gable_roof(engine: EngineProtocol, op: Operation) -> OperationResult:
         f"{prefix}_ridge_cap", *oriented_box_between(ridge_a, ridge_b, trim_width, trim_depth)
     )
 
-    gable_ids = []
-    for along_sign, label in ((-1.0, "neg"), (1.0, "pos")):
-        along = along_sign * (half_length + trim_width / 2.0)
-        points = (
-            _point(origin, axis, -half_roof, along, eave_z + thickness / 2.0),
-            _point(origin, axis, 0.0, along, ridge_z + thickness / 2.0),
-            _point(origin, axis, half_roof, along, eave_z + thickness / 2.0),
-        )
-        trim_id = engine.create_mesh(
-            f"{prefix}_gable_{label}_trim",
-            *_mitered_v_mesh(points, trim_width, trim_depth),
-        )
-        gable_ids.append(trim_id)
-
-    eave_ids = []
-    for cross_sign, label in ((-1.0, "neg"), (1.0, "pos")):
-        cross = cross_sign * (half_roof + trim_width / 2.0)
-        a = _point(origin, axis, cross, -half_length, eave_z + thickness / 2.0)
-        b = _point(origin, axis, cross, half_length, eave_z + thickness / 2.0)
-        eave_ids.append(
-            engine.create_mesh(
-                f"{prefix}_eave_{label}_fascia",
-                *oriented_box_between(a, b, trim_width, trim_depth),
-            )
-        )
-
-    # Rake and fascia profiles otherwise meet at only one mathematical point: their square
-    # ends are perpendicular to different paths. A small chamfered cover overlaps both
-    # profiles at each perimeter corner, turning that fragile point contact into a finished
-    # continuous junction without changing the caller's architectural dimensions.
-    corner_ids = []
-    corner_radius = trim_width * 0.75
-    corner_z = eave_z + thickness / 2.0
-    for along_sign, gable_label in ((-1.0, "neg"), (1.0, "pos")):
-        along = along_sign * (half_length + trim_width / 4.0)
-        for cross_sign, eave_label in ((-1.0, "neg"), (1.0, "pos")):
-            cross = cross_sign * (half_roof + trim_width * 0.15)
-            corner_ids.append(
-                engine.create_mesh(
-                    f"{prefix}_gable_{gable_label}_eave_{eave_label}_cap",
-                    *_chamfered_corner_mesh(
-                        origin, axis, cross, along, corner_z, corner_radius, trim_depth
-                    ),
-                )
-            )
+    trim_meshes = perimeter_trim_meshes(
+        origin,
+        axis,
+        half_roof,
+        half_length,
+        eave_z + thickness / 2.0,
+        ridge_z + thickness / 2.0,
+        trim_width,
+        trim_depth,
+    )
+    gable_ids = [
+        engine.create_mesh(f"{prefix}_gable_{label}_trim", *trim_meshes[f"gable_{label}"])
+        for label in ("neg", "pos")
+    ]
+    eave_ids = [
+        engine.create_mesh(f"{prefix}_eave_{label}_fascia", *trim_meshes[f"eave_{label}"])
+        for label in ("neg", "pos")
+    ]
 
     return OperationResult(
         op_id=op.op_id,
         ok=True,
-        produced_objects=(neg_id, pos_id, ridge_id, *gable_ids, *eave_ids, *corner_ids),
+        produced_objects=(neg_id, pos_id, ridge_id, *gable_ids, *eave_ids),
     )
 
 
@@ -122,95 +96,6 @@ def _point(origin: Vec3, axis: str, cross: float, along: float, z: float) -> Vec
     return Vec3(origin.x + along, origin.y + cross, z)
 
 
-def _mitered_v_mesh(
-    points: tuple[Vec3, Vec3, Vec3], width: float, depth: float
-) -> tuple[list[Vec3], list[tuple[int, ...]]]:
-    """One closed rake-trim mesh with a shared, vertical miter at the ridge.
-
-    Two separately swept boxes leave disconnected shells and need their square end caps
-    shortened, which produced the visible 86 mm break below the ridge cap. This sweep has
-    one apex ring. Its vertical offset is enlarged by ``1 / cos(pitch)`` so each leg keeps
-    the requested perpendicular depth after the miter.
-    """
-    p0, apex, p2 = points
-    forward_a = (apex - p0).normalized()
-    forward_b = (p2 - apex).normalized()
-    world_up = Vec3(0.0, 0.0, 1.0)
-
-    side_a = forward_a.cross(world_up).normalized()
-    side_b = forward_b.cross(world_up).normalized()
-    up_a = side_a.cross(forward_a).normalized()
-    up_b = side_b.cross(forward_b).normalized()
-
-    # Keep profile ordering consistent when a future roof orientation reverses the
-    # cross-product basis. A flipped ring would twist the four connecting side faces.
-    if side_a.dot(side_b) < 0.0:
-        side_b = side_b * -1.0
-        up_b = up_b * -1.0
-
-    miter_side = (side_a + side_b).normalized()
-    miter_up = (up_a + up_b).normalized()
-    half_width = width / 2.0
-    half_depth = depth / 2.0
-    miter_width = half_width / max(abs(miter_side.dot(side_a)), 1e-9)
-    miter_depth = half_depth / max(abs(miter_up.dot(up_a)), 1e-9)
-
-    def ring(point: Vec3, side: Vec3, up: Vec3, hw: float, hd: float) -> list[Vec3]:
-        return [
-            point - side * hw - up * hd,
-            point + side * hw - up * hd,
-            point + side * hw + up * hd,
-            point - side * hw + up * hd,
-        ]
-
-    verts = [
-        *ring(p0, side_a, up_a, half_width, half_depth),
-        *ring(apex, miter_side, miter_up, miter_width, miter_depth),
-        *ring(p2, side_b, up_b, half_width, half_depth),
-    ]
-    faces: list[tuple[int, ...]] = [(0, 1, 2, 3), (11, 10, 9, 8)]
-    for start, end in ((0, 4), (4, 8)):
-        faces.extend(
-            (
-                (start, end, end + 1, start + 1),
-                (start + 1, end + 1, end + 2, start + 2),
-                (start + 2, end + 2, end + 3, start + 3),
-                (start + 3, end + 3, end, start),
-            )
-        )
-    return verts, faces
-
-
-def _chamfered_corner_mesh(
-    origin: Vec3,
-    axis: str,
-    cross: float,
-    along: float,
-    center_z: float,
-    radius: float,
-    depth: float,
-) -> tuple[list[Vec3], list[tuple[int, ...]]]:
-    """Closed octagonal cover joining one rake end to one fascia end."""
-    sides = 8
-    rings: list[Vec3] = []
-    for z in (center_z - depth / 2.0, center_z + depth / 2.0):
-        for index in range(sides):
-            angle = 2.0 * math.pi * index / sides
-            dx = radius * math.cos(angle)
-            dy = radius * math.sin(angle)
-            if axis == "y":
-                rings.append(_point(origin, axis, cross + dx, along + dy, z))
-            else:
-                rings.append(_point(origin, axis, cross + dy, along + dx, z))
-    faces: list[tuple[int, ...]] = [
-        tuple(reversed(range(sides))),
-        tuple(range(sides, sides * 2)),
-    ]
-    faces.extend(
-        (index, (index + 1) % sides, sides + (index + 1) % sides, sides + index)
-        for index in range(sides)
-    )
-    return rings, faces
 
 
 def _panel_mesh(

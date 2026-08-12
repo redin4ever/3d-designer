@@ -15,9 +15,9 @@ accuracy and restores the product's detailed, relationship-driven purpose.
    whole-house generator were rejected.
 3. **Roof scope:** add an axis-aligned gable roof first (A-023), supporting ridges along X
    or Y (A-024).
-4. **Roof detail:** one call creates two roof panels, a ridge cap, front/back rake trim,
-   both eave fascia boards and four chamfered corner covers. A two-panel shell and
-   point-contact trim corners were rejected as visibly unfinished.
+4. **Roof detail:** one call creates two roof panels, a ridge cap, front/back rake trim and
+   both eave fascia boards. Rakes and fascias share full compound-miter end faces; a
+   two-panel shell, point contacts and visible connector covers were rejected as unfinished.
 5. **Roof intent:** footprint, eave height, pitch, thickness, overhang and trim sizes remain
    explicit parameters. Geometry is derived from them; hidden house-scale defaults are not.
 6. **Stair compatibility:** keep `add_staircase` unchanged for old logs and add a distinct

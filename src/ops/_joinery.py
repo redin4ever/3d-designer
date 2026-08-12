@@ -30,34 +30,20 @@ def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
             )
             for side in ("neg", "pos")
         ]
-        for gable in ("neg", "pos"):
-            for eave in ("neg", "pos"):
-                cap = f"{prefix}_gable_{gable}_eave_{eave}_cap"
-                intents.extend(
-                    (
-                        JoineryIntent(
-                            object_id=cap,
-                            into_object_id=f"{prefix}_gable_{gable}_trim",
-                            depth=params["trim_depth"],
-                            axis="z",
-                            reason="corner cap intentionally overlaps the rake trim",
-                        ),
-                        JoineryIntent(
-                            object_id=cap,
-                            into_object_id=f"{prefix}_eave_{eave}_fascia",
-                            depth=params["trim_depth"],
-                            axis="z",
-                            reason="corner cap intentionally overlaps the eave fascia",
-                        ),
-                        JoineryIntent(
-                            object_id=cap,
-                            into_object_id=f"{prefix}_slope_{eave}",
-                            depth=params["trim_depth"],
-                            axis="z",
-                            reason="corner cap intentionally overlaps the roof panel edge",
-                        ),
-                    )
-                )
+        intents.extend(
+            JoineryIntent(
+                object_id=f"{prefix}_gable_{gable}_trim",
+                into_object_id=f"{prefix}_eave_{eave}_fascia",
+                depth=params["trim_depth"],
+                axis="z",
+                reason=(
+                    "rake and fascia intentionally share a compound-miter face; "
+                    "their angled bounding boxes overlap"
+                ),
+            )
+            for gable in ("neg", "pos")
+            for eave in ("neg", "pos")
+        )
         return tuple(intents)
 
     if kind == "add_staircase_to_landing":

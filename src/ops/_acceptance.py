@@ -44,11 +44,11 @@ def acceptance_for(
         ]
         for gable in ("neg", "pos"):
             for eave in ("neg", "pos"):
-                cap = f"{object_id}_gable_{gable}_eave_{eave}_cap"
-                joints.extend(
+                joints.append(
                     (
-                        (cap, f"{object_id}_gable_{gable}_trim", "corner cap meets rake trim"),
-                        (cap, f"{object_id}_eave_{eave}_fascia", "corner cap meets eave fascia"),
+                        f"{object_id}_gable_{gable}_trim",
+                        f"{object_id}_eave_{eave}_fascia",
+                        "rake trim meets eave fascia across a compound miter",
                     )
                 )
         return tuple(
