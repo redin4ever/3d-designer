@@ -16,8 +16,8 @@ import math
 
 import pytest
 
-from contracts import EPSILON, Operation, Vec3
-from ops import add_railing
+from contracts import EPSILON, DefectClass, Operation, Vec3
+from ops import acceptance_for, add_railing
 from testing import connected_components
 
 
@@ -194,6 +194,26 @@ def test_top_rail_is_one_connected_shell_through_a_slope_to_landing_bend(engine)
         "the sloped handrail and landing handrail must share a mitered bend, not remain "
         f"as {len(shells)} disconnected box shells"
     )
+
+
+def test_railing_acceptance_rejects_broken_or_self_intersecting_top_rails() -> None:
+    queries = acceptance_for(
+        "add_railing",
+        {
+            "object_id": "landing_rail",
+            "path": [Vec3(0, 0, 0), Vec3(3, 0, 1.8), Vec3(4.2, 0, 1.8)],
+            "height": 0.9,
+            "post_spacing": 1.0,
+            "baluster_gap": 0.1,
+        },
+    )
+
+    forbidden = set(queries[0].forbidden_defects)
+    assert {
+        DefectClass.BOUNDARY_HOLE,
+        DefectClass.NON_MANIFOLD_EDGE,
+        DefectClass.SELF_INTERSECTION,
+    } <= forbidden
 
 
 def test_baluster_clear_gap_is_surface_to_surface_not_centre_pitch(engine) -> None:
