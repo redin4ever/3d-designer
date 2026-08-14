@@ -16,6 +16,9 @@ been regenerated with these operations.
   Each rib is intersected with those remaining solid regions at its full width, shortened
   by `opening_clearance`, and segments below `min_segment` are omitted. The output remains
   one predictable joined object even when a rib is split above a garage or window.
+- Sequential `add_opening` calls now subtract from every remaining connected wall region.
+  A later window or door no longer reconstructs the wall from its outer bounds and silently
+  fills earlier garage cuts—the underlying defect that let front ribs cross the garages.
 - `measure_surface_angle` makes face-normal alignment directly inspectable. Roof windows
   and signs persist one-degree alignment and 1 mm contact acceptance queries.
 

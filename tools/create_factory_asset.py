@@ -225,7 +225,7 @@ for name in engine.list_objects():
     engine.assign_material(name, material)
 
 for name in engine.list_objects():
-    if name == "factory_lot" or "glass" in name or "slope" in name or name.startswith("parking_line_"):
+    if name in {"factory_lot", "factory_sign"} or "glass" in name or "slope" in name or name.startswith("parking_line_"):
         continue
     if name.startswith(("rib_", "front_rib", "back_rib", "left_rib", "right_rib")):
         continue
