@@ -16,9 +16,11 @@ from __future__ import annotations
 from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
 from .chimney import add_chimney
+from .facade_ribs import add_facade_ribs
 from .primitives import add_primitive
 from .railing import add_railing
 from .roof import add_gable_roof
+from .surface_mounts import add_roof_window, add_wall_sign
 from .registry import OP_SPECS, OPS
 from .stairs import add_staircase
 from .landing_stairs import add_staircase_to_landing
@@ -36,6 +38,9 @@ __all__ = [
     "add_railing",
     "add_gable_roof",
     "add_chimney",
+    "add_roof_window",
+    "add_wall_sign",
+    "add_facade_ribs",
     "array_along",
     "add_lod_chain",
     "add_modular_kit",

@@ -43,6 +43,9 @@ _KNOWN_KINDS = (
     "array_along",
     "add_lod_chain",
     "add_modular_kit",
+    "add_roof_window",
+    "add_wall_sign",
+    "add_facade_ribs",
 )
 
 
@@ -233,6 +236,29 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
                 f"on the {crown_width:.4f} x {crown_depth:.4f} m crown",
                 "reduce flue_count, flue_radius, or rim_overhang; or enlarge the crown",
             )
+    elif kind == "add_roof_window":
+        _require(params, "roof_id", kind)
+        for name in ("width", "height", "frame_width", "depth"):
+            _positive(_require(params, name, kind), name, kind)
+        for name in ("horizontal_fraction", "vertical_fraction"):
+            value = _require(params, name, kind)
+            if not 0 <= value <= 1:
+                raise ToolError("ops.bad_fraction", f"{kind}: {name} is {value}, must be in [0, 1]", f"pass {name} between 0 and 1")
+
+    elif kind == "add_wall_sign":
+        for name in ("wall_id", "text", "toward", "center_height"):
+            _require(params, name, kind)
+        for name in ("height", "depth"):
+            _positive(_require(params, name, kind), name, kind)
+        _non_negative(_require(params, "edge_margin", kind), "edge_margin", kind)
+
+    elif kind == "add_facade_ribs":
+        for name in ("wall_id", "toward"):
+            _require(params, name, kind)
+        for name in ("spacing", "width", "depth", "min_segment"):
+            _positive(_require(params, name, kind), name, kind)
+        for name in ("edge_margin", "opening_clearance"):
+            _non_negative(_require(params, name, kind), name, kind)
     elif kind == "add_opening":
         _require(params, "wall_id", kind)
         _require(params, "position", kind)

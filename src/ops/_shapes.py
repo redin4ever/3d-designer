@@ -51,6 +51,8 @@ POINT_PARAMS: dict[str, tuple[str, ...]] = {
     "add_staircase": ("origin",),
     "add_staircase_to_landing": ("start",),
     "add_modular_kit": ("piece_size", "origin"),
+    "add_wall_sign": ("toward",),
+    "add_facade_ribs": ("toward",),
 }
 
 #: Which parameters of each kind are a polyline.

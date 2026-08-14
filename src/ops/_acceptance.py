@@ -28,6 +28,46 @@ def acceptance_for(
     object_id = params.get("object_id", "")
     output_prefix = op_id or object_id
 
+    if kind == "add_roof_window":
+        host = params.get("roof_id", "")
+        return (
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_aligned", description="skylight follows the roof face",
+                metric=MetricKind.SURFACE_ANGLE, subject=f"{host}|{object_id}_glass",
+                expected=0.0, tolerance=1.0, comparison=Comparison.EQ,
+            ),
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_contact", description="skylight frame contacts the roof",
+                metric=MetricKind.GAP_WIDTH, subject=f"{host}|{object_id}_frame",
+                expected=0.0, tolerance=0.001, comparison=Comparison.EQ,
+            ),
+        )
+
+    if kind == "add_wall_sign":
+        host = params.get("wall_id", "")
+        return (
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_aligned", description="sign follows the selected wall face",
+                metric=MetricKind.SURFACE_ANGLE, subject=f"{host}|{object_id}",
+                expected=0.0, tolerance=1.0, comparison=Comparison.EQ,
+            ),
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_contact", description="sign contacts the wall",
+                metric=MetricKind.GAP_WIDTH, subject=f"{host}|{object_id}",
+                expected=0.0, tolerance=0.001, comparison=Comparison.EQ,
+            ),
+        )
+
+    if kind == "add_facade_ribs":
+        return (
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_contact", description="façade ribs contact their wall",
+                metric=MetricKind.GAP_WIDTH,
+                subject=f"{params.get('wall_id', '')}|{object_id}", expected=0.0,
+                tolerance=0.001, comparison=Comparison.EQ,
+            ),
+        )
+
     if kind == "add_gable_roof":
         joints = [
             (f"{object_id}_slope_neg", f"{object_id}_slope_pos", "sloped panels meet"),

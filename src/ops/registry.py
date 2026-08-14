@@ -27,9 +27,11 @@ from contracts import HandlerRegistry, ToolRole, ToolSpec
 from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
 from .chimney import add_chimney
+from .facade_ribs import add_facade_ribs
 from .primitives import add_primitive
 from .railing import add_railing
 from .roof import add_gable_roof
+from .surface_mounts import add_roof_window, add_wall_sign
 from .landing_stairs import add_staircase_to_landing
 from .stairs import add_staircase
 from .transform import (
@@ -83,6 +85,9 @@ OPS: HandlerRegistry = {
     "array_along": array_along,
     "add_lod_chain": add_lod_chain,
     "add_modular_kit": add_modular_kit,
+    "add_roof_window": add_roof_window,
+    "add_wall_sign": add_wall_sign,
+    "add_facade_ribs": add_facade_ribs,
     # The direct edits (Q-14). Registered here with everything else, deliberately: Q-19 chose
     # one shared history, and OPS is what `scene` replays through. An operator's nudge and an
     # agent's staircase are the same kind of thing to everything downstream of this dict.
@@ -104,6 +109,49 @@ OPS: HandlerRegistry = {
 #: is as much a polish action as a roughing-out one — and because the operator reaching for
 #: these should not depend on which phase the run happens to be in.
 _EDIT_ROLES = (ToolRole.BLOCKOUT, ToolRole.REFINE)
+
+_SURFACE_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name="add_roof_window",
+        description="Mount a framed skylight flush to an existing upward roof face; orientation is derived from the host.",
+        roles=(ToolRole.REFINE,),
+        input_schema={"type": "object", "properties": {
+            "object_id": {"type": "string"}, "roof_id": {"type": "string"},
+            "width": {"type": "number", "exclusiveMinimum": 0},
+            "height": {"type": "number", "exclusiveMinimum": 0},
+            "frame_width": {"type": "number", "exclusiveMinimum": 0},
+            "depth": {"type": "number", "exclusiveMinimum": 0},
+            "horizontal_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+            "vertical_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        }, "required": ["object_id", "roof_id", "width", "height", "frame_width", "depth", "horizontal_fraction", "vertical_fraction"], "additionalProperties": False},
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_wall_sign",
+        description="Create centered mesh text on the wall face aimed at a point; rejects text that cannot fit.",
+        roles=(ToolRole.REFINE,),
+        input_schema={"type": "object", "properties": {
+            "object_id": {"type": "string"}, "wall_id": {"type": "string"},
+            "text": {"type": "string", "minLength": 1}, "toward": _VEC3_SCHEMA,
+            "center_height": {"type": "number"}, "height": {"type": "number", "exclusiveMinimum": 0},
+            "depth": {"type": "number", "exclusiveMinimum": 0},
+            "edge_margin": {"type": "number", "minimum": 0},
+        }, "required": ["object_id", "wall_id", "text", "toward", "center_height", "height", "depth", "edge_margin"], "additionalProperties": False},
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_facade_ribs",
+        description="Lay out joined façade ribs only on remaining solid wall regions, split around openings with explicit clearance.",
+        roles=(ToolRole.REFINE,),
+        input_schema={"type": "object", "properties": {
+            "object_id": {"type": "string"}, "wall_id": {"type": "string"}, "toward": _VEC3_SCHEMA,
+            "spacing": {"type": "number", "exclusiveMinimum": 0}, "width": {"type": "number", "exclusiveMinimum": 0},
+            "depth": {"type": "number", "exclusiveMinimum": 0}, "edge_margin": {"type": "number", "minimum": 0},
+            "opening_clearance": {"type": "number", "minimum": 0}, "min_segment": {"type": "number", "exclusiveMinimum": 0},
+        }, "required": ["object_id", "wall_id", "toward", "spacing", "width", "depth", "edge_margin", "opening_clearance", "min_segment"], "additionalProperties": False},
+        mutating=True,
+    ),
+)
 
 _SNAP_SCHEMA = {
     "type": "number",
@@ -570,4 +618,4 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         },
         mutating=True,
     ),
-) + EDIT_SPECS + TEXTURE_MATERIAL_SPECS
+) + EDIT_SPECS + TEXTURE_MATERIAL_SPECS + _SURFACE_SPECS
