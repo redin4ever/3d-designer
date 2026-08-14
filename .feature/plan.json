@@ -18,7 +18,7 @@
       "dependsOn": [],
       "seams": ["engine-text-contract", "blender-text-engine", "fake-text-engine", "engine-conformance"],
       "decisions": ["Q-09", "Q-13", "Q-23"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "surface-operations",

@@ -179,7 +179,26 @@ class FakeEngine(FakeSurfacingMixin):
         depth: float,
         transform: Transform | None = None,
     ) -> str:
-        raise NotImplementedError("engine.create_text: not implemented")
+        if not text.strip():
+            raise EngineError(
+                "engine.empty_text",
+                "text geometry needs at least one visible character",
+                "pass a non-empty sign label",
+            )
+        if height <= 0 or depth <= 0:
+            raise EngineError(
+                "engine.bad_text_dimensions",
+                "text height and depth must both be positive",
+                "pass height > 0 and depth > 0",
+            )
+
+        # The fake backend represents glyphs by their conservative envelope. That keeps
+        # placement and fit checks real while leaving font tessellation to Blender.
+        width_units = sum(0.35 if char.isspace() else 0.62 for char in text.strip())
+        verts, faces = unit_cube(Vec3(max(height * width_units, height * 0.5), height, depth))
+        oid = self.create_mesh(object_id, verts, faces, transform)
+        self._record("create_text", oid, text, height, depth)
+        return oid
 
     def duplicate(self, object_id: str, new_id: str, transform: Transform | None = None) -> str:
         src = self._get(object_id)
