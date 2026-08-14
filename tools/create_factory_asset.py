@@ -50,16 +50,6 @@ def box(name: str, size, at, rotation=None):
     return primitive(name, "cube", size, at, rotation)
 
 
-def axis_quat(axis: str, degrees: float):
-    half = math.radians(degrees) / 2.0
-    s = math.sin(half)
-    return {
-        "x": [math.cos(half), s, 0.0, 0.0],
-        "y": [math.cos(half), 0.0, s, 0.0],
-        "z": [math.cos(half), 0.0, 0.0, s],
-    }[axis]
-
-
 # Site and main industrial shell.
 box("factory_lot", [24.0, 20.0, 0.20], [0.0, 0.0, -0.10])
 box("loading_apron", [18.5, 5.4, 0.10], [0.0, -7.4, 0.01])
@@ -110,13 +100,17 @@ for label, y0 in (("front", -5.0), ("back", 5.0)):
     faces = [(0, 2, 1), (3, 4, 5), (0, 1, 4, 3), (1, 2, 5, 4), (2, 0, 3, 5)]
     engine.create_mesh(f"wall_gable_{label}", verts, faces)
 
-# Corrugated-panel ribs give the broad elevations industrial scale.
-for i, x in enumerate(range(-6, 7, 2)):
-    box(f"front_rib_{i}", [0.08, 0.10, 4.85], [x, -5.17, 2.78])
-    box(f"back_rib_{i}", [0.08, 0.10, 4.85], [x, 5.17, 2.78])
-for i, y in enumerate(range(-4, 5, 2)):
-    box(f"left_rib_{i}", [0.10, 0.08, 4.85], [-7.17, y, 2.78])
-    box(f"right_rib_{i}", [0.10, 0.08, 4.85], [7.17, y, 2.78])
+# Corrugated-panel ribs are derived from the cut wall meshes, so door and window
+# openings split the strips instead of being covered by them.
+for name, wall, toward in (
+    ("front_ribs", "wall_front", [0, -10, 2.5]),
+    ("back_ribs", "wall_back", [0, 10, 2.5]),
+    ("left_ribs", "wall_left", [-12, 0, 2.5]),
+    ("right_ribs", "wall_right", [12, 0, 2.5]),
+):
+    perform("add_facade_ribs", object_id=name, wall_id=wall, toward=toward,
+            spacing=2.0, width=0.08, depth=0.10, edge_margin=0.40,
+            opening_clearance=0.05, min_segment=0.10)
 
 # Roller shutters and safety-striped dock equipment.
 for name, x, width, height in (("loading_door_a", -3.1, 3.30, 3.66),
@@ -156,11 +150,18 @@ for i, x in enumerate((-4.0, 0.0, 4.0)):
     for dz in (-0.625, 0.625):
         box(f"rear_window_{i}_frame_h_{dz}", [1.80, 0.17, 0.10], [x, 5.16, z + dz])
 
-# Roof skylights follow the exact roof pitch rather than floating horizontally.
-for side, x, angle in (("left", -3.2, roof_pitch), ("right", 3.2, -roof_pitch)):
-    roof_z = wall_top + math.tan(math.radians(roof_pitch)) * (7.0 - abs(x)) + 0.18
-    for i, y in enumerate((-2.7, 0.0, 2.7)):
-        box(f"skylight_{side}_{i}", [2.0, 1.15, 0.10], [x, y, roof_z], axis_quat("y", angle))
+# Roof skylights derive both their plane and their rotation from each roof panel.
+for side, roof_id in (("left", "factory_roof_slope_neg"),
+                      ("right", "factory_roof_slope_pos")):
+    for i, horizontal_fraction in enumerate((0.22, 0.50, 0.78)):
+        perform("add_roof_window", object_id=f"skylight_{side}_{i}", roof_id=roof_id,
+                width=1.15, height=2.0, frame_width=0.10, depth=0.10,
+                horizontal_fraction=horizontal_fraction, vertical_fraction=0.50)
+
+# Raised exportable mesh text, horizontally centered on the selected exterior wall face.
+perform("add_wall_sign", object_id="factory_sign", wall_id="wall_front",
+        text="FORGE WORKS", toward=[0, -12, 4], center_height=4.65,
+        height=0.65, depth=0.08, edge_margin=0.35)
 
 # Exhaust stacks, rooftop vents, tanks and connecting pipework.
 for i, (x, y) in enumerate(((-4.5, 1.5), (-3.2, 2.2))):
@@ -214,6 +215,7 @@ for name in engine.list_objects():
     elif "skylight" in name or "glass" in name: material = "glass"
     elif name.startswith("loading_door"): material = "door" if "slat" not in name else "accent"
     elif name in {"personnel_door", "door_kickplate"}: material = "accent"
+    elif name == "factory_sign": material = "accent"
     elif name.startswith("bollard_") or name.startswith("parking_line_"): material = "yellow"
     elif name.startswith("dock_bumper_"): material = "rubber"
     elif name.startswith("storage_tank_") or name.startswith("tank_cap_"): material = "aluminum"
@@ -262,24 +264,6 @@ bg.inputs['Strength'].default_value = 0.28
 
 def point_at(obj, target):
     obj.rotation_euler = (Vector(target) - obj.location).to_track_quat('-Z', 'Y').to_euler()
-
-# Raised factory sign, converted to mesh so it ships in the GLB.
-curve = bpy.data.curves.new('ForgeWorksSign', type='FONT')
-curve.body = 'FORGE WORKS'
-curve.align_x = 'CENTER'
-curve.align_y = 'CENTER'
-curve.size = 0.72
-curve.extrude = 0.035
-curve.bevel_depth = 0.008
-sign = bpy.data.objects.new('factory_sign', curve)
-scene.collection.objects.link(sign)
-sign.location = (0.0, -5.23, 4.64)
-sign.rotation_euler = (math.radians(90), 0.0, 0.0)
-bpy.context.view_layer.objects.active = sign
-sign.select_set(True)
-bpy.ops.object.convert(target='MESH')
-sign.data.materials.append(bpy.data.materials['accent'])
-sign.select_set(False)
 
 camera_data = bpy.data.cameras.new('FactoryCamera')
 camera = bpy.data.objects.new('FactoryCamera', camera_data)

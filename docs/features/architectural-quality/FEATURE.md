@@ -20,6 +20,11 @@ forced an agent to guess raw geometry:
 - `add_railing` now sweeps the top rail as one closed shell. Every slope, landing, or plan
   corner shares a true miter ring, so hidden end caps cannot intersect and no joint can
   separate after beveling.
+- `add_roof_window` and `add_wall_sign` derive their plane and orientation from live host
+  geometry, reject details that do not fit, and persist surface-angle/contact acceptance.
+- `add_facade_ribs` reads the wall after openings are cut and splits cladding ribs around
+  garages, doors, and windows with explicit clearance instead of drawing full-height strips
+  through them. See [Host-aware surface details](../surface-mounted-features/FEATURE.md).
 
 Both tools reject impossible input before creating geometry. Their MCP operations persist
 re-runnable acceptance: roof panels, ridge cap and every trim corner must meet, and the

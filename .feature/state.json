@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Surface-mounted features: roof windows and facade signs aligned and verified against their host geometry",
   "slug": "surface-mounted-features",
-  "phase": 4,
+  "phase": 5,
   "baseSha": "4aff23f92f9a18aaa343b7cbff635b6dc808ce45",
   "branch": "feat/surface-mounted-features",
   "docsDir": "docs/features/surface-mounted-features",

@@ -37,7 +37,7 @@
       "dependsOn": ["surface-operations"],
       "seams": ["facade-rib-layout", "factory-regression-artifact", "capability-documentation"],
       "decisions": ["Q-03", "Q-04", "Q-24", "Q-25", "Q-26", "Q-27"],
-      "status": "planned"
+      "status": "green"
     }
   ]
 }

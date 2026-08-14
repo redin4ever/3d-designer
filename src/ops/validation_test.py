@@ -83,6 +83,9 @@ _MINIMAL_VALID_PARAMS: dict[str, dict] = {
         "count_x": 3,
         "count_y": 2,
     },
+    "add_roof_window": {"object_id": "light", "roof_id": "roof"},
+    "add_wall_sign": {"object_id": "sign", "wall_id": "wall"},
+    "add_facade_ribs": {"object_id": "ribs", "wall_id": "wall"},
 }
 
 
