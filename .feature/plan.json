@@ -1,60 +1,43 @@
 {
   "units": [
     {
-      "id": "gable-roof",
-      "what": "a detailed, axis-aligned gable roof with panels, ridge and fascia generated from architectural dimensions",
-      "paths": ["src/ops/roof.py", "src/ops/roof_test.py"],
-      "publicInterface": "ops.add_gable_roof",
+      "id": "surface-angle",
+      "what": "a measured face-normal angle, directly inspectable and usable by acceptance",
+      "paths": ["src/measure/surface_angle_test.py"],
+      "publicInterface": "measure.surface_angle",
       "dependsOn": [],
-      "seams": ["operation-handler-registry", "operation-tool-specs", "operation-validation", "operation-public-surface"],
-      "decisions": ["Q-03", "Q-04", "Q-05", "Q-06", "Q-16"],
-      "status": "green"
+      "seams": ["surface-angle-contract", "surface-angle-measurement", "measurement-evaluator", "measurement-tool-spec"],
+      "decisions": ["Q-18", "Q-19", "Q-21", "Q-22"],
+      "status": "planned"
     },
     {
-      "id": "landing-stairs",
-      "what": "an architectural stair that derives its direction/rise/run from a live landing and includes side stringers",
-      "paths": ["src/ops/landing_stairs.py", "src/ops/landing_stairs_test.py"],
-      "publicInterface": "ops.add_staircase_to_landing",
+      "id": "text-mesh",
+      "what": "backend-neutral centered extruded text mesh creation with fake/Blender conformance",
+      "paths": ["src/engine/text.py", "src/engine/conformance_text.py"],
+      "publicInterface": "contracts.EngineProtocol.create_text",
       "dependsOn": [],
-      "seams": ["operation-handler-registry", "operation-tool-specs", "operation-validation", "operation-public-surface"],
-      "decisions": ["Q-07", "Q-08", "Q-09", "Q-10", "Q-11", "Q-19"],
-      "status": "green"
+      "seams": ["engine-text-contract", "blender-text-engine", "fake-text-engine", "engine-conformance"],
+      "decisions": ["Q-09", "Q-13", "Q-23"],
+      "status": "planned"
     },
     {
-      "id": "ops-wiring",
-      "what": "register, validate, expose and compose both operations through the normal app path",
-      "paths": ["src/ops/architectural_wiring_test.py", "src/app/architectural_wiring_test.py"],
-      "dependsOn": ["gable-roof", "landing-stairs"],
-      "seams": ["operation-handler-registry", "operation-tool-specs", "operation-validation", "operation-public-surface", "application-handler-composition", "capability-documentation"],
-      "decisions": ["Q-02", "Q-05", "Q-11", "Q-16", "Q-17", "Q-20"],
-      "status": "green"
+      "id": "surface-operations",
+      "what": "host-derived roof windows, centered facade text, and wall ribs split around openings",
+      "paths": ["src/ops/surface_frame.py", "src/ops/surface_mounts.py", "src/ops/surface_mounts_test.py", "src/ops/facade_ribs.py", "src/ops/facade_ribs_test.py"],
+      "publicInterface": "ops.add_roof_window, ops.add_wall_sign, ops.add_facade_ribs",
+      "dependsOn": ["surface-angle", "text-mesh"],
+      "seams": ["operation-handler-registry", "operation-tool-specs", "operation-validation", "operation-acceptance", "operation-public-surface", "registry-completeness-test", "operation-assumption-sweep"],
+      "decisions": ["Q-01", "Q-02", "Q-05", "Q-06", "Q-07", "Q-08", "Q-10", "Q-11", "Q-12", "Q-14", "Q-15", "Q-16", "Q-17", "Q-19", "Q-20", "Q-22", "Q-25", "Q-26", "Q-27"],
+      "status": "planned"
     },
     {
-      "id": "operation-metadata",
-      "what": "valid architectural acceptance queries are attached automatically to persisted MCP operations",
-      "paths": ["src/ops/acceptance_runtime_test.py", "src/mcp_server/operation_metadata_test.py"],
-      "dependsOn": ["gable-roof", "landing-stairs"],
-      "seams": ["operation-acceptance", "mcp-operation-construction"],
-      "decisions": ["Q-01", "Q-12", "Q-14"],
-      "status": "green"
-    },
-    {
-      "id": "promotion-acceptance",
-      "what": "phase promotion re-runs logged semantic acceptance queries alongside generic scene checks",
-      "paths": ["src/orchestration/operation_acceptance_test.py"],
-      "dependsOn": ["operation-metadata"],
-      "seams": ["promotion-collects-operation-intent", "phase-acceptance-evaluator"],
-      "decisions": ["Q-01", "Q-13", "Q-15"],
-      "status": "green"
-    },
-    {
-      "id": "architectural-smoke",
-      "what": "real-Blender smoke proof and product workflow documentation for detailed architectural builds",
-      "paths": ["src/ops/architectural_blender_test.py", "docs/features/architectural-quality/FEATURE.md"],
-      "dependsOn": ["ops-wiring", "promotion-acceptance"],
-      "seams": ["capability-documentation"],
-      "decisions": ["Q-15", "Q-18", "Q-20"],
-      "status": "green"
+      "id": "factory-regression",
+      "what": "live-app wiring proof, documented workflow, and a regenerated factory using only host-aware operations",
+      "paths": ["src/app/surface_mount_wiring_test.py", "tools/create_factory_asset.py", "docs/features/surface-mounted-features/FEATURE.md", "docs/features/architectural-quality/FEATURE.md"],
+      "dependsOn": ["surface-operations"],
+      "seams": ["facade-rib-layout", "factory-regression-artifact", "capability-documentation"],
+      "decisions": ["Q-03", "Q-04", "Q-24", "Q-25", "Q-26", "Q-27"],
+      "status": "planned"
     }
   ]
 }
