@@ -361,3 +361,23 @@ reversible option; each is recorded here rather than asked, because the gate had
   reveal a crack after beveling or numerical changes.
 - **Blast radius:** `add_railing` top-rail geometry and persisted defect acceptance.
 - **Reversal:** none planned; disconnected rail shells are invalid construction.
+
+## A-034 — Facade ribs split around real wall openings
+
+- **Feature:** surface-mounted-features
+- **Assumed:** a rib whose layout crosses a door or window is split into only the solid
+  wall segments above, below, or beside that opening; the whole rib is not discarded.
+- **Why:** the user reported ribs colliding with the garage doors. Splitting preserves the
+  cladding rhythm while making it geometrically impossible for a rib to cover an opening.
+- **Blast radius:** the new facade-rib operation and the regenerated factory artifact.
+- **Reversal:** low — change the layout policy to omit any rib that meets an opening.
+
+## A-035 — Facade openings receive 50 mm rib clearance
+
+- **Feature:** surface-mounted-features
+- **Assumed:** rib segments stop 50 mm short of every opening edge and segments shorter
+  than 100 mm are omitted.
+- **Why:** exact edge contact can still read as a collision after beveling or export
+  quantization; 50 mm is visible construction clearance without disrupting the pattern.
+- **Blast radius:** facade-rib validation, geometry, and acceptance tests.
+- **Reversal:** low — both values are explicit operation parameters in the public schema.
