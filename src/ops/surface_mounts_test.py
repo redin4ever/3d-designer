@@ -9,6 +9,7 @@ from measure import surface_angle
 from testing import FakeEngine
 
 from .surface_mounts import add_roof_window, add_wall_sign
+from .surface_frame import roof_frame
 from .validation import acceptance_for
 
 
@@ -76,3 +77,14 @@ def test_surface_operations_publish_orientation_and_contact_acceptance() -> None
     sign_queries = acceptance_for("add_wall_sign", {"object_id": "sign", "wall_id": "wall"})
     assert {query.metric for query in roof_queries} == {MetricKind.SURFACE_ANGLE, MetricKind.GAP_WIDTH}
     assert {query.metric for query in sign_queries} == {MetricKind.SURFACE_ANGLE, MetricKind.GAP_WIDTH}
+
+
+def test_surface_detection_ignores_near_degenerate_tessellation_slivers() -> None:
+    engine = FakeEngine()
+    engine.create_mesh(
+        "roof",
+        [Vec3(-1, -1, 0), Vec3(1, -1, 0), Vec3(1, 1, 0), Vec3(-1, 1, 0),
+         Vec3(0, 0, 0), Vec3(0.003, 0, 0), Vec3(0, 0.003, 0)],
+        [(0, 1, 2), (0, 2, 3), (4, 5, 6)],
+    )
+    assert roof_frame(engine, "roof").width == pytest.approx(2.0)
