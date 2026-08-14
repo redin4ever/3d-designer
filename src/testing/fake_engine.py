@@ -171,6 +171,16 @@ class FakeEngine(FakeSurfacingMixin):
             verts, faces = unit_cube(size)
         return self.create_mesh(object_id, verts, faces, transform)
 
+    def create_text(
+        self,
+        object_id: str,
+        text: str,
+        height: float,
+        depth: float,
+        transform: Transform | None = None,
+    ) -> str:
+        raise NotImplementedError("engine.create_text: not implemented")
+
     def duplicate(self, object_id: str, new_id: str, transform: Transform | None = None) -> str:
         src = self._get(object_id)
         oid = self._unique(new_id)

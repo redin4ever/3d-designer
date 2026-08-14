@@ -311,4 +311,10 @@ def test_replace_mesh_keeps_material_slots(engine) -> None:
 
 def test_replace_mesh_rejects_an_empty_vertex_set(engine) -> None:
     conformance.check_replace_mesh_rejects_an_empty_vertex_set(engine)
+def test_create_text_is_centered_mesh(engine) -> None:
+    conformance.check_create_text_is_centered_mesh(engine)
+
+
+def test_create_text_rejects_empty_text(engine) -> None:
+    conformance.check_create_text_rejects_empty_text(engine)
 

@@ -42,6 +42,14 @@ def test_primitive_has_expected_world_bounds(engine) -> None:
     conformance.check_primitive_has_expected_world_bounds(engine)
 
 
+def test_create_text_is_centered_mesh(engine) -> None:
+    conformance.check_create_text_is_centered_mesh(engine)
+
+
+def test_create_text_rejects_empty_text(engine) -> None:
+    conformance.check_create_text_rejects_empty_text(engine)
+
+
 def test_create_mesh_produces_a_closed_manifold(engine) -> None:
     """If wrong: manifold checks downstream of mesh creation (boolean, solidify, export)
     are meaningless because the base geometry already leaks."""
@@ -406,4 +414,3 @@ def test_replace_mesh_keeps_material_slots(engine) -> None:
 
 def test_replace_mesh_rejects_an_empty_vertex_set(engine) -> None:
     conformance.check_replace_mesh_rejects_an_empty_vertex_set(engine)
-

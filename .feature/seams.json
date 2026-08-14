@@ -113,9 +113,9 @@
     },
     {
       "id": "blender-text-engine",
-      "file": "src/engine/mesh.py",
-      "line": 30,
-      "anchor": "class MeshOpsMixin:",
+      "file": "src/engine/session.py",
+      "line": 34,
+      "anchor": "class BlenderEngine(",
       "status": "wired",
       "decision": "Q-13, Q-23",
       "what": "implements the text mesh against Blender while keeping bpy inside engine",

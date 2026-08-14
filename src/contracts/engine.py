@@ -132,6 +132,22 @@ class MeshOps(Protocol):
         """``kind`` is one of: cube, cylinder, sphere, plane, cone, torus."""
         ...
 
+    def create_text(
+        self,
+        object_id: str,
+        text: str,
+        height: float,
+        depth: float,
+        transform: Transform | None = None,
+    ) -> str:
+        """Create centered extruded text as portable mesh geometry.
+
+        Local X runs along the text, local Y runs from baseline to cap, and local Z is
+        extrusion depth. The local bounds are centred on the origin in all three axes so
+        a surface-mount transform places the sign by its visible centre.
+        """
+        ...
+
     def replace_mesh(
         self,
         object_id: str,

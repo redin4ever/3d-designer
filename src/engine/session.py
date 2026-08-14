@@ -27,12 +27,14 @@ from .modifiers import ModifierOpsMixin
 from .raw import RawOpsMixin
 from .replacing import MeshReplaceMixin
 from .surfacing import SurfacingMixin
+from .text import TextOpsMixin
 
 __all__ = ["BlenderEngine", "create_engine"]
 
 
 class BlenderEngine(
     MeshOpsMixin,
+    TextOpsMixin,
     MeshReplaceMixin,
     ModifierOpsMixin,
     SurfacingMixin,
