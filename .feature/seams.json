@@ -1,137 +1,216 @@
 {
-  "feature": "Architectural quality",
+  "feature": "Surface-mounted features",
   "seams": [
     {
       "id": "operation-handler-registry",
       "file": "src/ops/registry.py",
-      "line": 70,
+      "line": 73,
       "anchor": "OPS: HandlerRegistry = {",
-      "status": "wired",
-      "decision": "Q-02, Q-17",
-      "what": "registers every replayable construction operation",
-      "evidence": "add_railing and add_staircase are both reachable only through this registry",
-      "asks": "should the roof and landing-connected stair be distinct typed operations rather than a whole-house composite?"
+      "status": "open",
+      "what": "registers replayable semantic construction operations",
+      "evidence": "add_gable_roof and add_chimney enter scene replay through this mapping",
+      "asks": "should roof windows and facade signs be separate semantic operations?"
     },
     {
       "id": "operation-tool-specs",
       "file": "src/ops/registry.py",
-      "line": 230,
+      "line": 236,
       "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
-      "status": "wired",
-      "decision": "Q-05, Q-08, Q-16",
-      "what": "defines the names and parameters an agent actually sees",
-      "evidence": "the existing staircase schema exposes no direction or landing target, and there is no roof spec",
-      "asks": "which architectural choices must be explicit in the agent-visible schemas?"
+      "status": "open",
+      "what": "defines the surface-mount parameters an agent can actually call",
+      "evidence": "the factory used add_primitive quaternions and raw bpy because no host-aware schema exists",
+      "asks": "which placement, fit, face-selection, and sizing choices must be explicit?"
     },
     {
       "id": "operation-validation",
       "file": "src/ops/validation.py",
-      "line": 246,
-      "anchor": "    elif kind == \"add_staircase\":",
-      "status": "wired",
-      "decision": "Q-06, Q-11",
-      "what": "rejects impossible construction parameters before geometry is created",
-      "evidence": "the current staircase validates positive numbers only; it cannot reject a run that misses its landing",
-      "asks": "should bad architectural attachment fail atomically or be created with a warning?"
+      "line": 130,
+      "anchor": "def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:",
+      "status": "open",
+      "what": "rejects missing hosts, invalid text, and attachments that cannot fit before mutation",
+      "evidence": "add_gable_roof and add_chimney validate every dimension before creating parts",
+      "asks": "should an attachment that does not fit be rejected or automatically resized?"
     },
     {
       "id": "operation-acceptance",
       "file": "src/ops/_acceptance.py",
       "line": 17,
       "anchor": "def acceptance_for(",
-      "status": "wired",
-      "decision": "Q-01, Q-12",
-      "what": "declares each operation's re-runnable definition of done",
-      "evidence": "the function has no production caller, and several subjects are not valid evaluator subjects",
-      "asks": "should operation-specific acceptance become a hard phase-promotion requirement?"
+      "status": "open",
+      "what": "persists re-runnable checks that the attachment is parallel to and touching its host surface",
+      "evidence": "roof and chimney joints already become phase-promotion acceptance queries here",
+      "asks": "should wrong surface angle or a host gap block phase promotion?"
+    },
+    {
+      "id": "operation-joinery",
+      "file": "src/ops/_joinery.py",
+      "line": 13,
+      "anchor": "def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:",
+      "status": "open",
+      "what": "declares intentional host contact so attached frames are not reported as clipping",
+      "evidence": "roof panels and chimney parts use declared joinery rather than inferred overlap",
+      "asks": "should mounted parts sit flush, use a raised curb/backplate, or cut into the host?"
     },
     {
       "id": "operation-public-surface",
       "file": "src/ops/__init__.py",
-      "line": 24,
+      "line": 27,
       "anchor": "__all__ = [",
-      "status": "wired",
-      "decision": "Q-07",
-      "what": "is the only supported import surface for construction operations",
-      "evidence": "the local module rules prohibit consumers from importing implementation files directly",
-      "asks": "should both new architectural operations be public and replayable?"
-    },
-    {
-      "id": "mcp-operation-construction",
-      "file": "src/mcp_server/dispatch.py",
-      "line": 140,
-      "anchor": "    op = Operation(",
-      "status": "wired",
-      "decision": "Q-12, Q-14",
-      "what": "turns a validated tool call into the persisted operation",
-      "evidence": "it currently leaves Operation.acceptance and Operation.joinery empty even though both are persisted contract fields",
-      "asks": "should dispatch attach typed operation acceptance and declared architectural joinery automatically?"
-    },
-    {
-      "id": "promotion-collects-operation-intent",
-      "file": "src/orchestration/phases.py",
-      "line": 110,
-      "anchor": "        active_operations = self._scene.document.active_operations",
-      "status": "wired",
-      "decision": "Q-01, Q-13",
-      "what": "decides whether a scene may advance to the next quality phase",
-      "evidence": "it collects logged joinery but ignores every logged operation acceptance query",
-      "asks": "should a scene remain unfinished while any construction operation's own definition of done fails?"
-    },
-    {
-      "id": "phase-acceptance-evaluator",
-      "file": "src/orchestration/_phase_acceptance.py",
-      "line": 206,
-      "anchor": "def evaluate_phase(",
-      "status": "wired",
-      "decision": "Q-13, Q-15",
-      "what": "evaluates hard geometric facts for phase promotion",
-      "evidence": "it evaluates only generic manifold/gap checks, not semantic roof or stair attachment checks",
-      "asks": "how should operation-specific queries be combined with generic phase checks without weakening either?"
+      "status": "open",
+      "what": "is the only supported Python import surface for construction operations",
+      "evidence": "the local module rules prohibit deep imports outside ops",
+      "asks": "should both host-aware operations be public and independently replayable?"
     },
     {
       "id": "application-handler-composition",
-      "file": "src/app/app_test.py",
-      "line": 69,
-      "anchor": "def test_every_operation_module_reaches_the_registry() -> None:",
-      "status": "wired",
-      "decision": "Q-18, Q-19",
-      "what": "connects ops handlers to the live scene and replay path",
-      "evidence": "new OPS entries are composed automatically, and this app-level test is the explicit proof they reached the live handler registry",
-      "asks": "should the app continue auto-composing architectural handlers from OPS?"
+      "file": "src/app/handlers.py",
+      "line": 251,
+      "anchor": "        from ops import OPS",
+      "status": "open",
+      "what": "coerces JSON vectors and makes OPS handlers live in the application",
+      "evidence": "all OPS entries are composed generically from OPS and OP_SPECS",
+      "asks": "should host points arrive as explicit world-space vectors or be inferred from the active camera?"
+    },
+    {
+      "id": "mcp-tool-registry",
+      "file": "src/mcp_server/registry.py",
+      "line": 36,
+      "anchor": "from ops import OP_SPECS",
+      "status": "open",
+      "what": "exposes the semantic tools to connected agents by phase role",
+      "evidence": "OPS tool specs are included as one registry source without per-tool wiring",
+      "asks": "in which build phase should roof windows and signs become callable?"
+    },
+    {
+      "id": "mcp-operation-metadata",
+      "file": "src/mcp_server/dispatch.py",
+      "line": 141,
+      "anchor": "    from ops import joinery_for, runtime_acceptance_for",
+      "status": "open",
+      "what": "attaches acceptance and joinery to persisted tool calls",
+      "evidence": "generic dispatch already calls both metadata builders for every operation",
+      "asks": "should acceptance be hard and automatic for every surface-mounted call?"
+    },
+    {
+      "id": "engine-text-contract",
+      "file": "src/contracts/engine.py",
+      "line": 118,
+      "anchor": "class MeshOps(Protocol):",
+      "status": "open",
+      "what": "needs a backend-neutral way to create centered extruded text as mesh geometry",
+      "evidence": "create_primitive cannot represent text, which forced the generator into raw bpy",
+      "asks": "should facade signs contain exportable raised text or only a rectangular plaque?"
+    },
+    {
+      "id": "blender-text-engine",
+      "file": "src/engine/mesh.py",
+      "line": 30,
+      "anchor": "class MeshOpsMixin:",
+      "status": "open",
+      "what": "implements the text mesh against Blender while keeping bpy inside engine",
+      "evidence": "all mesh creation methods live in this engine mixin",
+      "asks": "should text stay editable as font data or be converted to mesh for portable GLB export?"
+    },
+    {
+      "id": "fake-text-engine",
+      "file": "src/testing/fake_engine.py",
+      "line": 65,
+      "anchor": "class FakeEngine(FakeSurfacingMixin):",
+      "status": "open",
+      "what": "provides deterministic text bounds so operation placement can be tested without Blender",
+      "evidence": "FakeEngine is the specification every ops suite uses",
+      "asks": "is a conservative text bounding-box approximation acceptable outside Blender?"
+    },
+    {
+      "id": "engine-conformance",
+      "file": "src/engine/conformance.py",
+      "line": 145,
+      "anchor": "UNIVERSAL_CHECKS = (",
+      "status": "open",
+      "what": "holds FakeEngine and BlenderEngine to the same centered-text placement contract",
+      "evidence": "every universal mesh capability is registered here and run against both engines",
+      "asks": "which text properties must be identical across the fake and Blender backends?"
+    },
+    {
+      "id": "surface-angle-contract",
+      "file": "src/contracts/measurement.py",
+      "line": 30,
+      "anchor": "class MetricKind(StrEnum):",
+      "status": "open",
+      "what": "names the measurable angle between dominant surface normals",
+      "evidence": "the existing ANGLE metric compares long axes and cannot detect a panel standing on edge",
+      "asks": "what angular tolerance should define visibly flush surface mounting?"
+    },
+    {
+      "id": "surface-angle-measurement",
+      "file": "src/measure/metrics.py",
+      "line": 78,
+      "anchor": "def angle_between(engine: EngineProtocol, a: str, b: str) -> Measurement:",
+      "status": "open",
+      "what": "computes surface-normal angle rather than relying on a render",
+      "evidence": "angle_between explicitly uses dominant long axes, so it cannot verify coplanar panels",
+      "asks": "should opposite-facing but parallel surface normals count as aligned?"
+    },
+    {
+      "id": "measurement-evaluator",
+      "file": "src/measure/report.py",
+      "line": 51,
+      "anchor": "_PAIR_METRICS = {",
+      "status": "open",
+      "what": "lets phase acceptance evaluate the new surface angle metric",
+      "evidence": "all pairwise acceptance metrics dispatch through this table",
+      "asks": "should the new metric also be directly callable by inspect agents?"
+    },
+    {
+      "id": "measurement-tool-spec",
+      "file": "src/measure/registry.py",
+      "line": 119,
+      "anchor": "MEASURE_SPECS: tuple[ToolSpec, ...] = (",
+      "status": "open",
+      "what": "is where a direct inspect tool for surface alignment would be exposed",
+      "evidence": "the registry currently exposes long-axis angle but no face-normal angle",
+      "asks": "should users see a separate surface-angle tool or only automatic pass/fail checks?"
+    },
+    {
+      "id": "registry-completeness-test",
+      "file": "src/ops/registry_test.py",
+      "line": 72,
+      "anchor": "    assert len(OPS) == 22",
+      "status": "open",
+      "what": "pins the operation count so new handlers cannot be registered on only one side",
+      "evidence": "the test deliberately catches invisible handlers and handlerless tool specs",
+      "asks": "should both operations count as core OPS tools?"
+    },
+    {
+      "id": "operation-assumption-sweep",
+      "file": "src/ops/assumptions_test.py",
+      "line": 34,
+      "anchor": "_MINIMAL_PARAMS: dict[str, dict] = {",
+      "status": "open",
+      "what": "requires minimal valid parameters for every operation and exposes hidden defaults",
+      "evidence": "the sweep indexes this table by every OPS key",
+      "asks": "which mount dimensions may default, and which must always be supplied?"
+    },
+    {
+      "id": "factory-regression-artifact",
+      "file": "tools/create_factory_asset.py",
+      "line": 163,
+      "anchor": "        box(f\"skylight_{side}_{i}\", [2.0, 1.15, 0.10], [x, y, roof_z], axis_quat(\"y\", angle))",
+      "status": "open",
+      "what": "contains the exact guessed quaternion and raw text placement that produced the reported defects",
+      "evidence": "roof windows are manually rotated and the sign is created later through raw bpy",
+      "asks": "should the current factory be regenerated using only the new semantic operations?"
     },
     {
       "id": "capability-documentation",
-      "file": "README.md",
-      "line": 48,
-      "anchor": "| **Build** | primitives, walls, floors, openings, detailed gable roofs and chimneys, landing-derived supported staircases, continuous-miter railings, arrays along curves, LOD chains, grid-aligned modular kits |",
-      "status": "wired",
-      "decision": "Q-16, Q-20",
-      "what": "tells users and agents what semantic construction tools exist",
-      "evidence": "roofing and landing-connected stairs are absent from the published capability list",
-      "asks": "should the documented workflow explicitly forbid improvised cube roofs when a semantic roof tool applies?"
+      "file": "docs/features/architectural-quality/FEATURE.md",
+      "line": 1,
+      "anchor": "# Architectural quality",
+      "status": "open",
+      "what": "documents the existing rule to use semantic architectural operations instead of guessed primitives",
+      "evidence": "the documented workflow covers roofs and chimneys but not attachments mounted onto them",
+      "asks": "should surface-mounted features extend this architectural workflow or be documented separately?"
     }
   ],
-  "dismissed": [
-    {
-      "path": "src/mcp_server/registry.py",
-      "reason": "imports OP_SPECS as a collection, so new operation specs are included without a new registry seam"
-    },
-    {
-      "path": "src/scene/op_codec.py",
-      "reason": "already round-trips Operation.acceptance and Operation.joinery generically; no new shape is required"
-    },
-    {
-      "path": "src/contracts/operations.py",
-      "reason": "Operation already has the acceptance and joinery fields the fix needs"
-    },
-    {
-      "path": "frontend/",
-      "reason": "the viewer renders arbitrary mesh updates and needs no roof- or stair-specific UI"
-    },
-    {
-      "path": "src/export/",
-      "reason": "export consumes finished engine geometry generically; the new operations require no format change"
-    }
-  ]
+  "dismissed": []
 }
