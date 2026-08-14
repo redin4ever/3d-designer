@@ -26,3 +26,4 @@ def test_factory_generator_uses_semantic_surface_operations_only() -> None:
     assert "axis_quat" not in source
     assert "bpy.data.curves.new('ForgeWorksText'" not in source
     assert "front_rib_" not in source
+    assert 'name in {"factory_lot", "factory_sign"}' in source
