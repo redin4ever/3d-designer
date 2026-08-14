@@ -98,6 +98,21 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "count_x": 3,
         "count_y": 2,
     },
+    "add_roof_window": {
+        "object_id": "roof_detail", "roof_id": "hero", "width": 0.2, "height": 0.2,
+        "frame_width": 0.02, "depth": 0.02,
+        "horizontal_fraction": 0.5, "vertical_fraction": 0.5,
+    },
+    "add_wall_sign": {
+        "object_id": "wall_sign", "wall_id": "wall", "text": "A",
+        "toward": Vec3(2, -5, 1), "center_height": 1.5,
+        "height": 0.2, "depth": 0.02, "edge_margin": 0.1,
+    },
+    "add_facade_ribs": {
+        "object_id": "wall_ribs", "wall_id": "wall", "toward": Vec3(2, -5, 1),
+        "spacing": 1.0, "width": 0.04, "depth": 0.03, "edge_margin": 0.1,
+        "opening_clearance": 0.05, "min_segment": 0.1,
+    },
 }
 
 

@@ -4,11 +4,12 @@ import math
 
 import pytest
 
-from contracts import Operation, Quat, ToolError, Transform, Vec3
+from contracts import MetricKind, Operation, Quat, ToolError, Transform, Vec3
 from measure import surface_angle
 from testing import FakeEngine
 
 from .surface_mounts import add_roof_window, add_wall_sign
+from .validation import acceptance_for
 
 
 def _sloped_roof(engine: FakeEngine) -> None:
@@ -68,3 +69,10 @@ def test_wall_sign_that_does_not_fit_is_atomic() -> None:
             "height": 1.0, "depth": 0.08, "edge_margin": 0.2,
         }))
     assert engine.list_objects() == before
+
+
+def test_surface_operations_publish_orientation_and_contact_acceptance() -> None:
+    roof_queries = acceptance_for("add_roof_window", {"object_id": "light", "roof_id": "roof"})
+    sign_queries = acceptance_for("add_wall_sign", {"object_id": "sign", "wall_id": "wall"})
+    assert {query.metric for query in roof_queries} == {MetricKind.SURFACE_ANGLE, MetricKind.GAP_WIDTH}
+    assert {query.metric for query in sign_queries} == {MetricKind.SURFACE_ANGLE, MetricKind.GAP_WIDTH}
