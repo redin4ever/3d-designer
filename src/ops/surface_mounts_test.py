@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from contracts import Operation, Quat, ToolError, Transform, Vec3
+from measure import surface_angle
+from testing import FakeEngine
+
+from .surface_mounts import add_roof_window, add_wall_sign
+
+
+def _sloped_roof(engine: FakeEngine) -> None:
+    engine.create_primitive(
+        "roof", "cube", Vec3(8, 5, 0.2),
+        Transform(rotation=Quat.from_axis_angle(Vec3(0, 1, 0), math.radians(24))),
+    )
+
+
+def test_roof_window_derives_its_orientation_from_the_host_surface() -> None:
+    engine = FakeEngine()
+    _sloped_roof(engine)
+    result = add_roof_window(engine, Operation("rw", "add_roof_window", {
+        "object_id": "skylight", "roof_id": "roof", "width": 2.0, "height": 1.2,
+        "frame_width": 0.10, "depth": 0.08,
+        "horizontal_fraction": 0.5, "vertical_fraction": 0.5,
+    }))
+    assert result.produced_objects == ("skylight_glass", "skylight_frame")
+    assert surface_angle(engine, "roof", "skylight_glass").value == pytest.approx(0, abs=1e-6)
+
+
+def test_oversize_roof_window_is_rejected_without_partial_geometry() -> None:
+    engine = FakeEngine()
+    _sloped_roof(engine)
+    before = engine.list_objects()
+    with pytest.raises(ToolError, match="does not fit"):
+        add_roof_window(engine, Operation("rw", "add_roof_window", {
+            "object_id": "huge", "roof_id": "roof", "width": 20.0, "height": 1.2,
+            "frame_width": 0.10, "depth": 0.08,
+            "horizontal_fraction": 0.5, "vertical_fraction": 0.5,
+        }))
+    assert engine.list_objects() == before
+
+
+def test_wall_sign_is_centered_at_the_requested_height_and_faces_toward_point() -> None:
+    engine = FakeEngine()
+    engine.create_primitive("wall", "cube", Vec3(10, 0.2, 5), Transform(translation=Vec3(0, 0, 2.5)))
+    result = add_wall_sign(engine, Operation("sign", "add_wall_sign", {
+        "object_id": "factory_sign", "wall_id": "wall", "text": "FORGE WORKS",
+        "toward": Vec3(0, -10, 2), "center_height": 4.1,
+        "height": 0.65, "depth": 0.08, "edge_margin": 0.4,
+    }))
+    bounds = engine.world_bounds(result.produced_objects[0])
+    assert bounds.centre.x == pytest.approx(0, abs=1e-6)
+    assert bounds.centre.z == pytest.approx(4.1, abs=1e-6)
+    assert surface_angle(engine, "wall", "factory_sign").value == pytest.approx(0, abs=1e-6)
+
+
+def test_wall_sign_that_does_not_fit_is_atomic() -> None:
+    engine = FakeEngine()
+    engine.create_primitive("wall", "cube", Vec3(2, 0.2, 2), Transform(translation=Vec3(0, 0, 1)))
+    before = engine.list_objects()
+    with pytest.raises(ToolError, match="does not fit"):
+        add_wall_sign(engine, Operation("sign", "add_wall_sign", {
+            "object_id": "bad", "wall_id": "wall", "text": "FORGE WORKS",
+            "toward": Vec3(0, -10, 1), "center_height": 1.0,
+            "height": 1.0, "depth": 0.08, "edge_margin": 0.2,
+        }))
+    assert engine.list_objects() == before
