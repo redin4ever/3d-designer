@@ -23,6 +23,7 @@ __all__ = [
     "dimensions",
     "distance",
     "angle_between",
+    "surface_angle",
     "gap_width",
     "volume",
     "triangle_count",
@@ -90,6 +91,11 @@ def angle_between(engine: EngineProtocol, a: str, b: str) -> Measurement:
     cosine = max(-1.0, min(1.0, axis_a.dot(axis_b)))
     degrees = math.degrees(math.acos(cosine))
     return Measurement(kind=MetricKind.ANGLE, value=degrees, unit="deg", subject=f"{a}|{b}")
+
+
+def surface_angle(engine: EngineProtocol, a: str, b: str) -> Measurement:
+    """Acute angle between the dominant planar surfaces of two objects."""
+    raise NotImplementedError("measure.surface_angle: not implemented")
 
 
 def gap_width(engine: EngineProtocol, a: str, b: str) -> Measurement:
