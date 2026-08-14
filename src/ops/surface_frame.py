@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from contracts import EngineProtocol, Quat, ToolError, Vec3
+from contracts import EPSILON, EngineProtocol, Quat, ToolError, Vec3
 
 __all__ = ["SurfaceFrame", "roof_frame", "wall_frame"]
 
@@ -71,7 +71,7 @@ def _triangles(engine: EngineProtocol, object_id: str):
     for tri in snap.triangles:
         a, b, c = (verts[i] for i in tri)
         cross = (b - a).cross(c - a)
-        if cross.length() > 1e-8:
+        if cross.length() >= EPSILON:
             out.append((a, b, c, cross.normalized(), cross.length() / 2))
     return out
 
