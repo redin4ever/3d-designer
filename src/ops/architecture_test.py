@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from contracts import EPSILON, Operation, ToolError, Vec3
+from measure import volume
 from ops import add_floor, add_opening, add_wall
 
 
@@ -126,3 +127,18 @@ def test_opening_entirely_outside_the_wall_raises_tool_error(engine) -> None:
 
     with pytest.raises(ToolError):
         add_opening(engine, op)
+
+
+def test_sequential_openings_preserve_every_earlier_cut(engine) -> None:
+    add_wall(engine, Operation("wall", "add_wall", {
+        "object_id": "wall", "start": Vec3(-5, 0, 0), "end": Vec3(5, 0, 0),
+        "height": 5.0, "thickness": 0.2,
+    }))
+    for op_id, position in (("garage_a", 2.0), ("garage_b", 8.0)):
+        add_opening(engine, Operation(op_id, "add_opening", {
+            "object_id": op_id, "wall_id": "wall", "position": position,
+            "width": 2.0, "height": 3.0, "sill_height": 0.0,
+        }))
+
+    # 10 x .2 x 5 wall, minus two independent 2 x .2 x 3 openings.
+    assert volume(engine, "wall").value == pytest.approx(7.6, abs=1e-5)
