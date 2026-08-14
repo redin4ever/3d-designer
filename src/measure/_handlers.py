@@ -37,7 +37,16 @@ from spatial import SpatialIndex
 
 from ._errors import require_object, require_objects
 from .intersections import find_clipping as _find_clipping
-from .metrics import angle_between, bounds, dimensions, distance, gap_width, triangle_count, volume
+from .metrics import (
+    angle_between,
+    bounds,
+    dimensions,
+    distance,
+    gap_width,
+    surface_angle,
+    triangle_count,
+    volume,
+)
 from .neighbours import DEFAULT_MAX_GAP, neighbour_defects, neighbour_pairs
 from .report import inspect
 
@@ -48,6 +57,7 @@ __all__ = [
     "measure_distance",
     "measure_gap",
     "measure_angle",
+    "measure_surface_angle",
     "measure_dimensions",
     "find_clipping",
     "defect_report",
@@ -183,6 +193,15 @@ def measure_angle(a: str, b: str, *, engine: EngineProtocol | None = None) -> Me
     engine = resolve_engine(engine)
     _require_pair(engine, a, b)
     return _pair_report(angle_between(engine, a, b), a, b)
+
+
+@reads_geometry
+def measure_surface_angle(
+    a: str, b: str, *, engine: EngineProtocol | None = None
+) -> MeasurementReport:
+    engine = resolve_engine(engine)
+    _require_pair(engine, a, b)
+    return _pair_report(surface_angle(engine, a, b), a, b)
 
 
 @reads_geometry

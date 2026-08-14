@@ -8,7 +8,7 @@
       "dependsOn": [],
       "seams": ["surface-angle-contract", "surface-angle-measurement", "measurement-evaluator", "measurement-tool-spec"],
       "decisions": ["Q-18", "Q-19", "Q-21", "Q-22"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "text-mesh",

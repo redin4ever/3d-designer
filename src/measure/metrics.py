@@ -95,7 +95,43 @@ def angle_between(engine: EngineProtocol, a: str, b: str) -> Measurement:
 
 def surface_angle(engine: EngineProtocol, a: str, b: str) -> Measurement:
     """Acute angle between the dominant planar surfaces of two objects."""
-    raise NotImplementedError("measure.surface_angle: not implemented")
+    normal_a = _dominant_surface_normal(engine, a)
+    normal_b = _dominant_surface_normal(engine, b)
+    cosine = max(0.0, min(1.0, abs(normal_a.dot(normal_b))))
+    return Measurement(
+        kind=MetricKind.SURFACE_ANGLE,
+        value=math.degrees(math.acos(cosine)),
+        unit="deg",
+        subject=f"{a}|{b}",
+    )
+
+
+def _dominant_surface_normal(engine: EngineProtocol, object_id: str):
+    """Area-weighted normal of the largest parallel face family in world space.
+
+    Grouping opposite normals together makes a closed plate's front and back one surface
+    family. Summing triangle area per family, rather than choosing one triangle, keeps
+    extruded text reliable even though its front face is split across many glyphs.
+    """
+    snapshot = engine.snapshot(object_id)
+    vertices = snapshot.world_vertices()
+    groups: dict[tuple[float, float, float], tuple[float, object]] = {}
+    for i, j, k in snapshot.triangles:
+        cross = (vertices[j] - vertices[i]).cross(vertices[k] - vertices[i])
+        twice_area = cross.length()
+        if twice_area <= 1e-12:
+            continue
+        normal = cross * (1.0 / twice_area)
+        components = normal.as_tuple()
+        dominant = max(range(3), key=lambda index: abs(components[index]))
+        if components[dominant] < 0:
+            normal = normal * -1.0
+        key = tuple(round(component, 5) for component in normal.as_tuple())
+        area, _ = groups.get(key, (0.0, normal))
+        groups[key] = (area + twice_area, normal)
+    if not groups:
+        raise ValueError(f"{object_id!r} has no non-degenerate surface to measure")
+    return max(groups.values(), key=lambda item: item[0])[1]
 
 
 def gap_width(engine: EngineProtocol, a: str, b: str) -> Measurement:

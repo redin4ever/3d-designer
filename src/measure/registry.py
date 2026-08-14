@@ -158,6 +158,20 @@ MEASURE_SPECS: tuple[ToolSpec, ...] = (
         examples=("are these two balusters parallel",),
     ),
     ToolSpec(
+        name="measure_surface_angle",
+        description=(
+            "Acute angle in degrees between two objects' dominant face normals. Use this "
+            "for panels, signs, skylights and other surface-mounted parts; the ordinary "
+            "angle tool compares long axes and cannot tell a panel lying flat from one "
+            "standing on edge. Opposite-facing parallel normals report 0 degrees."
+        ),
+        roles=(ToolRole.INSPECT,),
+        input_schema=_pair_schema(),
+        handler=h.measure_surface_angle,
+        mutating=False,
+        examples=("is this skylight actually parallel to the roof face",),
+    ),
+    ToolSpec(
         name="measure_dimensions",
         description=(
             "Size, world bounding box, enclosed volume and triangle count for each named "
