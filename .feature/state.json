@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Surface-mounted features: roof windows and facade signs aligned and verified against their host geometry",
-  "slug": "surface-mounted-features",
-  "phase": 5,
-  "baseSha": "4aff23f92f9a18aaa343b7cbff635b6dc808ce45",
-  "branch": "feat/surface-mounted-features",
-  "docsDir": "docs/features/surface-mounted-features",
-  "startedAt": "2026-08-14",
-  "status": "finished"
+  "feature": "Model-generation quality: fitted hard-surface assemblies and coherent impact-head construction",
+  "slug": "model-generation-quality",
+  "phase": 2,
+  "baseSha": "2c44096e77e9c646e084360f7d0867af689b74e3",
+  "branch": "feat/model-generation-quality",
+  "docsDir": "docs/features/model-generation-quality",
+  "startedAt": "2026-08-18",
+  "status": "running"
 }
