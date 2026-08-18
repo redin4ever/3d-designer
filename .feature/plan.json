@@ -17,7 +17,7 @@
       "dependsOn": ["profiled-solid-kernel"],
       "seams": ["operation_dispatch", "tool_schema", "public_api", "assumption_sweep", "composition_root_reachability", "app_visible_count", "mcp_visible_count"],
       "decisions": ["Q-02", "Q-03", "Q-05", "Q-16", "Q-17", "Q-20", "Q-21"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "blacksmith-regression",
