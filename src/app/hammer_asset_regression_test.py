@@ -23,6 +23,7 @@ def test_hammer_generator_assigns_materials_to_semantic_part_families() -> None:
     for family in (
         "hero_head_body", "hero_head_top_plate", "hero_head_cheek_",
         "hero_head_shoulder_", "hero_head_collar_", "hero_head_face_",
-        "hero_head_rim_", "hero_head_handle_socket", "hero_head_handle_collar",
+        "hero_head_striker_", "hero_head_rim_", "hero_head_handle_socket",
+        "hero_head_handle_collar",
     ):
         assert family in SOURCE

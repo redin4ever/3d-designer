@@ -26,7 +26,7 @@
       "dependsOn": ["impact-head-geometry", "impact-head-wiring"],
       "seams": ["hammer-regression-artifact"],
       "decisions": ["Q-05", "Q-08", "Q-09", "Q-16", "Q-23", "Q-24"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "mechanical-workflow-docs",
