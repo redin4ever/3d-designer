@@ -58,6 +58,31 @@ def acceptance_for(
             for index, (a, b, description) in enumerate(joints)
         )
 
+    if kind == "add_profiled_solid":
+        return (
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_has_volume",
+                description="profiled solid encloses positive volume",
+                metric=MetricKind.VOLUME,
+                subject=object_id,
+                expected=1e-9,
+                comparison=Comparison.GTE,
+            ),
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_structurally_clean",
+                description="profiled solid is closed, manifold, consistently wound and clean",
+                subject=object_id,
+                forbidden_defects=(
+                    DefectClass.BOUNDARY_HOLE,
+                    DefectClass.NON_MANIFOLD_EDGE,
+                    DefectClass.NON_MANIFOLD_VERTEX,
+                    DefectClass.LOOSE_OR_DUPLICATE,
+                    DefectClass.FLIPPED_NORMAL,
+                    DefectClass.SELF_INTERSECTION,
+                ),
+            ),
+        )
+
     if kind == "add_roof_window":
         host = params.get("roof_id", "")
         return (
@@ -375,6 +400,7 @@ def acceptance_for(
 _RUNTIME_ACCEPTANCE_KINDS = frozenset({
     "add_primitive", "add_wall", "add_floor", "add_opening", "add_gable_roof", "add_chimney",
     "add_impact_head",
+    "add_profiled_solid",
     "add_staircase", "add_staircase_to_landing", "add_railing", "array_along",
     "add_lod_chain", "add_modular_kit", "apply_texture_material", "move_object",
     "rotate_object", "scale_object", "set_object_material", "duplicate_object",

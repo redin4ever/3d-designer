@@ -37,6 +37,7 @@ _KNOWN_KINDS = (
     "add_gable_roof",
     "add_chimney",
     "add_impact_head",
+    "add_profiled_solid",
     "add_opening",
     "add_staircase",
     "add_staircase_to_landing",
@@ -309,6 +310,18 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
                 f"{kind}: bevel_width {params['bevel_width']} consumes the smallest detail",
                 f"keep bevel_width below {smallest_detail / 2.0:.4f}",
             )
+    elif kind == "add_profiled_solid":
+        _require(params, "origin", kind)
+        _require(params, "sections", kind)
+        axis = _require(params, "axis", kind)
+        if axis not in ("x", "y", "z"):
+            raise ToolError(
+                "ops.profiled_bad_axis",
+                f"{kind}: axis is {axis!r}, must be 'x', 'y', or 'z'",
+                "pass one world axis: x, y, or z",
+            )
+        bevel_width = _require(params, "bevel_width", kind)
+        _non_negative(bevel_width, "bevel_width", kind)
     elif kind == "add_roof_window":
         _require(params, "roof_id", kind)
         for name in ("width", "height", "frame_width", "depth"):
