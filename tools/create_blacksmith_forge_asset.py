@@ -24,6 +24,7 @@ if not engine.backend_name.startswith("bpy-"):
 
 counter = 0
 object_materials: dict[str, str] = {}
+pre_beveled: set[str] = set()
 
 
 def perform(operation_kind: str, **params):
@@ -81,6 +82,35 @@ def torus(name: str, diameter: float, tube: float, at, material: str):
     return primitive(name, "torus", [diameter, diameter, tube], at, material)
 
 
+def chamfered_profile(width: float, height: float, chamfer: float, *, v_offset=0.0):
+    """Counter-clockwise local [u, v] section with clipped corners."""
+    half_width, half_height = width / 2.0, height / 2.0
+    cut = min(chamfer, half_width * 0.45, half_height * 0.45)
+    return [
+        [-half_width + cut, v_offset - half_height],
+        [half_width - cut, v_offset - half_height],
+        [half_width, v_offset - half_height + cut],
+        [half_width, v_offset + half_height - cut],
+        [half_width - cut, v_offset + half_height],
+        [-half_width + cut, v_offset + half_height],
+        [-half_width, v_offset + half_height - cut],
+        [-half_width, v_offset - half_height + cut],
+    ]
+
+
+def profiled(name: str, origin, axis: str, sections, material: str, bevel_width=0.012):
+    perform("add_profiled_solid",
+        object_id=name,
+        origin=origin,
+        axis=axis,
+        sections=sections,
+        bevel_width=bevel_width,
+    )
+    object_materials[name] = material
+    pre_beveled.add(name)
+    return name
+
+
 # --- The room: hand-laid flagstones, soot-darkened masonry, and oak framing. ---
 box("flagstone_floor", [12.5, 10.0, 0.22], [0, 0, -0.11], "stone_dark")
 for row, y in enumerate(range(-4, 5, 2)):
@@ -125,20 +155,27 @@ for x, y, s in ((-2.95, 2.42, 0.38), (-2.55, 2.62, 0.46), (-2.18, 2.40, 0.33), (
 for i, x in enumerate((-3.26, -2.88, -2.50, -2.12, -1.76)):
     box(f"grate_bar_{i}", [0.10, 1.46, 0.10], [x, 2.48, 1.91], "iron")
 
-box("hood_back", [3.55, 0.18, 2.50], [-2.55, 3.32, 3.35], "iron_dark")
-box("hood_left", [0.18, 1.58, 2.50], [-4.24, 2.55, 3.35], "iron_dark", axis=[0, 0, 1], angle=0.0)
-box("hood_right", [0.18, 1.58, 2.50], [-0.86, 2.55, 3.35], "iron_dark")
-box("hood_top", [3.55, 1.60, 0.18], [-2.55, 2.55, 4.56], "iron_dark")
-box("hood_front_lintel", [3.55, 0.22, 0.20], [-2.55, 1.76, 2.24], "iron")
+profiled("forge_hood", [-2.55, 2.55, 2.92], "z", [
+    {"offset": 0.0, "profile": chamfered_profile(3.65, 1.72, 0.10)},
+    {"offset": 0.34, "profile": chamfered_profile(3.65, 1.72, 0.10)},
+    {"offset": 1.02, "profile": chamfered_profile(2.35, 1.18, 0.08)},
+    {"offset": 1.62, "profile": chamfered_profile(1.02, 0.74, 0.07)},
+], "iron_dark", bevel_width=0.018)
+box("hood_front_lintel", [3.66, 0.24, 0.18], [-2.55, 1.69, 2.98], "iron")
 for x in (-4.0, -3.0, -2.1, -1.1):
-    cyl(f"hood_rivet_{x}", 0.12, 0.08, [x, 1.63, 2.28], "iron_bright", axis=[1, 0, 0], angle=math.pi / 2)
+    cyl(f"hood_rivet_{x}", 0.12, 0.08, [x, 1.54, 3.00], "iron_bright", axis=[1, 0, 0], angle=math.pi / 2)
 for z, diameter in ((4.78, 1.50), (5.40, 1.22), (6.03, 0.96)):
     cyl(f"chimney_{z}", diameter, 0.58, [-2.55, 2.56, z], "iron_dark")
     torus(f"chimney_band_{z}", diameter + 0.12, 0.10, [-2.55, 2.56, z + 0.24], "iron_bright")
 cone("chimney_cap", 1.46, 0.38, [-2.55, 2.56, 6.48], "iron_dark")
 
 # Bellows, including the timber arms and leather folds, tucked beside the hearth.
-box("bellows_body", [1.46, 0.64, 0.58], [-4.55, 2.22, 1.55], "leather")
+profiled("bellows_body", [-4.55, 2.22, 1.55], "x", [
+    {"offset": -0.72, "profile": chamfered_profile(0.50, 0.18, 0.05)},
+    {"offset": -0.43, "profile": chamfered_profile(0.68, 0.56, 0.10)},
+    {"offset": 0.43, "profile": chamfered_profile(0.68, 0.56, 0.10)},
+    {"offset": 0.72, "profile": chamfered_profile(0.50, 0.18, 0.05)},
+], "leather", bevel_width=0.008)
 box("bellows_top", [1.60, 0.70, 0.12], [-4.55, 2.22, 1.88], "oak")
 box("bellows_bottom", [1.60, 0.70, 0.12], [-4.55, 2.22, 1.22], "oak")
 for i, x in enumerate((-5.05, -4.76, -4.47, -4.18)):
@@ -150,16 +187,30 @@ box("bellows_nozzle", [0.22, 0.82, 0.22], [-3.63, 2.22, 1.55], "iron", axis=[0, 
 cyl("anvil_stump", 1.62, 1.52, [-0.05, 0.95, 0.76], "oak_dark")
 for i, z in enumerate((0.18, 0.54, 0.90, 1.26)):
     torus(f"stump_ring_{i}", 1.66, 0.055, [-0.05, 0.95, z], "iron")
-box("anvil_waist", [1.12, 0.92, 0.84], [-0.05, 0.95, 1.90], "iron_dark")
-box("anvil_body", [2.32, 1.20, 0.48], [-0.05, 0.95, 2.54], "iron_bright")
-box("anvil_face", [2.12, 0.98, 0.16], [-0.05, 0.95, 2.86], "steel_face")
+profiled("anvil_base", [-0.05, 0.95, 1.66], "x", [
+    {"offset": -0.86, "profile": chamfered_profile(1.18, 0.28, 0.08)},
+    {"offset": 0.66, "profile": chamfered_profile(1.18, 0.28, 0.08)},
+], "iron_dark", bevel_width=0.018)
+profiled("anvil_body", [-0.05, 0.95, 2.25], "x", [
+    {"offset": -1.18, "profile": chamfered_profile(0.88, 0.30, 0.06, v_offset=0.42)},
+    {"offset": -0.88, "profile": chamfered_profile(1.02, 0.40, 0.08, v_offset=0.36)},
+    {"offset": -0.58, "profile": chamfered_profile(1.04, 0.62, 0.10, v_offset=0.22)},
+    {"offset": -0.28, "profile": chamfered_profile(0.72, 0.94, 0.12, v_offset=-0.10)},
+    {"offset": 0.08, "profile": chamfered_profile(0.64, 0.92, 0.12, v_offset=-0.12)},
+    {"offset": 0.42, "profile": chamfered_profile(0.86, 0.74, 0.10, v_offset=0.04)},
+    {"offset": 0.70, "profile": chamfered_profile(0.94, 0.54, 0.09, v_offset=0.26)},
+    {"offset": 1.02, "profile": chamfered_profile(0.66, 0.36, 0.07, v_offset=0.36)},
+    {"offset": 1.36, "profile": chamfered_profile(0.36, 0.22, 0.05, v_offset=0.42)},
+    {"offset": 1.62, "profile": chamfered_profile(0.10, 0.10, 0.02, v_offset=0.43)},
+], "iron_bright", bevel_width=0.0)
+profiled("anvil_face", [-0.05, 0.95, 2.25], "x", [
+    {"offset": -1.28, "profile": chamfered_profile(1.02, 0.13, 0.025, v_offset=0.625)},
+    {"offset": 0.72, "profile": chamfered_profile(1.02, 0.13, 0.025, v_offset=0.625)},
+], "steel_face", bevel_width=0.0)
 box("anvil_step", [0.70, 0.98, 0.22], [-0.94, 0.95, 2.72], "steel_face")
-cone("anvil_horn", 0.92, 1.72, [1.55, 0.95, 2.67], "steel_face", axis=[0, 1, 0], angle=math.pi / 2)
 box("anvil_tail", [0.34, 1.04, 0.34], [-1.05, 0.95, 2.67], "iron_bright")
-for x in (-0.70, 0.60):
-    cyl(f"anvil_foot_{x}", 0.46, 0.30, [x, 0.95, 1.44], "iron_dark")
-for x, y in ((-0.72, 0.55), (-0.72, 1.35), (0.62, 0.55), (0.62, 1.35)):
-    cyl(f"anvil_hole_rim_{x}_{y}", 0.22, 0.035, [x, y, 2.96], "iron_dark")
+box("anvil_hardy_hole", [0.20, 0.20, 0.035], [-0.78, 0.95, 2.94], "iron_dark")
+cyl("anvil_pritchel_hole", 0.12, 0.035, [-0.48, 0.95, 2.94], "iron_dark")
 
 # A partially worked red-hot bar lying on the anvil.
 cyl("hot_bar", 0.16, 1.55, [0.12, 0.96, 3.10], "hot_steel", axis=[0, 1, 0], angle=math.radians(82))
@@ -291,6 +342,8 @@ for name, material in object_materials.items():
     engine.assign_material(name, material)
 
 for name in engine.list_objects():
+    if name in pre_beveled:
+        continue
     if name.startswith(("flag_", "mortar_", "brick_cap_", "spark_")):
         continue
     try:
@@ -380,6 +433,54 @@ for mat_name, color, strength in (
                     socket.default_value = color
                 elif socket.name == 'Emission Strength':
                     socket.default_value = strength
+
+def apply_surface_variation(mat_name, scale, contrast, rough_min, rough_max, bump_strength):
+    # Subtle object-space wear; material identity stays legible at scene distance.
+    mat = bpy.data.materials.get(mat_name)
+    if not mat or not mat.node_tree:
+        return
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    bsdf = next((node for node in nodes if node.type == 'BSDF_PRINCIPLED'), None)
+    if not bsdf:
+        return
+    base = tuple(bsdf.inputs['Base Color'].default_value[:3])
+    texcoord = nodes.new('ShaderNodeTexCoord')
+    noise = nodes.new('ShaderNodeTexNoise')
+    noise.inputs['Scale'].default_value = scale
+    noise.inputs['Detail'].default_value = 5.0
+    noise.inputs['Roughness'].default_value = 0.72
+    ramp = nodes.new('ShaderNodeValToRGB')
+    dark = tuple(max(0.0, component * (1.0 - contrast)) for component in base)
+    light = tuple(min(1.0, component * (1.0 + contrast * 0.55)) for component in base)
+    ramp.color_ramp.elements[0].color = (*dark, 1.0)
+    ramp.color_ramp.elements[1].color = (*light, 1.0)
+    roughness = nodes.new('ShaderNodeMapRange')
+    roughness.inputs['To Min'].default_value = rough_min
+    roughness.inputs['To Max'].default_value = rough_max
+    bump = nodes.new('ShaderNodeBump')
+    bump.inputs['Strength'].default_value = bump_strength
+    bump.inputs['Distance'].default_value = 0.035
+    links.new(texcoord.outputs['Generated'], noise.inputs['Vector'])
+    links.new(noise.outputs['Fac'], ramp.inputs['Fac'])
+    links.new(ramp.outputs['Color'], bsdf.inputs['Base Color'])
+    links.new(noise.outputs['Fac'], roughness.inputs['Value'])
+    links.new(roughness.outputs['Result'], bsdf.inputs['Roughness'])
+    links.new(noise.outputs['Fac'], bump.inputs['Height'])
+    links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+
+for args in (
+    ('masonry', 3.2, 0.34, 0.78, 0.98, 0.30),
+    ('brick', 5.5, 0.30, 0.72, 0.96, 0.24),
+    ('stone_warm', 4.2, 0.26, 0.70, 0.94, 0.22),
+    ('oak', 3.6, 0.32, 0.58, 0.88, 0.18),
+    ('oak_dark', 4.4, 0.28, 0.66, 0.92, 0.20),
+    ('iron', 7.0, 0.18, 0.28, 0.62, 0.12),
+    ('iron_dark', 8.5, 0.20, 0.34, 0.70, 0.15),
+    ('iron_bright', 9.0, 0.16, 0.20, 0.48, 0.09),
+    ('leather', 12.0, 0.30, 0.70, 0.96, 0.28),
+):
+    apply_surface_variation(*args)
 
 # A very restrained atmospheric haze catches the warm light under the hood.
 scene.world.color = (0.01, 0.008, 0.006)
