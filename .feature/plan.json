@@ -26,7 +26,7 @@
       "dependsOn": ["profiled-solid-wiring"],
       "seams": ["forge_regression", "forge_export"],
       "decisions": ["Q-04", "Q-19", "Q-23", "Q-24", "Q-25"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "profiled-solid-docs",
