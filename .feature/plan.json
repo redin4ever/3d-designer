@@ -35,7 +35,7 @@
       "dependsOn": ["impact-head-wiring", "hammer-regression"],
       "seams": ["construction-documentation"],
       "decisions": ["Q-02", "Q-03", "Q-17", "Q-24"],
-      "status": "red"
+      "status": "green"
     }
   ]
 }

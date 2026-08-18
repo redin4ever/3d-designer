@@ -27,6 +27,8 @@ add_primitive(engine, op) -> OperationResult
 add_wall(engine, op)      -> OperationResult   # start, end, height, thickness
 add_floor(engine, op)     -> OperationResult   # width, depth, thickness
 add_gable_roof(engine, op) -> OperationResult  # panels, ridge, compound-mitered rake/eave trim
+add_chimney(engine, op)    -> OperationResult  # shaft, flashing, crown, rimmed flues
+add_impact_head(engine, op) -> OperationResult # fitted armor, socketed strike stacks and handle
 add_opening(engine, op)   -> OperationResult   # boolean a door/window out of a wall
 add_staircase(engine, op) -> OperationResult   # treads, rise, run, width
 add_staircase_to_landing(engine, op) -> OperationResult # derives direction/rise/run
@@ -39,8 +41,8 @@ validate_params(kind: str, params: dict) -> dict          # raises ToolError nam
 acceptance_for(kind: str, params: dict) -> tuple[AcceptanceQuery, ...]
 ```
 
-`OPS` and `OP_SPECS` are real, constructed values — never stubs. Every handler function is
-a throwing stub (see `CLAUDE.md` for status).
+`OPS` and `OP_SPECS` are real, constructed values. Every public name resolves to a tested handler;
+see `CLAUDE.md` for current suite commands.
 
 ## Layout
 
@@ -53,6 +55,8 @@ same file:
 | `architecture.py` | `add_wall`, `add_floor`, `add_opening` |
 | `stairs.py`, `landing_stairs.py` | legacy raw-run and landing-derived supported stairs |
 | `roof.py` | detailed parametric gable roof assembly |
+| `chimney.py` | shaft, flashing, crown, and finished flue assembly |
+| `impact_head.py` | fitted dual-strike hard-surface assembly |
 | `railing.py` | `add_railing` — the flagship |
 | `arrays.py` | `array_along`, `add_lod_chain`, `add_modular_kit` |
 | `validation.py` | `validate_params`, `acceptance_for` |
@@ -80,7 +84,7 @@ carries the most tests in the package on purpose — see its module docstring.
   never a bare `KeyError`/`ValueError`/traceback (Gate A 4.2).
 - **Every operation kind returns at least one `AcceptanceQuery`.** An operation nobody can
   re-check is an operation nobody can trust the agent's own claim about (ADR-005).
-- **`OPS` and `OP_SPECS` cover exactly the same 21 kinds, in both directions.** A handler
+- **`OPS` and `OP_SPECS` cover exactly the same 26 kinds, in both directions.** A handler
   with no tool is unreachable; a tool with no handler crashes at call time.
 - **No operation tool is ever exposed to the `INSPECT` role.** Every one of them mutates
   the scene; `contracts.ToolSpec.__post_init__` enforces this at construction time
