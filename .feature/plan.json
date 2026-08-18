@@ -22,11 +22,11 @@
     {
       "id": "hammer-regression",
       "what": "the existing futuristic hammer rebuilt through the semantic head operation and rendered in Blender",
-      "paths": ["tools/create_hammer_asset.py"],
+      "paths": ["tools/create_hammer_asset.py", "src/app/hammer_asset_regression_test.py"],
       "dependsOn": ["impact-head-geometry", "impact-head-wiring"],
       "seams": ["hammer-regression-artifact"],
       "decisions": ["Q-05", "Q-08", "Q-09", "Q-16", "Q-23", "Q-24"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "mechanical-workflow-docs",
