@@ -31,11 +31,11 @@
     {
       "id": "mechanical-workflow-docs",
       "what": "document the semantic hard-surface workflow, parameters, part ids, and verification contract",
-      "paths": ["docs/features/model-generation-quality/FEATURE.md"],
+      "paths": ["docs/features/model-generation-quality/FEATURE.md", "src/ops/model_generation_docs_test.py"],
       "dependsOn": ["impact-head-wiring", "hammer-regression"],
       "seams": ["construction-documentation"],
       "decisions": ["Q-02", "Q-03", "Q-17", "Q-24"],
-      "status": "planned"
+      "status": "red"
     }
   ]
 }
