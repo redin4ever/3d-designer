@@ -32,3 +32,11 @@ def test_export_still_preserves_editable_scene_and_portable_model() -> None:
     assert 'blend_path = artifacts / "blacksmith_forge.blend"' in SOURCE
     assert 'glb_path = artifacts / "blacksmith_forge.glb"' in SOURCE
     assert 'engine.export_model(engine.list_objects()' in SOURCE
+
+
+def test_render_uses_surface_variation_instead_of_flat_debug_colours() -> None:
+    assert "def apply_surface_variation" in SOURCE
+    assert "ShaderNodeTexNoise" in SOURCE
+    assert "ShaderNodeBump" in SOURCE
+    for material in ("masonry", "brick", "oak", "iron", "leather"):
+        assert f"'{material}'" in SOURCE
