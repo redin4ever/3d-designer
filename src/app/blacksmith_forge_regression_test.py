@@ -45,3 +45,10 @@ def test_render_uses_surface_variation_instead_of_flat_debug_colours() -> None:
 def test_profiled_solids_are_not_bevelled_a_second_time_by_scene_polish() -> None:
     assert "pre_beveled.add(name)" in SOURCE
     assert "if name in pre_beveled:" in SOURCE
+    profiled_helper = SOURCE.split("def profiled", 1)[1].split("# --- The room", 1)[0]
+    assert "if bevel_width > 0" not in profiled_helper
+
+
+def test_aggressive_anvil_profiles_keep_their_modelled_edges_without_modifier_overlap() -> None:
+    assert '], "iron_bright", bevel_width=0.0)' in SOURCE
+    assert '], "steel_face", bevel_width=0.0)' in SOURCE
