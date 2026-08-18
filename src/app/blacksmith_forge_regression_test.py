@@ -40,3 +40,8 @@ def test_render_uses_surface_variation_instead_of_flat_debug_colours() -> None:
     assert "ShaderNodeBump" in SOURCE
     for material in ("masonry", "brick", "oak", "iron", "leather"):
         assert f"'{material}'" in SOURCE
+
+
+def test_profiled_solids_are_not_bevelled_a_second_time_by_scene_polish() -> None:
+    assert "pre_beveled.add(name)" in SOURCE
+    assert "if name in pre_beveled:" in SOURCE
