@@ -6,7 +6,8 @@
       "file": "src/ops/registry.py",
       "line": 76,
       "anchor": "OPS: HandlerRegistry = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-03",
       "what": "the replayable construction registry that makes a new shape operation executable",
       "evidence": "add_impact_head is imported and registered here before app handlers collect OPS",
       "asks": "should the reusable capability be one compact profiled-solid tool or separate extrusion and loft tools?"
@@ -16,7 +17,8 @@
       "file": "src/ops/registry.py",
       "line": 286,
       "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-05",
       "what": "the agent-visible schemas, descriptions, examples, and phase roles",
       "evidence": "every construction operation exposed over MCP has a ToolSpec in this tuple",
       "asks": "should shape construction be available during blockout, refine, or both?"
@@ -26,7 +28,8 @@
       "file": "src/ops/validation.py",
       "line": 33,
       "anchor": "_KNOWN_KINDS = (",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-12",
       "what": "named validation and actionable errors before malformed geometry reaches the engine",
       "evidence": "all semantic construction kinds are admitted here and validated by kind",
       "asks": "how strict should the tool be about convexity, winding, station order, and bevels that consume details?"
@@ -36,7 +39,8 @@
       "file": "src/ops/_shapes.py",
       "line": 45,
       "anchor": "POINT_PARAMS: dict[str, tuple[str, ...]] = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-06",
       "what": "normalization of agent JSON into geometry-domain points",
       "evidence": "point-bearing operations are listed here so replay and direct calls share one shape",
       "asks": "should cross-section profiles use simple two-number points or full three-number local points?"
@@ -46,7 +50,8 @@
       "file": "src/ops/_acceptance.py",
       "line": 375,
       "anchor": "_RUNTIME_ACCEPTANCE_KINDS = frozenset({",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-18",
       "what": "machine-rechecked definitions of done persisted with operations",
       "evidence": "semantic operations are explicitly admitted to runtime acceptance here",
       "asks": "should construction fail immediately on a verification miss, or build and report the exact mismatch for correction?"
@@ -56,7 +61,8 @@
       "file": "src/ops/__init__.py",
       "line": 30,
       "anchor": "__all__ = [",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02",
       "what": "the supported Python operation surface used by local generators and tests",
       "evidence": "add_impact_head and every other supported semantic builder are re-exported here",
       "asks": "should local scripts call the same agent-facing operation directly, with no Blender-only shortcut?"
@@ -66,7 +72,8 @@
       "file": "src/ops/assumptions_test.py",
       "line": 34,
       "anchor": "_MINIMAL_PARAMS: dict[str, dict] = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-15",
       "what": "the invariant that any tool-chosen dimension is reported back rather than hidden",
       "evidence": "one minimal invocation per OPS entry is exercised by the global assumption sweep",
       "asks": "which profile details may receive defaults, and which must always be explicit?"
@@ -76,7 +83,8 @@
       "file": "src/app/app_test.py",
       "line": 69,
       "anchor": "def test_every_operation_module_reaches_the_registry() -> None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-25",
       "what": "the end-to-end check that an implemented operation is actually reachable",
       "evidence": "the test names representative semantic operations and fails when one is absent from build_handlers",
       "asks": "should the new capability be pinned as a core representative construction operation?"
@@ -86,7 +94,8 @@
       "file": "src/app/app_test.py",
       "line": 29,
       "anchor": "RECORDED_TOOL_COUNTS: dict[str, int] = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-21",
       "what": "the recorded count of tools the connected model actually sees by role",
       "evidence": "the composition-root test deliberately detects accidental catalogue growth or hiding",
       "asks": "is the extra modelling capability worth another visible tool, or should it replace an overly narrow tool?"
@@ -96,7 +105,8 @@
       "file": "src/mcp_server/registry_test.py",
       "line": 30,
       "anchor": "TOOL_COUNTS_BY_ROLE: dict[str, int] = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-21",
       "what": "the independent MCP catalogue ledger that catches tools lost between declaration and exposure",
       "evidence": "role counts are asserted separately from app wiring because they have disagreed before",
       "asks": "should the capability be one tool to limit selection noise while still covering both extrusion and lofting?"
@@ -106,7 +116,8 @@
       "file": "src/ops/README.md",
       "line": 59,
       "anchor": "| `impact_head.py` | fitted dual-strike hard-surface assembly |",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-22",
       "what": "discoverability for local users choosing between primitives and semantic construction",
       "evidence": "the closest comparable shape builder is named and described in the operation map",
       "asks": "should examples emphasize blacksmith parts, architecture, furniture, or a balanced reusable set?"
@@ -116,7 +127,8 @@
       "file": "tools/create_blacksmith_forge_asset.py",
       "line": 153,
       "anchor": "box(\"anvil_waist\", [1.12, 0.92, 0.84], [-0.05, 0.95, 1.90], \"iron_dark\")",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-04",
       "what": "the concrete failing scene where important silhouettes are currently primitive stacks",
       "evidence": "the anvil waist/body/face use boxes and the horn uses a cone, producing the visibly crude hero object",
       "asks": "should the forge regression replace only the anvil and hood first, or rebuild every tool silhouette that benefits?"
@@ -126,7 +138,8 @@
       "file": "tools/create_blacksmith_forge_asset.py",
       "line": 392,
       "anchor": "engine.export_model(engine.list_objects(), str(glb_path), y_up=True, apply_modifiers=True)",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-23",
       "what": "the production output path that must preserve the improved meshes in GLB and Blend",
       "evidence": "the forge generator saves and exports every created mesh after rendering",
       "asks": "should the improved result stay as editable separate parts or join hero assemblies before export?"

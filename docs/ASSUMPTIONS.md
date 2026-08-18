@@ -466,3 +466,86 @@ reversible option; each is recorded here rather than asked, because the gate had
   reason for its material break.
 - **Blast radius:** impact-head schema, geometry, acceptance, joinery, and hammer materials.
 - **Reversal:** remove the three striker parameters and two deterministic parts.
+
+## A-045 — One reusable profiled-solid tool
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** add one `add_profiled_solid` REFINE operation whose ordered 2D sections cover
+  both straight extrusion and variable-section lofting.
+- **Why:** one middle-grain tool replaces brittle primitive stacks without adding separate
+  extrusion, loft, taper and horn tools to an already-large visible catalogue.
+- **Blast radius:** operation registry, validation, acceptance, wiring, documentation.
+- **Reversal:** split the schema into narrower tools while retaining the geometry kernel.
+
+## A-046 — Explicit local sections, no inferred proportions
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** callers supply an origin, a world axis, and at least two ordered stations. Each
+  station supplies its axis offset and an ordered closed 2D profile in metres.
+- **Why:** local sections reduce a 3D shape to auditable dimensions and correspondence. Hidden
+  presets would recreate the unreported proportion choices that produced the weak forge.
+- **Blast radius:** schema, JSON validation, generator scripts.
+- **Reversal:** add named presets above this explicit contract later.
+
+## A-047 — Closed convex profiles are the safe first kernel
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** profiles must be convex, consistently wound, non-self-intersecting, have equal
+  vertex counts, and stations must increase strictly. Ends are capped, producing one closed solid.
+- **Why:** arbitrary concave loft correspondence is ambiguous and can create folded faces. A
+  convex closed kernel covers anvils, hoods, brackets, handles and tapered fixtures reliably.
+- **Blast radius:** geometry builder and named validation errors.
+- **Reversal:** add triangulated concave profiles after a tested correspondence policy exists.
+
+## A-048 — Structural errors reject atomically
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** malformed winding, repeated points, crossing edges, station reversals, impossible
+  bevels and degenerate sections reject before any object is created. Visual styling remains the
+  agent's decision and is not silently corrected.
+- **Why:** a partial or silently rescaled mesh is harder to repair than a precise refusal naming
+  the station and rule.
+- **Blast radius:** validation, tests, action reports.
+- **Reversal:** convenience correction can be an explicit opt-in operation later.
+
+## A-049 — Topology and declared bounds are acceptance gates
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** runtime acceptance requires positive volume and forbids boundary holes,
+  non-manifold edges/vertices, loose geometry, flipped normals and self-intersections. Unit and
+  Blender tests separately pin exact bounds against the supplied stations.
+- **Why:** those facts are machine-measurable and directly affect export; aesthetic realism is
+  not honestly decidable by geometry checks.
+- **Blast radius:** acceptance declarations and Blender regression coverage.
+- **Reversal:** add component-wise dimension acceptance if tuple metrics gain comparison support.
+
+## A-050 — Assemblies remain editable and materials stay separate
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** each operation creates one deterministic mesh, while a scene may compose several
+  profiled solids as separate fitted parts. The tool does not auto-join or assign materials.
+- **Why:** the forge needs distinct face, body, horn, hood and wear materials, and stable object
+  ids allow later measurement and correction.
+- **Blast radius:** operation result shape and forge generator.
+- **Reversal:** callers can join selected parts explicitly before export.
+
+## A-051 — Realistic silhouette with game-ready density
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** the rebuilt forge prioritizes historically plausible proportions and readable
+  construction while keeping section counts deliberate rather than subdivision-heavy.
+- **Why:** the reported problem is realism and incorrect construction, not lack of raw polygon
+  count. More triangles would preserve the same wrong silhouette.
+- **Blast radius:** forge station data, materials, render and GLB size.
+- **Reversal:** a cinematic variant can add subdivision and texture displacement afterward.
+
+## A-052 — Forge regression targets the hero silhouette and airflow path
+
+- **Feature:** profiled-shape-design-accuracy
+- **Assumed:** rebuild the anvil as a continuous profiled load-bearing form and the hood as a
+  tapered collector into the chimney; retain the surrounding editable set, then re-render and
+  inspect the whole composition.
+- **Why:** those are the largest visible failures in the current render and exercise both
+  variable-section horizontal and vertical lofting.
+- **Blast radius:** blacksmith generator and its regression test.
+- **Reversal:** the generator remains declarative and can replace additional props incrementally.
