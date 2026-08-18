@@ -381,3 +381,77 @@ reversible option; each is recorded here rather than asked, because the gate had
   quantization; 50 mm is visible construction clearance without disrupting the pattern.
 - **Blast radius:** facade-rib validation, geometry, and acceptance tests.
 - **Reversal:** low — both values are explicit operation parameters in the public schema.
+
+## A-036 — Impact heads are a semantic middle-grain operation
+
+- **Feature:** model-generation-quality
+- **Assumed:** add `add_impact_head`, not a whole-hammer generator and not another primitive.
+- **Why:** the reported failure is relational: plates, collars, faces, and sockets must agree. A
+  whole weapon would bury too many design decisions in one call; individual primitives preserve
+  the failure mode.
+- **Reversal:** additive recipes can orchestrate the operation later.
+
+## A-037 — Neutral dual-strike industrial silhouette
+
+- **Feature:** model-generation-quality
+- **Assumed:** the first family is a symmetrical dual-strike hammer/maul head. Decorative claws,
+  floating fins, and disconnected status panels are excluded from the semantic assembly.
+- **Why:** both striking sides then carry the same believable load path and every visible part has
+  a mechanical role. Symmetry is a strong neutral default; asymmetrical tools can be separate
+  families rather than half-supported branches.
+- **Reversal:** add another semantic operation or an explicitly tested style branch.
+
+## A-038 — Fitted armor follows shared dimensions
+
+- **Feature:** model-generation-quality
+- **Assumed:** one inset top cap and front/back cheek plates are derived from the body dimensions,
+  touch the body directly, and retain a visible reveal around their edges.
+- **Why:** independent plate coordinates caused the current floating, poorly aligned top assembly.
+  Shared dimensions make misfit unrepresentable.
+- **Reversal:** expose a plate-layout enum after a second verified layout exists.
+
+## A-039 — Mechanical joints carry explicit load paths
+
+- **Feature:** model-generation-quality
+- **Assumed:** each striking face sits on a shoulder that sockets into the body; the handle enters a
+  dedicated underside socket. Intentional insertion depths become `JoineryIntent` records.
+- **Why:** a disk touching the side of a box has no convincing way to transfer impact. Shoulders,
+  collars, and sockets explain assembly and distinguish designed overlap from clipping.
+- **Reversal:** all insertion dimensions are public parameters.
+
+## A-040 — Invalid proportions are rejected atomically
+
+- **Feature:** model-generation-quality
+- **Assumed:** every visible dimension is explicit. Validation rejects plates that cannot fit,
+  sockets wider than the body, non-positive reveals, and shoulders/faces with impossible nesting;
+  it never silently rescales one part.
+- **Why:** silent correction hides the same proportion mistakes the tool is intended to prevent.
+- **Reversal:** convenience presets can supply explicit parameter sets above this contract.
+
+## A-041 — Parts stay separate and predictably named
+
+- **Feature:** model-generation-quality
+- **Assumed:** body, top plate, cheek plates, shoulders, collars, strike faces, rims, and handle
+  socket remain separate mesh objects with deterministic ids. Materials are assigned afterward.
+- **Why:** the generator needs different metal, ceramic, and energy materials, while stable ids let
+  agents address parts without rediscovering them visually.
+- **Reversal:** callers may join parts after material assignment or export.
+
+## A-042 — Fit is an automatic REFINE-phase acceptance gate
+
+- **Feature:** model-generation-quality
+- **Assumed:** `add_impact_head` is a REFINE tool. Zero-gap checks cover top/cheek plates, both
+  shoulder/body joints, both collar/face joints, and the handle socket/body joint; positive-volume
+  checks cover representative structural parts.
+- **Why:** these are the exact relationships that were visibly wrong, and the project already
+  blocks phase promotion on persisted acceptance failures.
+- **Reversal:** tolerances and the role tuple are local registry/acceptance changes.
+
+## A-043 — The existing hammer is the real-Blender regression artifact
+
+- **Feature:** model-generation-quality
+- **Assumed:** preserve primitive compatibility, rebuild only the head section through
+  `add_impact_head`, remove the old free-floating plates/claws/fins, render it in Blender, and
+  inspect the image before completion.
+- **Why:** unit geometry can prove fit but not whether the assembled silhouette reads well.
+- **Reversal:** the generator remains an ordinary script and can evolve independently.
