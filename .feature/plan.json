@@ -17,7 +17,7 @@
       "dependsOn": ["impact-head-geometry"],
       "seams": ["registry-completeness-test", "operation-assumption-sweep", "application-wiring-test"],
       "decisions": ["Q-02", "Q-07", "Q-14", "Q-21", "Q-22"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "hammer-regression",

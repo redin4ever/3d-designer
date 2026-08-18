@@ -31,7 +31,7 @@ RECORDED_TOOL_COUNTS: dict[str, int] = {
     # scale, delete, duplicate, rename, set material. Updated deliberately, which is the
     # measurement Gate B 3.3 asked for; not capped, which is the one response ruled out.
     "blockout": 18,
-    "refine": 19,
+    "refine": 20,
     "repair": 8,
     "align": 7,
     "detail": 8,
@@ -74,6 +74,7 @@ def test_every_operation_module_reaches_the_registry() -> None:
         "add_railing",        # ops
         "add_gable_roof",     # semantic architectural blockout
         "add_chimney",        # complete architectural roof penetration
+        "add_impact_head",    # fitted mechanical hard-surface assembly
         "add_staircase_to_landing",  # relation-derived architectural refine
         "repair",             # gaps
         "make_plumb",         # align

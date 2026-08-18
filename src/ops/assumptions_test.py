@@ -69,6 +69,16 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "flue_height": 0.5,
         "rim_overhang": 0.03, "rim_height": 0.1,
     },
+    "add_impact_head": {
+        "object_id": "maul", "origin": [0, 0, 4], "width": 3.6, "depth": 1.5,
+        "height": 1.45, "corner_chamfer": 0.22, "plate_thickness": 0.12,
+        "plate_inset": 0.26, "shoulder_depth": 0.38, "shoulder_diameter": 0.88,
+        "socket_depth": 0.16, "collar_depth": 0.20, "collar_diameter": 1.24,
+        "face_depth": 0.52, "face_diameter": 1.62, "rim_depth": 0.10,
+        "rim_overhang": 0.10, "handle_socket_diameter": 0.72,
+        "handle_socket_depth": 0.20, "handle_collar_depth": 0.18,
+        "handle_collar_overhang": 0.10, "bevel_width": 0.025,
+    },
     "add_opening": {
         "object_id": "opening",
         "wall_id": "wall",
