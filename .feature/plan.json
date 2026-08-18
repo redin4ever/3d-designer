@@ -8,7 +8,7 @@
       "dependsOn": [],
       "seams": ["parameter_validation", "json_shape_coercion", "runtime_acceptance"],
       "decisions": ["Q-06", "Q-07", "Q-08", "Q-09", "Q-10", "Q-11", "Q-12", "Q-13", "Q-14", "Q-15", "Q-18"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "profiled-solid-wiring",
