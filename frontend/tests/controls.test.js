@@ -12,16 +12,16 @@ import {
   buildSetCadenceMessage,
 } from '../src/controls.js';
 
-test('run controls expose one valid action for the current connection and run state', () => {
+test('run controls keep Pause and Run visible while enabling only the valid action', () => {
   assert.equal(typeof controls.runControlPresentation, 'function');
   assert.deepEqual(controls.runControlPresentation?.({ connected: false, runState: 'running' }), {
-    label: 'Unavailable', action: 'pause', disabled: true,
+    label: 'Unavailable', pauseDisabled: true, runDisabled: true,
   });
   assert.deepEqual(controls.runControlPresentation?.({ connected: true, runState: 'running' }), {
-    label: 'Running', action: 'pause', disabled: false,
+    label: 'Running', pauseDisabled: false, runDisabled: true,
   });
   assert.deepEqual(controls.runControlPresentation?.({ connected: true, runState: 'paused' }), {
-    label: 'Paused', action: 'resume', disabled: false,
+    label: 'Paused', pauseDisabled: true, runDisabled: false,
   });
 });
 

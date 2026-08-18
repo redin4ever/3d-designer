@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as fileIo from '../src/file-io.js';
 
 import {
   MAX_FILE_BYTES,
@@ -8,6 +9,20 @@ import {
   attachFileMenu,
   validateLocalFile,
 } from '../src/file-io.js';
+
+test('file errors recursively extract readable text and never stringify as object Object', () => {
+  assert.equal(typeof fileIo.formatFileError, 'function');
+  assert.equal(
+    fileIo.formatFileError?.({ error: { message: 'Pause the build before opening this project.' } }),
+    'Pause the build before opening this project.',
+  );
+  assert.equal(
+    fileIo.formatFileError?.({ code: 'project_invalid', details: ['Missing scene.json', 'Invalid package'] }),
+    'Missing scene.json; Invalid package',
+  );
+  assert.equal(fileIo.formatFileError?.({ unexpected: true }), 'File operation failed.');
+  assert.notEqual(fileIo.formatFileError?.({ unexpected: true }), '[object Object]');
+});
 
 function file(name, bytes = 4, type = 'application/octet-stream') {
   return {
