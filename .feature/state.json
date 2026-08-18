@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Model-generation quality: fitted hard-surface assemblies and coherent impact-head construction",
-  "slug": "model-generation-quality",
-  "phase": 5,
-  "baseSha": "2c44096e77e9c646e084360f7d0867af689b74e3",
-  "branch": "feat/model-generation-quality",
-  "docsDir": "docs/features/model-generation-quality",
+  "feature": "General model-design accuracy through profiled geometry, fitted assemblies, and measurable scene-quality checks",
+  "slug": "profiled-shape-design-accuracy",
+  "phase": 2,
+  "baseSha": "44ae3698479bfed0d73d3e98d063ac00323b0bc0",
+  "branch": "feat/profiled-shape-design-accuracy",
+  "docsDir": "docs/features/profiled-shape-design-accuracy",
   "startedAt": "2026-08-18",
-  "status": "finished"
+  "status": "running"
 }
