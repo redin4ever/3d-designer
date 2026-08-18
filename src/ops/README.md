@@ -29,6 +29,7 @@ add_floor(engine, op)     -> OperationResult   # width, depth, thickness
 add_gable_roof(engine, op) -> OperationResult  # panels, ridge, compound-mitered rake/eave trim
 add_chimney(engine, op)    -> OperationResult  # shaft, flashing, crown, rimmed flues
 add_impact_head(engine, op) -> OperationResult # fitted armor, socketed strike stacks and handle
+add_profiled_solid(engine, op) -> OperationResult # exact extrusion and variable-section loft
 add_opening(engine, op)   -> OperationResult   # boolean a door/window out of a wall
 add_staircase(engine, op) -> OperationResult   # treads, rise, run, width
 add_staircase_to_landing(engine, op) -> OperationResult # derives direction/rise/run
@@ -57,6 +58,7 @@ same file:
 | `roof.py` | detailed parametric gable roof assembly |
 | `chimney.py` | shaft, flashing, crown, and finished flue assembly |
 | `impact_head.py` | fitted dual-strike hard-surface assembly |
+| `profiled_solid.py` | closed convex-profile extrusion and lofting on X/Y/Z |
 | `railing.py` | `add_railing` — the flagship |
 | `arrays.py` | `array_along`, `add_lod_chain`, `add_modular_kit` |
 | `validation.py` | `validate_params`, `acceptance_for` |
@@ -84,7 +86,7 @@ carries the most tests in the package on purpose — see its module docstring.
   never a bare `KeyError`/`ValueError`/traceback (Gate A 4.2).
 - **Every operation kind returns at least one `AcceptanceQuery`.** An operation nobody can
   re-check is an operation nobody can trust the agent's own claim about (ADR-005).
-- **`OPS` and `OP_SPECS` cover exactly the same 26 kinds, in both directions.** A handler
+- **`OPS` and `OP_SPECS` cover exactly the same 27 kinds, in both directions.** A handler
   with no tool is unreachable; a tool with no handler crashes at call time.
 - **No operation tool is ever exposed to the `INSPECT` role.** Every one of them mutates
   the scene; `contracts.ToolSpec.__post_init__` enforces this at construction time
