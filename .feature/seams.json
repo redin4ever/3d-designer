@@ -4,7 +4,7 @@
     {
       "id": "operation_dispatch",
       "file": "src/ops/registry.py",
-      "line": 76,
+      "line": 106,
       "anchor": "OPS: HandlerRegistry = {",
       "status": "wired",
       "decision": "Q-03",
@@ -15,8 +15,8 @@
     {
       "id": "tool_schema",
       "file": "src/ops/registry.py",
-      "line": 286,
-      "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
+      "line": 481,
+      "anchor": "name=\"add_profiled_solid\",",
       "status": "wired",
       "decision": "Q-05",
       "what": "the agent-visible schemas, descriptions, examples, and phase roles",
@@ -48,7 +48,7 @@
     {
       "id": "runtime_acceptance",
       "file": "src/ops/_acceptance.py",
-      "line": 375,
+      "line": 400,
       "anchor": "_RUNTIME_ACCEPTANCE_KINDS = frozenset({",
       "status": "wired",
       "decision": "Q-18",
@@ -70,8 +70,8 @@
     {
       "id": "assumption_sweep",
       "file": "src/ops/assumptions_test.py",
-      "line": 34,
-      "anchor": "_MINIMAL_PARAMS: dict[str, dict] = {",
+      "line": 83,
+      "anchor": "\"add_profiled_solid\": {",
       "status": "wired",
       "decision": "Q-15",
       "what": "the invariant that any tool-chosen dimension is reported back rather than hidden",
@@ -125,18 +125,18 @@
     {
       "id": "forge_regression",
       "file": "tools/create_blacksmith_forge_asset.py",
-      "line": 153,
-      "anchor": "box(\"anvil_waist\", [1.12, 0.92, 0.84], [-0.05, 0.95, 1.90], \"iron_dark\")",
+      "line": 194,
+      "anchor": "profiled(\"anvil_body\", [-0.05, 0.95, 2.25], \"x\", [",
       "status": "wired",
       "decision": "Q-04",
       "what": "the concrete failing scene where important silhouettes are currently primitive stacks",
-      "evidence": "the anvil waist/body/face use boxes and the horn uses a cone, producing the visibly crude hero object",
+      "evidence": "the regression now builds the anvil body and horn as one continuous profiled solid instead of primitive stacks",
       "asks": "should the forge regression replace only the anvil and hood first, or rebuild every tool silhouette that benefits?"
     },
     {
       "id": "forge_export",
       "file": "tools/create_blacksmith_forge_asset.py",
-      "line": 392,
+      "line": 493,
       "anchor": "engine.export_model(engine.list_objects(), str(glb_path), y_up=True, apply_modifiers=True)",
       "status": "wired",
       "decision": "Q-23",
@@ -147,8 +147,8 @@
     {
       "id": "validation_acceptance_sweep",
       "file": "src/ops/validation_test.py",
-      "line": 20,
-      "anchor": "_MINIMAL_VALID_PARAMS: dict[str, dict] = {",
+      "line": 68,
+      "anchor": "\"add_profiled_solid\": {",
       "status": "wired",
       "decision": "Q-18",
       "what": "the existing sweep requiring every registered operation to declare acceptance",

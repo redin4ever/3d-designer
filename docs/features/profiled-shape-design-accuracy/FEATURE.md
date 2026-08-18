@@ -57,3 +57,34 @@ tapered extraction hood and leather bellows. Those meshes remain separate for ma
 and later editing. The saved BLEND, GLB and PNG are regenerated, then the five profiled hero meshes
 are inspected from the saved Blender file so modifier or export-side topology damage cannot hide
 behind clean source parameters.
+
+## How it is wired in
+
+- `src/ops/profiled_solid.py` owns validation, mesh construction and structural acceptance.
+- `src/ops/registry.py` exposes the operation to REFINE agents and replay dispatch.
+- `src/app/` and `src/mcp_server/` pin composition-root reachability and the visible tool count.
+- `tools/create_blacksmith_forge_asset.py` is the concrete visual and export regression.
+
+## Decisions
+
+The full decision record is in [decisions.md](decisions.md).
+
+## Assumptions still standing
+
+A-045 through A-052 remain standing: one explicit convex-profile tool, atomic rejection,
+structural acceptance, separate editable parts, game-ready density, and anvil/hood-first forge
+coverage. Reversal costs are recorded in `docs/ASSUMPTIONS.md`; none require changing existing
+primitive behavior.
+
+## Noticed but not done
+
+Concave and mixed-vertex-count lofts remain outside this feature because their correspondence and
+triangulation policies need a separate tested design. Cinematic subdivision and displacement are
+also separate from the requested accurate, editable construction workflow.
+
+## Known gaps
+
+The repository instructions name `.pipeline/check.mjs`, but that script is absent in this checkout.
+The mandatory feature gate, complete backend/frontend suites, product doctor, saved-file topology
+audit, and render inspection were run instead. Nothing is quarantined or unfinished within the
+declared convex profiled-solid scope.
