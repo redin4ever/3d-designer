@@ -53,7 +53,9 @@ separate material-ready parts, explicit dimensions, and replaceable socketed str
 ## Trace correction
 
 The initial trace missed `src/ops/_shapes.py`; implementation showed that agent JSON origins also
-need registration in `POINT_PARAMS`. The seam was added and wired before the feature gate.
+need registration in `POINT_PARAMS`. The full suite then exposed two more independent ledgers: MCP
+role counts and the global acceptance-parameter sweep. All three seams were added and wired before
+the feature gate.
 
 ## Noticed but not done
 

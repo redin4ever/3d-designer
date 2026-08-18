@@ -132,7 +132,7 @@ Recorded counts, pinned by `registry_test.py::test_the_visible_tool_count_of_eve
 | Role | Tools | |
 |---|---|---|
 | `blockout` | 18 | includes texture operations and model import |
-| `refine` | 19 | includes texture operations, model import, and host-aware surface details |
+| `refine` | 20 | includes textures, model import, surface details, and fitted impact heads |
 | `repair` | 8 | |
 | `align` | 7 | |
 | `detail` | 8 | detail and texture tools plus model import |
@@ -146,7 +146,7 @@ band is logged by `build_registry` every time it happens; it is never trimmed. T
 change from the previous pass: a `_cap.py` used to round-robin each role down to eight, and
 it silently hid `repair`, `make_plumb` and `close_visual_gap` — three core operations — from
 every agent that would have called them, with every suite green. The real fix for `REFINE`'s
-19 tools was splitting `REPAIR` and `ALIGN` out of it in `contracts.ToolRole`; capping was
+20 tools was splitting `REPAIR` and `ALIGN` out of it in `contracts.ToolRole`; capping was
 the symptom. `_cap.py` is deleted.
 
 If you add a tool and this table is wrong, update the table and the test. Updating it is the

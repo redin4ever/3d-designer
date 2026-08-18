@@ -15,7 +15,7 @@
       "what": "registry, minimal-parameter, and live-application reachability proof",
       "paths": ["src/app/impact_head_wiring_test.py"],
       "dependsOn": ["impact-head-geometry"],
-      "seams": ["registry-completeness-test", "operation-assumption-sweep", "application-wiring-test"],
+      "seams": ["mcp-role-count-ledger", "mcp-role-count-documentation", "acceptance-minimal-params-sweep", "registry-completeness-test", "operation-assumption-sweep", "application-wiring-test"],
       "decisions": ["Q-02", "Q-07", "Q-14", "Q-21", "Q-22"],
       "status": "green"
     },

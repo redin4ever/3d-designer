@@ -104,12 +104,45 @@
       "id": "registry-completeness-test",
       "file": "src/ops/registry_test.py",
       "line": 73,
-      "anchor": "    assert len(OP_SPECS) == 25",
+      "anchor": "    assert len(OP_SPECS) == 26",
       "status": "wired",
       "decision": "Q-22",
       "what": "pins the public operation count so a handler cannot be added invisibly",
       "evidence": "the current count covers every OPS handler and MCP declaration",
       "asks": "should impact-head construction count as a core construction operation?"
+    },
+    {
+      "id": "mcp-role-count-ledger",
+      "file": "src/mcp_server/registry_test.py",
+      "line": 30,
+      "anchor": "TOOL_COUNTS_BY_ROLE: dict[str, int] = {",
+      "status": "wired",
+      "decision": "Q-06, Q-22",
+      "what": "records the exact visible tool count for every agent role",
+      "evidence": "the full suite failed when REFINE grew from 19 to 20, proving this is an independent registry seam",
+      "asks": "should the impact-head tool remain visible in REFINE even though the role is already above the accuracy-optimal band?"
+    },
+    {
+      "id": "mcp-role-count-documentation",
+      "file": "src/mcp_server/README.md",
+      "line": 131,
+      "anchor": "| Role | Tools | |",
+      "status": "wired",
+      "decision": "Q-06, Q-22",
+      "what": "publishes the measured per-role counts and no-capping policy",
+      "evidence": "registry_test explicitly requires every count change to be updated here too",
+      "asks": "should the documented REFINE count move to 20 rather than hiding the operation?"
+    },
+    {
+      "id": "acceptance-minimal-params-sweep",
+      "file": "src/ops/validation_test.py",
+      "line": 20,
+      "anchor": "_MINIMAL_VALID_PARAMS: dict[str, dict] = {",
+      "status": "wired",
+      "decision": "Q-14, Q-15, Q-18, Q-19, Q-22",
+      "what": "requires every registered operation to return a well-formed acceptance contract",
+      "evidence": "the full suite indexed this table by OPS and failed specifically for add_impact_head",
+      "asks": "should the impact-head operation participate in the global acceptance sweep with all explicit dimensions?"
     },
     {
       "id": "operation-assumption-sweep",
@@ -136,8 +169,8 @@
     {
       "id": "hammer-regression-artifact",
       "file": "tools/create_hammer_asset.py",
-      "line": 87,
-      "anchor": "# Main head: an angular silhouette instead of a single rectangular block.",
+      "line": 72,
+      "anchor": "# The hero head is built by the same fitted semantic operation available to connected agents.",
       "status": "wired",
       "decision": "Q-05, Q-08, Q-09, Q-16, Q-23, Q-24, Q-25",
       "what": "contains the manually placed top rails, cheek plates, and striking assemblies that prompted the report",
