@@ -1,41 +1,41 @@
 {
   "units": [
     {
-      "id": "impact-head-geometry",
-      "what": "a fitted, deterministic dual-strike head assembly with armor, sockets, validation, acceptance, and joinery",
-      "paths": ["src/ops/impact_head.py", "src/ops/impact_head_test.py"],
-      "publicInterface": "ops.add_impact_head",
+      "id": "profiled-solid-kernel",
+      "what": "validated backend-neutral section-loft geometry with exact bounds and structural acceptance",
+      "paths": ["src/ops/profiled_solid.py", "src/ops/profiled_solid_test.py", "src/ops/profiled_solid_blender_test.py"],
+      "publicInterface": "src/ops/profiled_solid.py",
       "dependsOn": [],
-      "seams": ["operation-handler-registry", "operation-tool-spec", "operation-point-coercion", "operation-validation", "operation-acceptance", "operation-joinery", "operation-public-surface"],
-      "decisions": ["Q-01", "Q-03", "Q-04", "Q-06", "Q-08", "Q-09", "Q-10", "Q-11", "Q-12", "Q-13", "Q-15", "Q-16", "Q-17", "Q-18", "Q-19", "Q-20", "Q-25"],
-      "status": "green"
+      "seams": ["parameter_validation", "json_shape_coercion", "runtime_acceptance"],
+      "decisions": ["Q-06", "Q-07", "Q-08", "Q-09", "Q-10", "Q-11", "Q-12", "Q-13", "Q-14", "Q-15", "Q-18"],
+      "status": "planned"
     },
     {
-      "id": "impact-head-wiring",
-      "what": "registry, minimal-parameter, and live-application reachability proof",
-      "paths": ["src/app/impact_head_wiring_test.py"],
-      "dependsOn": ["impact-head-geometry"],
-      "seams": ["mcp-role-count-ledger", "mcp-role-count-documentation", "acceptance-minimal-params-sweep", "registry-completeness-test", "operation-assumption-sweep", "application-wiring-test"],
-      "decisions": ["Q-02", "Q-07", "Q-14", "Q-21", "Q-22"],
-      "status": "green"
+      "id": "profiled-solid-wiring",
+      "what": "agent schema, replay/public reachability, count ledgers and assumption coverage",
+      "paths": ["src/app/profiled_solid_wiring_test.py"],
+      "dependsOn": ["profiled-solid-kernel"],
+      "seams": ["operation_dispatch", "tool_schema", "public_api", "assumption_sweep", "composition_root_reachability", "app_visible_count", "mcp_visible_count"],
+      "decisions": ["Q-02", "Q-03", "Q-05", "Q-16", "Q-17", "Q-20", "Q-21"],
+      "status": "planned"
     },
     {
-      "id": "hammer-regression",
-      "what": "the existing futuristic hammer rebuilt through the semantic head operation and rendered in Blender",
-      "paths": ["tools/create_hammer_asset.py", "src/app/hammer_asset_regression_test.py"],
-      "dependsOn": ["impact-head-geometry", "impact-head-wiring"],
-      "seams": ["hammer-regression-artifact"],
-      "decisions": ["Q-05", "Q-08", "Q-09", "Q-16", "Q-23", "Q-24"],
-      "status": "green"
+      "id": "blacksmith-regression",
+      "what": "rebuild the anvil and hood through profiled solids and regenerate editable production artifacts",
+      "paths": ["src/app/blacksmith_forge_regression_test.py", "tools/create_blacksmith_forge_asset.py"],
+      "dependsOn": ["profiled-solid-wiring"],
+      "seams": ["forge_regression", "forge_export"],
+      "decisions": ["Q-04", "Q-19", "Q-23", "Q-24", "Q-25"],
+      "status": "planned"
     },
     {
-      "id": "mechanical-workflow-docs",
-      "what": "document the semantic hard-surface workflow, parameters, part ids, and verification contract",
-      "paths": ["docs/features/model-generation-quality/FEATURE.md", "src/ops/model_generation_docs_test.py"],
-      "dependsOn": ["impact-head-wiring", "hammer-regression"],
-      "seams": ["construction-documentation"],
-      "decisions": ["Q-02", "Q-03", "Q-17", "Q-24"],
-      "status": "green"
+      "id": "profiled-solid-docs",
+      "what": "document the reusable workflow, invariants and representative uses",
+      "paths": ["docs/features/profiled-shape-design-accuracy/FEATURE.md", "src/ops/profiled_solid_docs_test.py"],
+      "dependsOn": ["profiled-solid-wiring"],
+      "seams": ["ops_documentation"],
+      "decisions": ["Q-22", "Q-25"],
+      "status": "planned"
     }
   ]
 }
