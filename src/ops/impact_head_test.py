@@ -26,6 +26,9 @@ def _operation(**overrides) -> Operation:
         "collar_diameter": 1.24,
         "face_depth": 0.52,
         "face_diameter": 1.62,
+        "striker_depth": 0.12,
+        "striker_socket_depth": 0.05,
+        "striker_diameter": 0.82,
         "rim_depth": 0.10,
         "rim_overhang": 0.10,
         "handle_socket_diameter": 0.72,
@@ -49,10 +52,12 @@ def test_add_impact_head_builds_predictable_material_ready_parts(engine) -> None
         "maul_shoulder_left",
         "maul_collar_left",
         "maul_face_left",
+        "maul_striker_left",
         "maul_rim_left",
         "maul_shoulder_right",
         "maul_collar_right",
         "maul_face_right",
+        "maul_striker_right",
         "maul_rim_right",
         "maul_handle_socket",
         "maul_handle_collar",
@@ -89,6 +94,8 @@ def test_strike_faces_have_socketed_shoulders_and_continuous_transitions(engine)
     right_shoulder = engine.world_bounds("maul_shoulder_right")
     right_collar = engine.world_bounds("maul_collar_right")
     right_face = engine.world_bounds("maul_face_right")
+    left_striker = engine.world_bounds("maul_striker_left")
+    right_striker = engine.world_bounds("maul_striker_right")
 
     assert left_shoulder.maximum.x == pytest.approx(body.minimum.x + p["socket_depth"], abs=EPSILON)
     assert left_collar.maximum.x == pytest.approx(left_shoulder.minimum.x, abs=EPSILON)
@@ -96,6 +103,13 @@ def test_strike_faces_have_socketed_shoulders_and_continuous_transitions(engine)
     assert right_shoulder.minimum.x == pytest.approx(body.maximum.x - p["socket_depth"], abs=EPSILON)
     assert right_collar.minimum.x == pytest.approx(right_shoulder.maximum.x, abs=EPSILON)
     assert right_face.minimum.x == pytest.approx(right_collar.maximum.x, abs=EPSILON)
+    assert left_striker.maximum.x == pytest.approx(
+        left_face.minimum.x + p["striker_socket_depth"], abs=EPSILON,
+    )
+    assert right_striker.minimum.x == pytest.approx(
+        right_face.maximum.x - p["striker_socket_depth"], abs=EPSILON,
+    )
+    assert right_striker.size.y == pytest.approx(p["striker_diameter"], abs=EPSILON)
     assert left_face.size.y == pytest.approx(p["face_diameter"], abs=EPSILON)
     assert right_face.size.z == pytest.approx(p["face_diameter"], abs=EPSILON)
 
@@ -122,6 +136,7 @@ def test_handle_socket_penetrates_body_and_presents_a_fitted_collar(engine) -> N
         ({"plate_inset": 0.10}, "ops.impact_plate_does_not_fit"),
         ({"shoulder_diameter": 1.20}, "ops.impact_shoulder_does_not_fit"),
         ({"collar_diameter": 0.70}, "ops.impact_transition_does_not_fit"),
+        ({"striker_diameter": 1.62}, "ops.impact_striker_does_not_fit"),
         ({"handle_socket_diameter": 1.60}, "ops.impact_handle_socket_does_not_fit"),
     ),
 )
@@ -137,7 +152,7 @@ def test_impact_head_acceptance_pins_every_visible_fit_joint() -> None:
     p = _operation().params
     queries = acceptance_for("add_impact_head", p, op_id="maul-op")
 
-    assert len(queries) == 12
+    assert len(queries) == 14
     assert all(query.metric is MetricKind.GAP_WIDTH for query in queries)
     subjects = {query.subject for query in queries}
     assert {
@@ -148,6 +163,8 @@ def test_impact_head_acceptance_pins_every_visible_fit_joint() -> None:
         "maul_body|maul_shoulder_right",
         "maul_face_left|maul_rim_left",
         "maul_face_right|maul_rim_right",
+        "maul_face_left|maul_striker_left",
+        "maul_face_right|maul_striker_right",
         "maul_body|maul_handle_socket",
     } <= subjects
     assert runtime_acceptance_for("add_impact_head", p, op_id="maul-op") == queries
@@ -162,9 +179,12 @@ def test_impact_head_declares_every_designed_socket_as_joinery() -> None:
         ("maul_shoulder_right", "maul_body"),
         ("maul_rim_left", "maul_face_left"),
         ("maul_rim_right", "maul_face_right"),
+        ("maul_striker_left", "maul_face_left"),
+        ("maul_striker_right", "maul_face_right"),
         ("maul_handle_socket", "maul_body"),
         ("maul_handle_collar", "maul_handle_socket"),
     }
     by_part = {intent.object_id: intent for intent in intents}
     assert by_part["maul_shoulder_left"].depth == pytest.approx(p["socket_depth"])
+    assert by_part["maul_striker_left"].depth == pytest.approx(p["striker_socket_depth"])
     assert by_part["maul_handle_socket"].depth == pytest.approx(p["handle_socket_depth"])
