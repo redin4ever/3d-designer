@@ -29,6 +29,7 @@ from .arrays import add_lod_chain, add_modular_kit, array_along
 from .chimney import add_chimney
 from .facade_ribs import add_facade_ribs
 from .impact_head import add_impact_head
+from .profiled_solid import add_profiled_solid
 from .primitives import add_primitive
 from .railing import add_railing
 from .roof import add_gable_roof
@@ -72,6 +73,35 @@ _PATH_SCHEMA = {
 
 _PAIR_SCHEMA = {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
 
+_PROFILE_POINT_SCHEMA = {
+    "type": "array",
+    "items": {"type": "number"},
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Local [u, v] profile coordinate in metres.",
+}
+
+_PROFILE_SECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "offset": {
+            "type": "number",
+            "description": "Distance in metres along the selected world axis from origin.",
+        },
+        "profile": {
+            "type": "array",
+            "items": _PROFILE_POINT_SCHEMA,
+            "minItems": 3,
+            "description": (
+                "Closed convex profile, counter-clockwise in local [u, v]. Every section "
+                "must use the same vertex count and corresponding point order."
+            ),
+        },
+    },
+    "required": ["offset", "profile"],
+    "additionalProperties": False,
+}
+
 
 OPS: HandlerRegistry = {
     "add_primitive": add_primitive,
@@ -80,6 +110,7 @@ OPS: HandlerRegistry = {
     "add_gable_roof": add_gable_roof,
     "add_chimney": add_chimney,
     "add_impact_head": add_impact_head,
+    "add_profiled_solid": add_profiled_solid,
     "add_opening": add_opening,
     "add_staircase": add_staircase,
     "add_staircase_to_landing": add_staircase_to_landing,
@@ -444,6 +475,48 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         mutating=True,
         examples=(
             "A 3.6m wide sci-fi maul head with fitted armor and 1.6m striking faces.",
+        ),
+    ),
+    ToolSpec(
+        name="add_profiled_solid",
+        description=(
+            "Build one exact closed hard-surface solid from corresponding 2D sections. "
+            "Two identical sections make an extrusion; changing sections make a taper or "
+            "loft. Use this for anvils, extraction hoods, brackets, furniture legs and "
+            "other silhouette-critical forms that would otherwise become stacks of cubes "
+            "and cones. Invalid winding, correspondence and station order reject atomically."
+        ),
+        roles=(ToolRole.REFINE,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "axis": {
+                    "type": "string",
+                    "enum": ["x", "y", "z"],
+                    "description": "World axis the ordered sections advance along.",
+                },
+                "sections": {
+                    "type": "array",
+                    "items": _PROFILE_SECTION_SCHEMA,
+                    "minItems": 2,
+                    "description": "Ordered sections; offsets must increase strictly.",
+                },
+                "bevel_width": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Edge bevel width in metres; 0 keeps exact sharp edges.",
+                },
+            },
+            "required": ["object_id", "origin", "axis", "sections", "bevel_width"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+        examples=(
+            "A tapered forge hood narrowing from a 3m rectangle to a 0.8m flue neck.",
+            "An anvil body whose horizontal sections narrow through the waist and horn.",
+            "A furniture leg extruded from a chamfered octagonal profile.",
         ),
     ),
     ToolSpec(

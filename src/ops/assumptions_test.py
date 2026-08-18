@@ -80,6 +80,14 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "handle_socket_depth": 0.20, "handle_collar_depth": 0.18,
         "handle_collar_overhang": 0.10, "bevel_width": 0.025,
     },
+    "add_profiled_solid": {
+        "object_id": "bracket", "origin": [1.0, 2.0, 3.0], "axis": "z",
+        "sections": [
+            {"offset": 0.0, "profile": [[-0.5, -0.3], [0.5, -0.3], [0.5, 0.3], [-0.5, 0.3]]},
+            {"offset": 1.2, "profile": [[-0.2, -0.15], [0.2, -0.15], [0.2, 0.15], [-0.2, 0.15]]},
+        ],
+        "bevel_width": 0.02,
+    },
     "add_opening": {
         "object_id": "opening",
         "wall_id": "wall",

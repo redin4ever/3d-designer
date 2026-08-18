@@ -132,7 +132,7 @@ Recorded counts, pinned by `registry_test.py::test_the_visible_tool_count_of_eve
 | Role | Tools | |
 |---|---|---|
 | `blockout` | 18 | includes texture operations and model import |
-| `refine` | 20 | includes textures, model import, surface details, and fitted impact heads |
+| `refine` | 21 | includes textures, model import, surface details, fitted impact heads, and profiled solids |
 | `repair` | 8 | |
 | `align` | 7 | |
 | `detail` | 8 | detail and texture tools plus model import |

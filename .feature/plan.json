@@ -15,9 +15,9 @@
       "what": "agent schema, replay/public reachability, count ledgers and assumption coverage",
       "paths": ["src/app/profiled_solid_wiring_test.py"],
       "dependsOn": ["profiled-solid-kernel"],
-      "seams": ["operation_dispatch", "tool_schema", "public_api", "assumption_sweep", "composition_root_reachability", "app_visible_count", "mcp_visible_count"],
+      "seams": ["operation_dispatch", "tool_schema", "public_api", "assumption_sweep", "composition_root_reachability", "app_visible_count", "mcp_visible_count", "validation_acceptance_sweep", "ops_registry_count", "mcp_catalogue_docs"],
       "decisions": ["Q-02", "Q-03", "Q-05", "Q-16", "Q-17", "Q-20", "Q-21"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "blacksmith-regression",

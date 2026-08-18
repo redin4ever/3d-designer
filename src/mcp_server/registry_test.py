@@ -34,8 +34,8 @@ TOOL_COUNTS_BY_ROLE: dict[str, int] = {
     # +1 in each modelling phase: local model import is useful from blockout through
     # polish and remains one opaque, undoable operation.
     "blockout": 18,
-    # +1: add_impact_head, the fitted mechanical assembly operation (Q-06).
-    "refine": 20,
+    # +1 each: fitted impact heads and reusable profiled-solid lofting.
+    "refine": 21,
     "repair": 8,
     "align": 7,
     "detail": 8,

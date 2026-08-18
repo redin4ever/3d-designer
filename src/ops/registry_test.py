@@ -58,8 +58,8 @@ def test_every_op_tool_role_is_an_editing_role() -> None:
             assert set(spec.roles) <= allowed, spec.name
 
 
-def test_registry_covers_exactly_the_twenty_six_operations_this_library_declares() -> None:
-    """Twenty-two kinds are this library's stated public surface: the original construction
+def test_registry_covers_exactly_the_twenty_seven_operations_this_library_declares() -> None:
+    """Twenty-seven kinds are this library's stated public surface: the original construction
     and editing operations plus semantic roof, stair, and chimney assemblies.
 
     A registry short of that count silently drops an operation nobody can call through
@@ -69,8 +69,8 @@ def test_registry_covers_exactly_the_twenty_six_operations_this_library_declares
     shared history for the operator's edits and the agent's: ``OPS`` is what ``scene``
     replays through, so being here is what makes a manual nudge undoable, replayable and
     reachable by roll-back-N-steps."""
-    assert len(OPS) == 26
-    assert len(OP_SPECS) == 26
+    assert len(OPS) == 27
+    assert len(OP_SPECS) == 27
 
 
 def test_every_op_tool_has_a_non_empty_input_schema() -> None:

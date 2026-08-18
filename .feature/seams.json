@@ -143,6 +143,39 @@
       "what": "the production output path that must preserve the improved meshes in GLB and Blend",
       "evidence": "the forge generator saves and exports every created mesh after rendering",
       "asks": "should the improved result stay as editable separate parts or join hero assemblies before export?"
+    },
+    {
+      "id": "validation_acceptance_sweep",
+      "file": "src/ops/validation_test.py",
+      "line": 20,
+      "anchor": "_MINIMAL_VALID_PARAMS: dict[str, dict] = {",
+      "status": "wired",
+      "decision": "Q-18",
+      "what": "the existing sweep requiring every registered operation to declare acceptance",
+      "evidence": "the new kind must have a valid invocation here or the global acceptance contract fails",
+      "asks": "which verification facts should every profiled solid persist?"
+    },
+    {
+      "id": "ops_registry_count",
+      "file": "src/ops/registry_test.py",
+      "line": 61,
+      "anchor": "def test_registry_covers_exactly_the_twenty_seven_operations_this_library_declares() -> None:",
+      "status": "wired",
+      "decision": "Q-21",
+      "what": "the construction-library completeness ledger",
+      "evidence": "OPS and OP_SPECS counts are pinned together so a handler or schema cannot disappear silently",
+      "asks": "should this operation deliberately increase the public construction count?"
+    },
+    {
+      "id": "mcp_catalogue_docs",
+      "file": "src/mcp_server/README.md",
+      "line": 135,
+      "anchor": "| `refine` | 21 | includes textures, model import, surface details, fitted impact heads, and profiled solids |",
+      "status": "wired",
+      "decision": "Q-21",
+      "what": "the documented model-visible REFINE catalogue",
+      "evidence": "the README records the same role count and capability summary as the executable registry",
+      "asks": "should users see the extra capability and updated count documented?"
     }
   ],
   "dismissed": []

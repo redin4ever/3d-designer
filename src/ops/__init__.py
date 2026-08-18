@@ -18,6 +18,7 @@ from .arrays import add_lod_chain, add_modular_kit, array_along
 from .chimney import add_chimney
 from .facade_ribs import add_facade_ribs
 from .impact_head import add_impact_head
+from .profiled_solid import add_profiled_solid
 from .primitives import add_primitive
 from .railing import add_railing
 from .roof import add_gable_roof
@@ -40,6 +41,7 @@ __all__ = [
     "add_gable_roof",
     "add_chimney",
     "add_impact_head",
+    "add_profiled_solid",
     "add_roof_window",
     "add_wall_sign",
     "add_facade_ribs",
