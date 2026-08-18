@@ -33,12 +33,15 @@ export function registerRunControlTests({ test, withScene, waitUntil, greeting }
 
       session.wire.broadcast(serverMessage('run_state', 6, { text: 'paused' }));
       const paused = await waitUntil(
-        () => session.page.evaluate(() => ({
-          visibleActions: [...document.querySelectorAll('.run-group [data-action]')]
+        () => session.page.evaluate(() => {
+          const visibleActions = [...document.querySelectorAll('.run-group [data-action]')]
             .filter((button) => !button.hidden)
-            .map((button) => button.dataset.action),
-          label: document.querySelector('[data-run-state-label]')?.textContent.trim(),
-        })),
+            .map((button) => button.dataset.action);
+          const label = document.querySelector('[data-run-state-label]')?.textContent.trim();
+          return label === 'Paused' && visibleActions[0] === 'resume'
+            ? { visibleActions, label }
+            : null;
+        }),
         'the paused run control',
       );
       assert.deepEqual(paused.visibleActions, ['resume']);

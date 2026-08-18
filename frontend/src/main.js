@@ -55,6 +55,7 @@ function main() {
   const viewportState = createViewportState();
   const actionLog = createActionLog();
   const transcript = createTranscript();
+  let runControls;
   // A live session begins as an unsaved project, even when it was seeded with geometry.
   let sceneDirty = true;
 
@@ -92,6 +93,7 @@ function main() {
               : undefined,
         );
         pointing.setRun({ connected: status === 'open' });
+        runControls?.setRunState({ connected: status === 'open' });
         if (status === 'open') {
           pushLog('connected', 'status');
           pushTranscript({ text: 'connected', data: { role: 'system' } });
@@ -162,7 +164,11 @@ function main() {
         // Editing is only reachable while paused (Q-17), so the edit panel has to learn
         // about a pause the agent's own operator caused from another tab, not just one
         // this browser asked for.
-        pointing.setRun({ runState: /paus/i.test(message.text) ? 'paused' : 'running' });
+        {
+          const runState = /paus/i.test(message.text) ? 'paused' : 'running';
+          pointing.setRun({ runState });
+          runControls?.setRunState({ runState });
+        }
         break;
       case ServerMessageType.FOCUS:
         // The server is the authority on what is marked. A browser that kept its own idea
@@ -228,7 +234,7 @@ function main() {
     },
   });
 
-  attachControls(controlsRoot, {
+  runControls = attachControls(controlsRoot, {
     send: (clientMessage) => {
       // Show the operator's own words the instant they press Enter. The server echoes
       // them back once it has queued them, and that echo is what turns this line from

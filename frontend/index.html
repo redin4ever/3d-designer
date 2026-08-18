@@ -100,9 +100,10 @@
     <section class="controls-panel" aria-label="Operator controls">
       <div class="control-group run-group">
         <span id="run-controls-label" class="control-label">Run</span>
+        <span class="run-state-label" data-run-state-label aria-live="polite">Unavailable</span>
         <div class="control-row" role="group" aria-labelledby="run-controls-label">
-          <button type="button" class="btn" data-action="pause">Pause</button>
-          <button type="button" class="btn primary" data-action="resume">Resume</button>
+          <button type="button" class="btn" data-action="pause" disabled>Pause</button>
+          <button type="button" class="btn primary" data-action="resume" hidden>Resume</button>
         </div>
       </div>
 

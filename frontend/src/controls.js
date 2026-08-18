@@ -26,6 +26,17 @@ export function buildResumeMessage() {
   return { type: ClientMessageType.RESUME, data: {} };
 }
 
+/**
+ * Describe the one run action that is valid now. Showing Pause and Resume together makes
+ * the current state ambiguous and wastes scarce top-bar width; disconnected controls stay
+ * discoverable but disabled until their socket is usable.
+ */
+export function runControlPresentation({ connected = false, runState = 'running' } = {}) {
+  if (!connected) return { label: 'Unavailable', action: 'pause', disabled: true };
+  if (runState === 'paused') return { label: 'Paused', action: 'resume', disabled: false };
+  return { label: 'Running', action: 'pause', disabled: false };
+}
+
 export function buildRequestFullSceneMessage() {
   return { type: ClientMessageType.REQUEST_FULL_SCENE, data: {} };
 }
@@ -100,11 +111,27 @@ export function buildSetCadenceMessage(cadence) {
 export function attachControls(root, io) {
   const pauseButton = root.querySelector('[data-action="pause"]');
   const resumeButton = root.querySelector('[data-action="resume"]');
+  const runStateLabel = root.querySelector('[data-run-state-label]');
   const rollbackForm = root.querySelector('[data-action="rollback-form"]');
   const rollbackStepsInput = root.querySelector('[data-field="rollback-steps"]');
   const redirectForm = root.querySelector('[data-action="redirect-form"]');
   const redirectInput = root.querySelector('[data-field="redirect-text"]');
   const cadenceSelect = root.querySelector('[data-field="cadence"]');
+  let runContext = { connected: false, runState: 'running' };
+
+  const renderRunControl = (patch = {}) => {
+    runContext = { ...runContext, ...patch };
+    const presentation = runControlPresentation(runContext);
+    if (runStateLabel) runStateLabel.textContent = presentation.label;
+    if (pauseButton) {
+      pauseButton.hidden = presentation.action !== 'pause';
+      pauseButton.disabled = presentation.disabled;
+    }
+    if (resumeButton) {
+      resumeButton.hidden = presentation.action !== 'resume';
+      resumeButton.disabled = presentation.disabled;
+    }
+  };
 
   // Returns whether the message was actually queued: false if it failed validation, and
   // false if `send` reported it never left (the socket is down). Callers use that to
@@ -141,4 +168,7 @@ export function attachControls(root, io) {
   cadenceSelect?.addEventListener('change', () => {
     guarded(() => buildSetCadenceMessage(cadenceSelect.value));
   });
+
+  renderRunControl();
+  return { setRunState: renderRunControl };
 }
