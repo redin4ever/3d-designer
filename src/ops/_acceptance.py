@@ -28,6 +28,34 @@ def acceptance_for(
     object_id = params.get("object_id", "")
     output_prefix = op_id or object_id
 
+    if kind == "add_impact_head":
+        joints = [
+            (f"{object_id}_body", f"{object_id}_top_plate", "top armor seats on body"),
+            (f"{object_id}_body", f"{object_id}_cheek_front", "front cheek seats on body"),
+            (f"{object_id}_body", f"{object_id}_cheek_back", "rear cheek seats on body"),
+            (f"{object_id}_body", f"{object_id}_shoulder_left", "left shoulder sockets into body"),
+            (f"{object_id}_body", f"{object_id}_shoulder_right", "right shoulder sockets into body"),
+            (f"{object_id}_shoulder_left", f"{object_id}_collar_left", "left collar meets shoulder"),
+            (f"{object_id}_shoulder_right", f"{object_id}_collar_right", "right collar meets shoulder"),
+            (f"{object_id}_collar_left", f"{object_id}_face_left", "left face seats on collar"),
+            (f"{object_id}_collar_right", f"{object_id}_face_right", "right face seats on collar"),
+            (f"{object_id}_face_left", f"{object_id}_rim_left", "left retaining rim seats on face"),
+            (f"{object_id}_face_right", f"{object_id}_rim_right", "right retaining rim seats on face"),
+            (f"{object_id}_body", f"{object_id}_handle_socket", "handle socket enters body"),
+        ]
+        return tuple(
+            AcceptanceQuery(
+                query_id=f"{output_prefix}_impact_joint_{index}",
+                description=description,
+                metric=MetricKind.GAP_WIDTH,
+                subject=f"{a}|{b}",
+                expected=0.0,
+                tolerance=1e-4,
+                comparison=Comparison.EQ,
+            )
+            for index, (a, b, description) in enumerate(joints)
+        )
+
     if kind == "add_roof_window":
         host = params.get("roof_id", "")
         return (
@@ -344,6 +372,7 @@ def acceptance_for(
 
 _RUNTIME_ACCEPTANCE_KINDS = frozenset({
     "add_primitive", "add_wall", "add_floor", "add_opening", "add_gable_roof", "add_chimney",
+    "add_impact_head",
     "add_staircase", "add_staircase_to_landing", "add_railing", "array_along",
     "add_lod_chain", "add_modular_kit", "apply_texture_material", "move_object",
     "rotate_object", "scale_object", "set_object_material", "duplicate_object",

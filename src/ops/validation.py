@@ -36,6 +36,7 @@ _KNOWN_KINDS = (
     "add_floor",
     "add_gable_roof",
     "add_chimney",
+    "add_impact_head",
     "add_opening",
     "add_staircase",
     "add_staircase_to_landing",
@@ -235,6 +236,68 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
                 f"{kind}: {count} flue rim(s) of diameter {rim_diameter:.4f} m do not fit "
                 f"on the {crown_width:.4f} x {crown_depth:.4f} m crown",
                 "reduce flue_count, flue_radius, or rim_overhang; or enlarge the crown",
+            )
+    elif kind == "add_impact_head":
+        _require(params, "origin", kind)
+        dimensions = (
+            "width", "depth", "height", "corner_chamfer", "plate_thickness",
+            "plate_inset", "shoulder_depth", "shoulder_diameter", "socket_depth",
+            "collar_depth", "collar_diameter", "face_depth", "face_diameter",
+            "rim_depth", "rim_overhang", "handle_socket_diameter",
+            "handle_socket_depth", "handle_collar_depth", "handle_collar_overhang",
+            "bevel_width",
+        )
+        for name in dimensions:
+            _positive(_require(params, name, kind), name, kind)
+
+        width, depth, height = params["width"], params["depth"], params["height"]
+        chamfer, inset = params["corner_chamfer"], params["plate_inset"]
+        if 2.0 * chamfer >= min(width, height):
+            raise ToolError(
+                "ops.impact_body_does_not_fit",
+                f"{kind}: corner_chamfer {chamfer} consumes the {width} x {height} body profile",
+                "reduce corner_chamfer or enlarge width and height",
+            )
+        if inset < chamfer or 2.0 * inset >= min(width, depth, height):
+            raise ToolError(
+                "ops.impact_plate_does_not_fit",
+                f"{kind}: plate_inset {inset} must clear chamfer {chamfer} and leave positive armor spans",
+                "use plate_inset >= corner_chamfer and less than half every body dimension",
+            )
+        shoulder_limit = min(depth, height - 2.0 * chamfer)
+        if params["shoulder_diameter"] > shoulder_limit or params["socket_depth"] >= width / 2.0:
+            raise ToolError(
+                "ops.impact_shoulder_does_not_fit",
+                f"{kind}: shoulder diameter/depth exceeds the body's flat side bearing area",
+                f"keep shoulder_diameter <= {shoulder_limit:.4f} and socket_depth < {width / 2.0:.4f}",
+            )
+        if not (
+            params["shoulder_diameter"] <= params["collar_diameter"]
+            <= params["face_diameter"]
+        ) or params["rim_depth"] >= params["face_depth"]:
+            raise ToolError(
+                "ops.impact_transition_does_not_fit",
+                f"{kind}: strike stack must grow shoulder <= collar <= face and rim_depth < face_depth",
+                "increase the outer transition diameters or reduce rim_depth",
+            )
+        handle_limit = min(depth, width - 2.0 * chamfer)
+        if (
+            params["handle_socket_diameter"] > handle_limit
+            or params["handle_socket_depth"] >= height / 2.0
+        ):
+            raise ToolError(
+                "ops.impact_handle_socket_does_not_fit",
+                f"{kind}: handle socket exceeds the body's underside bearing area",
+                f"keep handle_socket_diameter <= {handle_limit:.4f} and depth < {height / 2.0:.4f}",
+            )
+        smallest_detail = min(
+            params["plate_thickness"], params["rim_depth"], params["handle_collar_depth"]
+        )
+        if 2.0 * params["bevel_width"] >= smallest_detail:
+            raise ToolError(
+                "ops.impact_bevel_does_not_fit",
+                f"{kind}: bevel_width {params['bevel_width']} consumes the smallest detail",
+                f"keep bevel_width below {smallest_detail / 2.0:.4f}",
             )
     elif kind == "add_roof_window":
         _require(params, "roof_id", kind)

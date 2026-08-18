@@ -48,6 +48,7 @@ POINT_PARAMS: dict[str, tuple[str, ...]] = {
     "add_floor": ("origin",),
     "add_gable_roof": ("origin",),
     "add_chimney": ("origin",),
+    "add_impact_head": ("origin",),
     "add_staircase": ("origin",),
     "add_staircase_to_landing": ("start",),
     "add_modular_kit": ("piece_size", "origin"),

@@ -28,6 +28,7 @@ from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
 from .chimney import add_chimney
 from .facade_ribs import add_facade_ribs
+from .impact_head import add_impact_head
 from .primitives import add_primitive
 from .railing import add_railing
 from .roof import add_gable_roof
@@ -78,6 +79,7 @@ OPS: HandlerRegistry = {
     "add_floor": add_floor,
     "add_gable_roof": add_gable_roof,
     "add_chimney": add_chimney,
+    "add_impact_head": add_impact_head,
     "add_opening": add_opening,
     "add_staircase": add_staircase,
     "add_staircase_to_landing": add_staircase_to_landing,
@@ -389,6 +391,56 @@ OP_SPECS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         mutating=True,
+    ),
+    ToolSpec(
+        name="add_impact_head",
+        description=(
+            "Build a coherent dual-strike mechanical head from one fitted parameter set: "
+            "corner-clipped body, seated top and cheek armor, socketed shoulders, load "
+            "collars, striking faces, retaining rims, and an underside handle socket. Use "
+            "this instead of independently placing plates and rotated cylinders."
+        ),
+        roles=(ToolRole.REFINE,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "depth": {"type": "number", "exclusiveMinimum": 0},
+                "height": {"type": "number", "exclusiveMinimum": 0},
+                "corner_chamfer": {"type": "number", "exclusiveMinimum": 0},
+                "plate_thickness": {"type": "number", "exclusiveMinimum": 0},
+                "plate_inset": {"type": "number", "exclusiveMinimum": 0},
+                "shoulder_depth": {"type": "number", "exclusiveMinimum": 0},
+                "shoulder_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "socket_depth": {"type": "number", "exclusiveMinimum": 0},
+                "collar_depth": {"type": "number", "exclusiveMinimum": 0},
+                "collar_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "face_depth": {"type": "number", "exclusiveMinimum": 0},
+                "face_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "rim_depth": {"type": "number", "exclusiveMinimum": 0},
+                "rim_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "handle_socket_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "handle_socket_depth": {"type": "number", "exclusiveMinimum": 0},
+                "handle_collar_depth": {"type": "number", "exclusiveMinimum": 0},
+                "handle_collar_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "bevel_width": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": [
+                "object_id", "origin", "width", "depth", "height", "corner_chamfer",
+                "plate_thickness", "plate_inset", "shoulder_depth", "shoulder_diameter",
+                "socket_depth", "collar_depth", "collar_diameter", "face_depth",
+                "face_diameter", "rim_depth", "rim_overhang", "handle_socket_diameter",
+                "handle_socket_depth", "handle_collar_depth", "handle_collar_overhang",
+                "bevel_width",
+            ],
+            "additionalProperties": False,
+        },
+        mutating=True,
+        examples=(
+            "A 3.6m wide sci-fi maul head with fitted armor and 1.6m striking faces.",
+        ),
     ),
     ToolSpec(
         name="add_gable_roof",

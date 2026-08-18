@@ -13,6 +13,45 @@ __all__ = ["joinery_for"]
 def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
     """The declared support/cover overlaps for one operation, never inferred from meshes."""
     prefix = params.get("object_id", "")
+    if kind == "add_impact_head":
+        intents = [
+            JoineryIntent(
+                object_id=f"{prefix}_shoulder_{side}",
+                into_object_id=f"{prefix}_body",
+                depth=params["socket_depth"],
+                axis="x",
+                reason=f"{side} strike shoulder intentionally sockets into the load-bearing body",
+            )
+            for side in ("left", "right")
+        ]
+        intents.extend(
+            JoineryIntent(
+                object_id=f"{prefix}_rim_{side}",
+                into_object_id=f"{prefix}_face_{side}",
+                depth=params["rim_depth"] / 2.0,
+                axis="x",
+                reason=f"{side} retaining rim intentionally seats into the striking face",
+            )
+            for side in ("left", "right")
+        )
+        intents.extend((
+            JoineryIntent(
+                object_id=f"{prefix}_handle_socket",
+                into_object_id=f"{prefix}_body",
+                depth=params["handle_socket_depth"],
+                axis="z",
+                reason="handle socket intentionally penetrates the head body to transfer impact load",
+            ),
+            JoineryIntent(
+                object_id=f"{prefix}_handle_collar",
+                into_object_id=f"{prefix}_handle_socket",
+                depth=params["handle_collar_depth"],
+                axis="z",
+                reason="handle collar intentionally wraps the exposed socket",
+            ),
+        ))
+        return tuple(intents)
+
     if kind == "add_gable_roof":
         angle = math.radians(params["pitch_degrees"])
         miter_depth = params["trim_depth"] / (2.0 * math.cos(angle))
