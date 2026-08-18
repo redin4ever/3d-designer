@@ -141,6 +141,31 @@ test('job progress is reported and cancellation stops polling', async () => {
   assert.ok(calls.some(({ url, init }) => url.endsWith('/cancel') && init.method === 'POST'));
 });
 
+test('structured file-job failures stay readable instead of becoming object text', async () => {
+  const statuses = [];
+  const controller = createFileController({
+    fetchImpl: async (url) => url === '/api/file-io/jobs'
+      ? response({ job_id: 'job-error' })
+      : response({
+        status: 'failed',
+        error: {
+          code: 'run_must_be_paused',
+          message: 'Pause the build before you open a project.',
+          details: ['The running agent may still be changing geometry.'],
+        },
+      }),
+    pollInterval: 0,
+    onStatus: (status) => statuses.push(status),
+  });
+
+  const result = await controller.openProject(file('scene.forge3d'));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'Pause the build before you open a project.');
+  assert.equal(typeof result.error, 'string');
+  assert.equal(statuses.at(-1).message, 'Pause the build before you open a project.');
+});
+
 test('dirty Open and Import honor Save, Discard, and Cancel', async () => {
   const actions = [];
   const fetchImpl = async (url, init) => {
