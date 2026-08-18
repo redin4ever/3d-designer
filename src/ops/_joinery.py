@@ -26,6 +26,16 @@ def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:
         ]
         intents.extend(
             JoineryIntent(
+                object_id=f"{prefix}_striker_{side}",
+                into_object_id=f"{prefix}_face_{side}",
+                depth=params["striker_socket_depth"],
+                axis="x",
+                reason=f"{side} replaceable striker intentionally sockets into the face plate",
+            )
+            for side in ("left", "right")
+        )
+        intents.extend(
+            JoineryIntent(
                 object_id=f"{prefix}_rim_{side}",
                 into_object_id=f"{prefix}_face_{side}",
                 depth=params["rim_depth"] / 2.0,

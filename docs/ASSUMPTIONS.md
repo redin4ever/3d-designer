@@ -455,3 +455,14 @@ reversible option; each is recorded here rather than asked, because the gate had
   inspect the image before completion.
 - **Why:** unit geometry can prove fit but not whether the assembled silhouette reads well.
 - **Reversal:** the generator remains an ordinary script and can evolve independently.
+
+## A-044 — Striking faces use replaceable socketed inserts
+
+- **Feature:** model-generation-quality
+- **Assumed:** each broad striking face carries a smaller, darker wear insert inside the retaining
+  rim. The insert has explicit diameter, exposed depth, and socket depth.
+- **Why:** the first real render proved that a structurally fitted but featureless reflective disk
+  still reads as under-designed. A replaceable wear part gives the face hierarchy and a functional
+  reason for its material break.
+- **Blast radius:** impact-head schema, geometry, acceptance, joinery, and hammer materials.
+- **Reversal:** remove the three striker parameters and two deterministic parts.

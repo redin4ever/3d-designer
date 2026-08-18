@@ -18,7 +18,7 @@
       "line": 284,
       "anchor": "OP_SPECS: tuple[ToolSpec, ...] = (",
       "status": "wired",
-      "decision": "Q-03, Q-04, Q-06, Q-15, Q-17",
+      "decision": "Q-03, Q-04, Q-06, Q-15, Q-17, Q-25",
       "what": "defines the parameters and guidance visible to a model-building agent",
       "evidence": "the semantic roof and chimney specs explicitly direct agents away from rotated cubes",
       "asks": "which dimensions and style choices should the impact-head tool expose without inviting incoherent proportions?"
@@ -40,7 +40,7 @@
       "line": 133,
       "anchor": "def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:",
       "status": "wired",
-      "decision": "Q-12, Q-13, Q-15",
+      "decision": "Q-12, Q-13, Q-15, Q-25",
       "what": "rejects impossible dimensions before partial geometry is created",
       "evidence": "chimney validation already refuses flues that cannot fit their crown",
       "asks": "should undersized collars, plates, sockets, or striking faces be rejected rather than auto-distorted?"
@@ -51,7 +51,7 @@
       "line": 17,
       "anchor": "def acceptance_for(",
       "status": "wired",
-      "decision": "Q-14, Q-18, Q-19",
+      "decision": "Q-14, Q-18, Q-19, Q-25",
       "what": "records re-runnable checks that generated parts contact and support one another",
       "evidence": "roof, chimney, and surface-mount assemblies persist zero-gap checks for every meaningful joint",
       "asks": "which head joints must be measured as fitted before the operation counts as complete?"
@@ -62,7 +62,7 @@
       "line": 13,
       "anchor": "def joinery_for(kind: str, params: dict[str, Any]) -> tuple[JoineryIntent, ...]:",
       "status": "wired",
-      "decision": "Q-10, Q-11, Q-20",
+      "decision": "Q-10, Q-11, Q-20, Q-25",
       "what": "distinguishes intentional mechanical sockets from accidental clipping",
       "evidence": "roof caps, chimney flashing, and stair stringers declare their designed insertion depth here",
       "asks": "should strike shoulders and the handle socket penetrate the body as explicit load-bearing joinery?"
@@ -139,7 +139,7 @@
       "line": 87,
       "anchor": "# Main head: an angular silhouette instead of a single rectangular block.",
       "status": "wired",
-      "decision": "Q-05, Q-08, Q-09, Q-16, Q-23, Q-24",
+      "decision": "Q-05, Q-08, Q-09, Q-16, Q-23, Q-24, Q-25",
       "what": "contains the manually placed top rails, cheek plates, and striking assemblies that prompted the report",
       "evidence": "the generator currently places those parts independently with no shared fit contract",
       "asks": "should the hammer be regenerated through the semantic operation and keep separate material-ready parts?"

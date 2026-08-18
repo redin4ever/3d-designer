@@ -39,6 +39,8 @@ def acceptance_for(
             (f"{object_id}_shoulder_right", f"{object_id}_collar_right", "right collar meets shoulder"),
             (f"{object_id}_collar_left", f"{object_id}_face_left", "left face seats on collar"),
             (f"{object_id}_collar_right", f"{object_id}_face_right", "right face seats on collar"),
+            (f"{object_id}_face_left", f"{object_id}_striker_left", "left replaceable striker sockets into face"),
+            (f"{object_id}_face_right", f"{object_id}_striker_right", "right replaceable striker sockets into face"),
             (f"{object_id}_face_left", f"{object_id}_rim_left", "left retaining rim seats on face"),
             (f"{object_id}_face_right", f"{object_id}_rim_right", "right retaining rim seats on face"),
             (f"{object_id}_body", f"{object_id}_handle_socket", "handle socket enters body"),

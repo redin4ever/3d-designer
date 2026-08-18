@@ -23,6 +23,7 @@
     {"id":"Q-21","wave":"compatibility","question":"Should add_primitive or existing scene replay change?","assumed":"No; the feature is additive","assumption":"A-043","seams":["application-composition"]},
     {"id":"Q-22","wave":"compatibility","question":"Should the app integration suite pin reachability?","assumed":"Yes, explicitly include add_impact_head","assumption":"A-042","seams":["application-wiring-test","registry-completeness-test"]},
     {"id":"Q-23","wave":"regression","question":"How should the reported hammer be repaired?","assumed":"Replace its manual head block with the semantic operation and remove incoherent decorations","assumption":"A-043","seams":["hammer-regression-artifact"]},
-    {"id":"Q-24","wave":"regression","question":"What evidence is required beyond unit tests?","assumed":"Regenerate BLEND, GLB, and PNG in real Blender and visually inspect the render","assumption":"A-043","seams":["hammer-regression-artifact","construction-documentation","semantic-workflow-documentation"]}
+    {"id":"Q-24","wave":"regression","question":"What evidence is required beyond unit tests?","assumed":"Regenerate BLEND, GLB, and PNG in real Blender and visually inspect the render","assumption":"A-043","seams":["hammer-regression-artifact","construction-documentation","semantic-workflow-documentation"]},
+    {"id":"Q-25","wave":"visual-qa","question":"How should a broad striking face avoid reading as a blank disk?","assumed":"Use a smaller replaceable wear insert socketed inside the retaining rim","assumption":"A-044","seams":["operation-tool-spec","operation-validation","operation-acceptance","operation-joinery","hammer-regression-artifact"]}
   ]
 }

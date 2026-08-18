@@ -243,6 +243,7 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
             "width", "depth", "height", "corner_chamfer", "plate_thickness",
             "plate_inset", "shoulder_depth", "shoulder_diameter", "socket_depth",
             "collar_depth", "collar_diameter", "face_depth", "face_diameter",
+            "striker_depth", "striker_socket_depth", "striker_diameter",
             "rim_depth", "rim_overhang", "handle_socket_diameter",
             "handle_socket_depth", "handle_collar_depth", "handle_collar_overhang",
             "bevel_width",
@@ -279,6 +280,15 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
                 "ops.impact_transition_does_not_fit",
                 f"{kind}: strike stack must grow shoulder <= collar <= face and rim_depth < face_depth",
                 "increase the outer transition diameters or reduce rim_depth",
+            )
+        if (
+            params["striker_diameter"] >= params["face_diameter"] - 2.0 * params["rim_overhang"]
+            or params["striker_socket_depth"] >= params["face_depth"]
+        ):
+            raise ToolError(
+                "ops.impact_striker_does_not_fit",
+                f"{kind}: replaceable striker collides with its retaining rim or consumes the face",
+                "reduce striker_diameter/socket depth or enlarge the striking face",
             )
         handle_limit = min(depth, width - 2.0 * chamfer)
         if (

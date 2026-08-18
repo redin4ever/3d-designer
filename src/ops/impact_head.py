@@ -136,12 +136,20 @@ def add_impact_head(engine: EngineProtocol, op: Operation) -> OperationResult:
             Vec3(face_x, origin.y, origin.z),
         )
         face_outer = collar_outer + sign * p["face_depth"]
+        striker_x = face_outer + sign * (
+            p["striker_depth"] - p["striker_socket_depth"]
+        ) / 2.0
+        striker_id = _axis_x(
+            engine, f"{prefix}_striker_{side}",
+            p["striker_depth"] + p["striker_socket_depth"], p["striker_diameter"],
+            Vec3(striker_x, origin.y, origin.z),
+        )
         rim_id = _rim_x(
             engine, f"{prefix}_rim_{side}", p["rim_depth"],
             p["face_diameter"] + 2.0 * p["rim_overhang"],
             Vec3(face_outer, origin.y, origin.z),
         )
-        produced.extend((shoulder_id, collar_id, face_id, rim_id))
+        produced.extend((shoulder_id, collar_id, face_id, striker_id, rim_id))
 
     body_bottom = origin.z - half_height
     socket_length = p["handle_socket_depth"] + p["handle_collar_depth"]

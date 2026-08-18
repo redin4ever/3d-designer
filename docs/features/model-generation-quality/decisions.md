@@ -30,6 +30,7 @@ reversible defaults recorded in A-036 through A-043.
 | Q-22 | Pin live-app reachability in integration tests. |
 | Q-23 | Rebuild the existing hammer head through the operation and remove incoherent decoration. |
 | Q-24 | Require real-Blender BLEND/GLB/PNG regeneration and visual inspection. |
+| Q-25 | Give each striking face a smaller replaceable wear insert socketed inside its rim. |
 
 ## User note
 
