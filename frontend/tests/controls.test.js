@@ -4,12 +4,26 @@
 // CheckCadence values). Pure functions — no DOM required.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as controls from '../src/controls.js';
 import {
   VALID_CADENCES,
   buildRollbackMessage,
   buildRedirectMessage,
   buildSetCadenceMessage,
 } from '../src/controls.js';
+
+test('run controls expose one valid action for the current connection and run state', () => {
+  assert.equal(typeof controls.runControlPresentation, 'function');
+  assert.deepEqual(controls.runControlPresentation?.({ connected: false, runState: 'running' }), {
+    label: 'Unavailable', action: 'pause', disabled: true,
+  });
+  assert.deepEqual(controls.runControlPresentation?.({ connected: true, runState: 'running' }), {
+    label: 'Running', action: 'pause', disabled: false,
+  });
+  assert.deepEqual(controls.runControlPresentation?.({ connected: true, runState: 'paused' }), {
+    label: 'Paused', action: 'resume', disabled: false,
+  });
+});
 
 test('rollback by steps produces a well-formed client message', () => {
   const msg = buildRollbackMessage({ steps: 3 });
