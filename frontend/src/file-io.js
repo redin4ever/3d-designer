@@ -24,7 +24,11 @@ function extensionOf(name) {
 }
 
 function failure(error, extra = {}) {
-  return { ok: false, error, ...extra };
+  // Keep the failure contract authoritative even when `extra` contains the raw job
+  // payload. Poll responses carry `ok: true` (the HTTP request worked) and may carry a
+  // structured `error` object (the file job did not); spreading those last turned a
+  // failed Open into `{ok: true, error: {...}}`, which rendered as "[object Object]".
+  return { ...extra, ok: false, error };
 }
 
 function errorText(value, fallback) {
