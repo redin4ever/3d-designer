@@ -27,14 +27,14 @@ export function buildResumeMessage() {
 }
 
 /**
- * Describe the one run action that is valid now. Showing Pause and Resume together makes
- * the current state ambiguous and wastes scarce top-bar width; disconnected controls stay
- * discoverable but disabled until their socket is usable.
+ * Describe which persistent run control is valid now. Pause and Run remain in stable
+ * positions for muscle memory; disabled state prevents contradictory commands, and a
+ * disconnected toolbar stays discoverable without pretending it can act.
  */
 export function runControlPresentation({ connected = false, runState = 'running' } = {}) {
-  if (!connected) return { label: 'Unavailable', action: 'pause', disabled: true };
-  if (runState === 'paused') return { label: 'Paused', action: 'resume', disabled: false };
-  return { label: 'Running', action: 'pause', disabled: false };
+  if (!connected) return { label: 'Unavailable', pauseDisabled: true, runDisabled: true };
+  if (runState === 'paused') return { label: 'Paused', pauseDisabled: true, runDisabled: false };
+  return { label: 'Running', pauseDisabled: false, runDisabled: true };
 }
 
 export function buildRequestFullSceneMessage() {
@@ -123,14 +123,8 @@ export function attachControls(root, io) {
     runContext = { ...runContext, ...patch };
     const presentation = runControlPresentation(runContext);
     if (runStateLabel) runStateLabel.textContent = presentation.label;
-    if (pauseButton) {
-      pauseButton.hidden = presentation.action !== 'pause';
-      pauseButton.disabled = presentation.disabled;
-    }
-    if (resumeButton) {
-      resumeButton.hidden = presentation.action !== 'resume';
-      resumeButton.disabled = presentation.disabled;
-    }
+    if (pauseButton) pauseButton.disabled = presentation.pauseDisabled;
+    if (resumeButton) resumeButton.disabled = presentation.runDisabled;
   };
 
   // Returns whether the message was actually queued: false if it failed validation, and

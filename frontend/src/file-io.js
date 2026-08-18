@@ -31,10 +31,25 @@ function failure(error, extra = {}) {
   return { ...extra, ok: false, error };
 }
 
-function errorText(value, fallback) {
-  if (typeof value === 'string' && value) return value;
-  if (value && typeof value.message === 'string') return value.message;
-  return fallback;
+function nestedErrorText(value, seen) {
+  if (typeof value === 'string') return value.trim();
+  if (!value || typeof value !== 'object' || seen.has(value)) return '';
+  seen.add(value);
+  for (const key of ['message', 'detail', 'reason', 'error']) {
+    const text = nestedErrorText(value[key], seen);
+    if (text) return text;
+  }
+  for (const key of ['details', 'errors']) {
+    const entries = Array.isArray(value[key]) ? value[key] : [value[key]];
+    const text = entries.map((entry) => nestedErrorText(entry, seen)).filter(Boolean).join('; ');
+    if (text) return text;
+  }
+  return '';
+}
+
+/** Convert any service/proxy error shape into safe human-readable UI text. */
+export function formatFileError(value, fallback = 'File operation failed.') {
+  return nestedErrorText(value, new Set()) || fallback;
 }
 
 /** Validate a browser File without ever accepting a path or URL string. */
@@ -109,6 +124,7 @@ export function createFileController(options = {}) {
 
   const emit = (patch) => {
     state = { ...state, ...patch };
+    if (state.phase === 'error') state.message = formatFileError(state.message);
     onStatus({ ...state });
   };
 
@@ -120,7 +136,7 @@ export function createFileController(options = {}) {
       return failure(`Could not reach the file service: ${error?.message ?? String(error)}`);
     }
     const payload = await responsePayload(response);
-    if (!response.ok) return failure(errorText(payload.error, `File service answered ${response.status}.`), { payload });
+    if (!response.ok) return failure(formatFileError(payload.error, `File service answered ${response.status}.`), { payload });
     return { ok: true, ...payload };
   }
 
@@ -165,7 +181,7 @@ export function createFileController(options = {}) {
         return { ok: true, ...result, status: 'cancelled' };
       }
       if (status === 'failed' || status === 'error') {
-        const message = errorText(result.error, result.message ?? 'File job failed.');
+        const message = formatFileError(result.error, formatFileError(result.message, 'File job failed.'));
         emit({ action, phase: 'error', status: 'error', progress, message });
         return failure(message, { ...result });
       }

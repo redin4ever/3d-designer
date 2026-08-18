@@ -489,6 +489,14 @@ textarea:focus { border-color: var(--hairline-strong); }
 
 @media (max-width: 480px) {
   .run-state-label { display: none; }
+  .status-pill {
+    inline-size: var(--control-size);
+    justify-content: center;
+    padding-inline: 0;
+    overflow: hidden;
+    color: transparent;
+    font-size: 0;
+  }
 }
 
 @media (pointer: coarse) {
