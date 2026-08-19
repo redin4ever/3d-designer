@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Repair native Blender .blend import and verify the real import path",
   "slug": "blend-import-verification",
-  "phase": 4,
+  "phase": 5,
   "baseSha": "01c2ffb2ce78d53a0621c510f542a9590b934b04",
   "branch": "fix/blend-import-verification",
   "docsDir": "docs/features/blend-import-verification",

@@ -15,7 +15,7 @@
     {
       "id": "flattened-mesh-ownership",
       "file": "src/engine/model_io.py",
-      "line": 320,
+      "line": 328,
       "anchor": "for obj in mesh_objects:",
       "status": "wired",
       "decision": "Q-04",
