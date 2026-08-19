@@ -195,12 +195,20 @@ def _append_blend_objects(bpy: Any, source: Path) -> tuple[list[Any], tuple[str,
         f"ignored imported non-mesh object {name!r} ({kind})" for name, kind in ignored
     )
 
+    # Library-loaded objects are not part of the active scene yet. Blender cannot evaluate
+    # their parent hierarchy there, so matrix_world reads as identity until the hierarchy is
+    # linked and the view layer updates. Link every dependency temporarily; non-meshes are
+    # removed after their mesh children have retained the evaluated world placement.
+    scene = bpy.context.scene
+    for obj in objects:
+        if obj.name not in scene.objects:
+            scene.collection.objects.link(obj)
+    bpy.context.view_layer.update()
+
     # A mesh may inherit from an empty/armature that is deliberately not imported. Preserve
     # its evaluated placement before detaching that relationship and removing the parent.
     worlds = {obj: obj.matrix_world.copy() for obj in mesh_objects}
     for obj in mesh_objects:
-        if not obj.users_collection:
-            bpy.context.scene.collection.objects.link(obj)
         obj.parent = None
         obj.matrix_world = worlds[obj]
     return objects, warnings
@@ -320,6 +328,8 @@ class ModelIOMixin:
             for obj in mesh_objects:
                 world = conversion @ obj.matrix_world.copy()
                 if flatten:
+                    if obj.data.users > 1:
+                        obj.data = obj.data.copy()
                     obj.data.transform(world)
                     obj.data.update()
                     obj.matrix_world.identity()
