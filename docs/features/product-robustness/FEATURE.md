@@ -30,6 +30,28 @@ what an agent has to choose among. External Codex, Claude, and Cursor configurat
 rewritten automatically. Raw execution remains unrestricted after explicit opt-in, so it is
 disabled by default.
 
+## Decisions and assumptions
+
+The full decision record is in [decisions.md](decisions.md). Assumptions A-053 through A-061
+remain standing in [the project ledger](../../ASSUMPTIONS.md): this is a local, single-writer
+desktop workflow; 529px is the minimum supported width; client config writes stay explicit;
+file replacement remains paused for inspection; MCP discovery is focused while semantic calls
+stay compatible; and deterministic workflow evals are the baseline. Reversing any one is a
+separate, localized product change rather than a rewrite of this feature.
+
+## Deliberate boundaries
+
+Forge3D cannot hot-restart Codex, Claude, or Cursor, so it reports restart-required and refreshes
+readiness when this tab becomes visible again. Cloud accounts, multi-writer scene editing, mobile
+layout, new 3D formats, and replacing Blender were not added. Raw execution is available only
+through explicit `--raw` startup and remains unrestricted after that choice.
+
+## Known gaps
+
+No unit is quarantined and no traced seam remains open. The deterministic agent evals measure
+workflow context and tool availability, not the subjective artistic quality of every generated
+model; future model-driven evals can extend them without replacing the current gate.
+
 ## Verification
 
 Run `node .pipeline/check.mjs`. Exit 0 means every product and wiring check passed, exit 1
