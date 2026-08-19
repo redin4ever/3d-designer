@@ -19,7 +19,7 @@ from contracts import (
     Operation,
     OperationResult,
     RuleError,
-    SUPPORTED_MODEL_EXTENSIONS,
+    SUPPORTED_MODEL_IMPORT_EXTENSIONS,
     ToolError,
 )
 
@@ -68,8 +68,8 @@ def _local_file(raw_path: object) -> tuple[str, Path]:
         )
 
     extension = path.suffix.lower()
-    if extension not in SUPPORTED_MODEL_EXTENSIONS:
-        supported = ", ".join(SUPPORTED_MODEL_EXTENSIONS)
+    if extension not in SUPPORTED_MODEL_IMPORT_EXTENSIONS:
+        supported = ", ".join(SUPPORTED_MODEL_IMPORT_EXTENSIONS)
         raise _failure(
             "import.unsupported_format",
             f"model format {extension or '(none)'!r} is not supported",

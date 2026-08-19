@@ -27,6 +27,8 @@ from .geometry import AABB, MeshSnapshot, Transform, Vec3
 __all__ = [
     "RepairOutcome",
     "ModelImportResult",
+    "SUPPORTED_MODEL_IMPORT_EXTENSIONS",
+    "SUPPORTED_MODEL_EXPORT_EXTENSIONS",
     "SUPPORTED_MODEL_EXTENSIONS",
     "MeshOps",
     "ModifierOps",
@@ -41,14 +43,19 @@ __all__ = [
 ]
 
 
-SUPPORTED_MODEL_EXTENSIONS: tuple[str, ...] = (
+SUPPORTED_MODEL_EXPORT_EXTENSIONS: tuple[str, ...] = (
     ".glb", ".gltf", ".fbx", ".obj", ".stl", ".ply", ".usd", ".usda", ".usdc",
 )
-"""Interchange formats supported by the installed Blender 5.2 adapter.
+"""Interchange formats supported by the installed Blender 5.2 export adapter."""
 
-``.blend`` is deliberately absent: a forge3d project is a versioned ``.forge3d`` package,
-while opening an arbitrary Blender working file would replace process-level scene state.
-"""
+SUPPORTED_MODEL_IMPORT_EXTENSIONS: tuple[str, ...] = (
+    *SUPPORTED_MODEL_EXPORT_EXTENSIONS,
+    ".blend",
+)
+"""Model sources accepted by import, including non-destructive Blender library append."""
+
+# Compatibility for callers that historically used the shared tuple for export choices.
+SUPPORTED_MODEL_EXTENSIONS = SUPPORTED_MODEL_EXPORT_EXTENSIONS
 
 
 class EngineError(RuleError):

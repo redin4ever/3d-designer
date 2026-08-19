@@ -16,7 +16,8 @@ from contracts import (
     EngineError,
     EngineUnavailable,
     ModelImportResult,
-    SUPPORTED_MODEL_EXTENSIONS,
+    SUPPORTED_MODEL_EXPORT_EXTENSIONS,
+    SUPPORTED_MODEL_IMPORT_EXTENSIONS,
     Vec3,
 )
 
@@ -150,11 +151,11 @@ class FakeSurfacingMixin:
         """Bookkeep a deterministic placeholder mesh; the fake never parses asset bytes."""
         source = Path(path)
         suffix = source.suffix.lower()
-        if suffix not in SUPPORTED_MODEL_EXTENSIONS:
+        if suffix not in SUPPORTED_MODEL_IMPORT_EXTENSIONS:
             raise EngineError(
                 "engine.unsupported_import_format",
                 f"{suffix or '(none)'} is not a supported model format",
-                f"use one of: {', '.join(SUPPORTED_MODEL_EXTENSIONS)}",
+                f"use one of: {', '.join(SUPPORTED_MODEL_IMPORT_EXTENSIONS)}",
             )
         if unit_scale <= 0:
             raise EngineError(
@@ -193,11 +194,11 @@ class FakeSurfacingMixin:
         apply_modifiers: bool = True,
     ) -> str:
         suffix = Path(path).suffix.lower()
-        if suffix not in SUPPORTED_MODEL_EXTENSIONS:
+        if suffix not in SUPPORTED_MODEL_EXPORT_EXTENSIONS:
             raise EngineError(
                 "engine.unsupported_export_format",
                 f"{suffix or '(none)'} is not a supported model format",
-                f"use one of: {', '.join(SUPPORTED_MODEL_EXTENSIONS)}",
+                f"use one of: {', '.join(SUPPORTED_MODEL_EXPORT_EXTENSIONS)}",
             )
         if not object_ids:
             raise EngineError(

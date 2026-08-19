@@ -8,7 +8,7 @@
       "dependsOn": [],
       "seams": ["model_format_contract", "import_validation", "blender_import_dispatch", "blender_import_transaction", "file_job_import", "real_format_regression"],
       "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-06", "Q-07", "Q-08", "Q-09", "Q-10", "Q-21", "Q-23"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "browser-blend-picker",

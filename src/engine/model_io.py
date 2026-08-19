@@ -1,4 +1,4 @@
-"""Blender 5.2 interchange model import/export.
+"""Blender 5.2 model import/export, including non-destructive native append.
 
 All advertised GLB/glTF, FBX, OBJ, STL, PLY, USD, USDA, and USDC suffixes are exercised
 against their real Blender operators. The ``wm`` exporters use Blender 5's long-form axis
@@ -20,7 +20,12 @@ import math
 from pathlib import Path
 from typing import Any, Sequence
 
-from contracts import EngineError, ModelImportResult, SUPPORTED_MODEL_EXTENSIONS
+from contracts import (
+    EngineError,
+    ModelImportResult,
+    SUPPORTED_MODEL_EXPORT_EXTENSIONS,
+    SUPPORTED_MODEL_IMPORT_EXTENSIONS,
+)
 
 __all__ = [
     "ModelIOMixin",
@@ -173,6 +178,34 @@ def _import_kwargs(suffix: str) -> dict[str, object]:
     return {}
 
 
+def _append_blend_objects(bpy: Any, source: Path) -> tuple[list[Any], tuple[str, ...]]:
+    """Load native objects as local datablocks and link only meshes into this scene.
+
+    ``open_mainfile`` is intentionally never used: it would replace the process scene and
+    invalidate the live project. Loading every object lets Blender resolve dependencies and
+    parent transforms; non-mesh objects are retained only long enough to report and detach.
+    """
+
+    with bpy.data.libraries.load(str(source), link=False) as (available, loaded):
+        loaded.objects = list(available.objects)
+    objects = [obj for obj in loaded.objects if obj is not None]
+    mesh_objects = [obj for obj in objects if obj.type == "MESH"]
+    ignored = sorted((obj.name, obj.type) for obj in objects if obj.type != "MESH")
+    warnings = tuple(
+        f"ignored imported non-mesh object {name!r} ({kind})" for name, kind in ignored
+    )
+
+    # A mesh may inherit from an empty/armature that is deliberately not imported. Preserve
+    # its evaluated placement before detaching that relationship and removing the parent.
+    worlds = {obj: obj.matrix_world.copy() for obj in mesh_objects}
+    for obj in mesh_objects:
+        if not obj.users_collection:
+            bpy.context.scene.collection.objects.link(obj)
+        obj.parent = None
+        obj.matrix_world = worlds[obj]
+    return objects, warnings
+
+
 def _axis_export_kwargs(y_up: bool) -> dict[str, object]:
     if y_up:
         return {"axis_forward": "-Z", "axis_up": "Y"}
@@ -246,11 +279,11 @@ class ModelIOMixin:
 
         source = Path(path)
         suffix = source.suffix.lower()
-        if suffix not in SUPPORTED_MODEL_EXTENSIONS:
+        if suffix not in SUPPORTED_MODEL_IMPORT_EXTENSIONS:
             raise EngineError(
                 "engine.unsupported_model_format",
                 f"model suffix {suffix or '(none)'!r} is not supported",
-                f"use one of {', '.join(SUPPORTED_MODEL_EXTENSIONS)}",
+                f"use one of {', '.join(SUPPORTED_MODEL_IMPORT_EXTENSIONS)}",
             )
         if not source.is_file():
             raise EngineError(
@@ -263,14 +296,19 @@ class ModelIOMixin:
         before_data = _new_datablock_snapshot(bpy)
         created: list[Any] = []
         try:
-            op = _operator(bpy, import_operator_for_suffix(suffix))
-            op(filepath=str(source), **_import_kwargs(suffix))
-            created = [obj for obj in bpy.data.objects if obj not in before_objects]
+            warnings: tuple[str, ...] = ()
+            if suffix == ".blend":
+                created, warnings = _append_blend_objects(bpy, source)
+            else:
+                op = _operator(bpy, import_operator_for_suffix(suffix))
+                op(filepath=str(source), **_import_kwargs(suffix))
+                created = [obj for obj in bpy.data.objects if obj not in before_objects]
             mesh_objects = [obj for obj in created if obj.type == "MESH"]
             ignored = sorted((obj.name, obj.type) for obj in created if obj.type != "MESH")
-            warnings = tuple(
-                f"ignored imported non-mesh object {name!r} ({kind})" for name, kind in ignored
-            )
+            if suffix != ".blend":
+                warnings = tuple(
+                    f"ignored imported non-mesh object {name!r} ({kind})" for name, kind in ignored
+                )
             if not mesh_objects:
                 raise EngineError(
                     "engine.model_import_no_meshes",
@@ -288,6 +326,10 @@ class ModelIOMixin:
                 else:
                     obj.matrix_world = world
             bpy.context.view_layer.update()
+
+            if suffix == ".blend":
+                _remove_created_objects([obj for obj in created if obj.type != "MESH"])
+                _purge_new_orphans(bpy, before_data)
 
             # Blender's own name allocator is collision-safe. Sorting the actual names makes
             # result order deterministic without replacing or guessing a collision suffix.
@@ -335,11 +377,11 @@ class ModelIOMixin:
 
         target = Path(path)
         suffix = target.suffix.lower()
-        if suffix not in SUPPORTED_MODEL_EXTENSIONS:
+        if suffix not in SUPPORTED_MODEL_EXPORT_EXTENSIONS:
             raise EngineError(
                 "engine.unsupported_model_format",
                 f"model suffix {suffix or '(none)'!r} is not supported",
-                f"use one of {', '.join(SUPPORTED_MODEL_EXTENSIONS)}",
+                f"use one of {', '.join(SUPPORTED_MODEL_EXPORT_EXTENSIONS)}",
             )
 
         sources: list[Any] = []

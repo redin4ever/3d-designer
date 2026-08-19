@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Callable
 
-from contracts import RunState, SUPPORTED_MODEL_EXTENSIONS
+from contracts import RunState, SUPPORTED_MODEL_EXPORT_EXTENSIONS
 from export import export_scene
 from importing import make_import_operation
 from scene_files import load_package, save_scene
@@ -120,7 +120,7 @@ def _zip_gltf_outputs(root: Path, filename: str) -> Path:
 def _export(app: Any, context: FileJobContext) -> FileOperationResult:
     payload = context.payload
     format_name = str(payload.get("format", "glb")).lower().lstrip(".")
-    if f".{format_name}" not in SUPPORTED_MODEL_EXTENSIONS:
+    if f".{format_name}" not in SUPPORTED_MODEL_EXPORT_EXTENSIONS:
         raise FileApiError("unsupported_format", f"Unsupported export format {format_name!r}.")
     requested = payload.get("object_ids") if payload.get("scope") == "selection" else None
     object_ids = tuple(requested or app.engine.list_objects())

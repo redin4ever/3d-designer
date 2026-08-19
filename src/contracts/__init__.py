@@ -37,6 +37,8 @@ from .engine import (
     RawOps,
     RepairOutcome,
     ModelImportResult,
+    SUPPORTED_MODEL_EXPORT_EXTENSIONS,
+    SUPPORTED_MODEL_IMPORT_EXTENSIONS,
     SUPPORTED_MODEL_EXTENSIONS,
     UVBakeOps,
 )
@@ -140,7 +142,8 @@ __all__ = [
     "AABB", "MeshSnapshot", "Quat", "Transform", "Vec3", "WORLD_UP",
     # engine
     "EngineProtocol", "EngineError", "EngineUnavailable", "RepairOutcome",
-    "ModelImportResult", "SUPPORTED_MODEL_EXTENSIONS",
+    "ModelImportResult", "SUPPORTED_MODEL_IMPORT_EXTENSIONS",
+    "SUPPORTED_MODEL_EXPORT_EXTENSIONS", "SUPPORTED_MODEL_EXTENSIONS",
     "MeshOps", "ModifierOps", "MaterialOps", "UVBakeOps", "ImportOps", "ExportOps", "RawOps",
     # measurement
     "MetricKind", "DefectClass", "Severity", "DEFAULT_SEVERITY", "Comparison",
