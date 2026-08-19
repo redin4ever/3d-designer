@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from app.connect import CLIENTS, config_for, config_path_for, describe, write_config
+from app.connect import CLIENTS, config_for, config_path_for, describe, detect_clients, write_config
 
 
 def _command_for(client: str) -> dict:
@@ -164,3 +164,32 @@ def test_every_client_names_a_real_config_path() -> None:
     for client in CLIENTS:
         suffix = ".toml" if client == "codex" else ".json"
         assert config_path_for(client).name.endswith(suffix)
+
+
+def test_detection_distinguishes_the_current_server_from_a_stale_config(
+    tmp_path, monkeypatch
+) -> None:
+    """Presence of a forge3d table is not a live-ready state when it launches another
+    checkout or interpreter. Startup must ask for repair instead of claiming success."""
+    target = tmp_path / "installed" / "claude.json"
+    target.parent.mkdir()
+    target.write_text(
+        json.dumps({"mcpServers": {"forge3d": {"command": "old-python", "args": []}}}),
+        encoding="utf-8",
+    )
+    for name in CLIENTS:
+        isolated = target if name == "claude-code" else tmp_path / name / "missing" / "config.json"
+        monkeypatch.setitem(CLIENTS[name], "path", lambda path=isolated: path)
+
+    stale = detect_clients()
+
+    assert len(stale) == 1
+    assert stale[0]["id"] == "claude-code"
+    assert stale[0]["configured"] is False
+    assert stale[0]["status"] == "needs_update"
+
+    target.write_text(json.dumps(config_for("claude-code")), encoding="utf-8")
+    ready = detect_clients()
+
+    assert ready[0]["configured"] is True
+    assert ready[0]["status"] == "ready"

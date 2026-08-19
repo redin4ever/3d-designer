@@ -15,7 +15,7 @@
       "dependsOn": [],
       "seams": ["connect_control_layout", "connect_startup", "client_detection_and_config"],
       "decisions": ["Q-06", "Q-11", "Q-12", "Q-13"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "responsive-interface",
