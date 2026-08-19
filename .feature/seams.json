@@ -26,8 +26,8 @@
     {
       "id": "native-engine-regression",
       "file": "src/engine/model_io_test.py",
-      "line": 85,
-      "anchor": "def test_blend_import_appends_editable_meshes_without_replacing_scene(tmp_path: Path) -> None:",
+      "line": 117,
+      "anchor": "def test_blend_import_flattens_evaluated_world_placement_and_shared_meshes(tmp_path: Path) -> None:",
       "status": "wired",
       "decision": "Q-03",
       "what": "the real-Blender native import proof",
@@ -37,8 +37,8 @@
     {
       "id": "browser-job-integration",
       "file": "src/app/scene_file_integration_test.py",
-      "line": 106,
-      "anchor": "def test_real_blender_glb_job_round_trips_on_the_engine_owner_thread(tmp_path) -> None:",
+      "line": 158,
+      "anchor": "def test_real_blend_upload_preserves_placement_and_reaches_the_viewer(tmp_path) -> None:",
       "status": "wired",
       "decision": "Q-19",
       "what": "the closest real browser-file-job proof through owner-thread dispatch",

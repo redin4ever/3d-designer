@@ -23,6 +23,7 @@ See [decisions.md](decisions.md) and [assumptions.md](assumptions.md). The brows
 - 16 targeted engine and application integration tests passed with real Blender.
 - The complete backend and deterministic agent-eval suite passed.
 - All five checked-in native assets imported successfully: 759 meshes and 1,410,096 triangles total; per-file measured results are retained in the run output.
+- The complete project pipeline passed frontend unit tests, 35 real-Chrome tests, startup doctor, and feature wiring checks.
 
 ## Noticed but not done
 
