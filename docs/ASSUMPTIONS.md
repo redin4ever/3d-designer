@@ -597,3 +597,5 @@ reversible option; each is recorded here rather than asked, because the gate had
 - **Details and reversal costs:** [feature assumptions](features/responsive-blend-import/assumptions.md).
 
 - **A-086–A-104 — Contextual file dialog controls:** feature `contextual-file-dialog-controls`; IDs A-086, A-087, A-088, A-089, A-090, A-091, A-092, A-093, A-094, A-095, A-096, A-097, A-098, A-099, A-100, A-101, A-102, A-103, A-104; [details and reversal costs](features/contextual-file-dialog-controls/assumptions.md).
+
+- **A-105–A-123 — Blender import repair:** feature `blend-import-verification`; IDs A-105, A-106, A-107, A-108, A-109, A-110, A-111, A-112, A-113, A-114, A-115, A-116, A-117, A-118, A-119, A-120, A-121, A-122, A-123; [details and reversal costs](features/blend-import-verification/assumptions.md).

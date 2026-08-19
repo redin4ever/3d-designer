@@ -6,7 +6,8 @@
       "file": "src/engine/model_io.py",
       "line": 181,
       "anchor": "def _append_blend_objects(bpy: Any, source: Path) -> tuple[list[Any], tuple[str, ...]]:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02",
       "what": "loads Blender datablocks and decides when objects join the active scene",
       "evidence": "real saved .blend files load objects outside the active scene, so matrix_world reads as identity before linking",
       "asks": "should imported hierarchy be evaluated in the active scene before non-mesh parents are detached?"
@@ -16,7 +17,8 @@
       "file": "src/engine/model_io.py",
       "line": 320,
       "anchor": "for obj in mesh_objects:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-04",
       "what": "bakes each imported object's world transform into editable mesh vertices",
       "evidence": "two Blender objects can share one mesh datablock; transforming it in place makes instances corrupt each other",
       "asks": "should flattening make shared mesh data single-user before applying different world transforms?"
@@ -26,7 +28,8 @@
       "file": "src/engine/model_io_test.py",
       "line": 85,
       "anchor": "def test_blend_import_appends_editable_meshes_without_replacing_scene(tmp_path: Path) -> None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-03",
       "what": "the real-Blender native import proof",
       "evidence": "the existing fixture has one origin object, so it cannot detect lost transforms or shared-data corruption",
       "asks": "which ordinary Blender authoring features must the regression fixture include?"
@@ -36,7 +39,8 @@
       "file": "src/app/scene_file_integration_test.py",
       "line": 106,
       "anchor": "def test_real_blender_glb_job_round_trips_on_the_engine_owner_thread(tmp_path) -> None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-19",
       "what": "the closest real browser-file-job proof through owner-thread dispatch",
       "evidence": "it verifies GLB export/import but never uploads a .blend or checks the viewer message produced by that job",
       "asks": "should verification cover binary upload, job completion, authoritative geometry, and viewer delivery together?"
@@ -46,7 +50,9 @@
       "file": "src/app/file_api.py",
       "line": 245,
       "anchor": "if action == \"import-model\" and not is_json:",
-      "status": "open",
+      "status": "declined",
+      "decision": "Q-16",
+      "reason": "The reproduced binary upload and job dispatch succeeded; the defect begins inside native geometry loading.",
       "what": "validates binary model upload headers before dispatch",
       "evidence": "a real architectural .blend completed successfully through this boundary during reproduction",
       "asks": "does the upload contract need to change, or should the fix remain inside native geometry loading?"
@@ -56,7 +62,9 @@
       "file": "src/app/file_operations.py",
       "line": 55,
       "anchor": "def _import(app: Any, context: FileJobContext) -> FileOperationResult:",
-      "status": "open",
+      "status": "declined",
+      "decision": "Q-17",
+      "reason": "The operation completes and records one opaque undo step; its semantics and progress do not cause transform loss.",
       "what": "turns a completed browser upload into one opaque scene operation",
       "evidence": "the job completes and records the operation; wrong geometry originates after this boundary",
       "asks": "should operation semantics or progress reporting change for this geometry correction?"
@@ -66,7 +74,9 @@
       "file": "frontend/src/file-io.js",
       "line": 282,
       "anchor": "async function importModel(file, { sourceUp = 'AUTO', unitScale = 1, flatten = true } = {}) {",
-      "status": "open",
+      "status": "declined",
+      "decision": "Q-16",
+      "reason": "The existing picker validates and uploads .blend correctly, so changing its request would widen the repair.",
       "what": "uploads the selected .blend and import settings",
       "evidence": "validation, binary upload, polling, and completion all succeeded in existing controller tests and the reproduced job",
       "asks": "does the browser request shape need any change?"
@@ -76,7 +86,9 @@
       "file": "src/viewer/translate.py",
       "line": 118,
       "anchor": "def _on_scene_change(self, event: SceneChangeEvent) -> None:",
-      "status": "open",
+      "status": "declined",
+      "decision": "Q-19",
+      "reason": "Viewer translation already emitted all 149 meshes in reproduction; the integration regression will verify it without changing production translation.",
       "what": "turns imported object snapshots into live viewport messages",
       "evidence": "the reproduced architectural import emitted one mesh_upsert containing all 149 imported objects",
       "asks": "does viewer translation need a behavior change or only end-to-end verification?"
