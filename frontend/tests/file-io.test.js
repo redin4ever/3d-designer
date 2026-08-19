@@ -47,6 +47,15 @@ test('local file validation rejects URLs, text values, unsupported extensions, a
   assert.equal(validateLocalFile(file('huge.glb', MAX_FILE_BYTES + 1)).ok, false);
 });
 
+test('native Blender files are importable but never offered as model exports', () => {
+  assert.equal(validateLocalFile(file('workshop.blend'), { kind: 'model' }).ok, true);
+  assert.match(fileIo.MODEL_IMPORT_ACCEPT, /(?:^|,)\.blend(?:,|$)/);
+  assert.throws(
+    () => buildExportPayload({ format: 'blend' }),
+    /Unsupported export format/,
+  );
+});
+
 test('export defaults to the whole scene and requires explicit selection scope', () => {
   assert.deepEqual(
     buildExportPayload({ selectedIds: ['beam_04', 'beam_04', 'post_02'], scope: 'selection', format: 'gltf' }),
