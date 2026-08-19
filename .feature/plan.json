@@ -1,44 +1,18 @@
 {
   "units": [
     {
-      "id": "native-blend-import",
-      "what": "split import/export format contracts and append editable mesh objects from Blender libraries atomically",
-      "paths": ["src/contracts/**", "src/engine/model_io.py", "src/engine/model_io*_test.py", "src/importing/**", "src/app/file_operations.py", "src/testing/fake_surfacing.py"],
-      "publicInterface": "src/contracts/engine.py",
-      "dependsOn": [],
-      "seams": ["model_format_contract", "import_validation", "blender_import_dispatch", "blender_import_transaction", "file_job_import", "real_format_regression"],
-      "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-06", "Q-07", "Q-08", "Q-09", "Q-10", "Q-21", "Q-23"],
-      "status": "green"
-    },
-    {
-      "id": "browser-blend-picker",
-      "what": "accept local .blend files in model imports without adding a Blender export option",
-      "paths": ["frontend/src/file-io.js", "frontend/tests/file-io.test.js"],
+      "id": "file-dialog-visibility",
+      "what": "mode-specific File dialog fields with rendered-browser regression coverage",
+      "paths": [
+        "frontend/index.html",
+        "frontend/src/file-io.js",
+        "frontend/tests-browser/file-io.browser.mjs"
+      ],
       "publicInterface": "frontend/src/file-io.js",
-      "dependsOn": ["native-blend-import"],
-      "seams": ["browser_import_formats"],
-      "decisions": ["Q-02", "Q-21", "Q-22"],
-      "status": "green"
-    },
-    {
-      "id": "viewer-preview-budget",
-      "what": "send deterministic scene-budgeted preview geometry with truthful quality metadata",
-      "paths": ["src/viewer/**"],
-      "publicInterface": "src/viewer/payloads.py",
       "dependsOn": [],
-      "seams": ["viewer_preview_payload", "viewer_scene_messages"],
-      "decisions": ["Q-11", "Q-12", "Q-14", "Q-15", "Q-16", "Q-20"],
-      "status": "green"
-    },
-    {
-      "id": "responsive-renderer",
-      "what": "make Canvas2D rendering invalidation-driven and use a temporary interaction triangle budget",
-      "paths": ["frontend/src/scene-renderer.js", "frontend/src/render-scheduler.js", "frontend/src/viewport.js", "frontend/src/main.js", "frontend/tests/render-scheduler.test.js", "frontend/tests/viewport.test.js", "frontend/tests/index.js", "frontend/tests-browser/**"],
-      "publicInterface": "frontend/src/scene-renderer.js",
-      "dependsOn": ["viewer-preview-budget"],
-      "seams": ["frontend_geometry_ingest", "renderer_schedule", "renderer_triangle_work", "browser_performance_regression"],
-      "decisions": ["Q-13", "Q-16", "Q-17", "Q-18", "Q-19", "Q-20", "Q-24", "Q-25"],
-      "status": "green"
+      "seams": ["file-dialog-markup", "file-dialog-runtime", "file-dialog-browser-regression"],
+      "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-06", "Q-07", "Q-08", "Q-09", "Q-10", "Q-11", "Q-12", "Q-14", "Q-15", "Q-16", "Q-17", "Q-18", "Q-19", "Q-20"],
+      "status": "planned"
     }
   ]
 }
