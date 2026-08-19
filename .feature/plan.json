@@ -1,95 +1,44 @@
 {
   "units": [
     {
-      "id": "connection-startup",
-      "what": "automatic viewer reconnection, startup client detection, truthful client states, and explicit external configuration repair",
-      "paths": [
-        "frontend/src/connect-ui.js",
-        "frontend/src/main.js",
-        "frontend/tests/connect-ui.test.js",
-        "src/app/connect.py",
-        "src/app/connect_test.py"
-      ],
-      "publicInterface": "src/app/connect.py",
+      "id": "native-blend-import",
+      "what": "split import/export format contracts and append editable mesh objects from Blender libraries atomically",
+      "paths": ["src/contracts/**", "src/engine/model_io.py", "src/engine/model_io*_test.py", "src/importing/**", "src/app/file_operations.py", "src/testing/fake_surfacing.py"],
+      "publicInterface": "src/contracts/engine.py",
       "dependsOn": [],
-      "seams": ["connect_control_layout", "connect_startup", "client_detection_and_config"],
-      "decisions": ["Q-06", "Q-11", "Q-12", "Q-13"],
-      "status": "green"
+      "seams": ["model_format_contract", "import_validation", "blender_import_dispatch", "blender_import_transaction", "file_job_import", "real_format_regression"],
+      "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-06", "Q-07", "Q-08", "Q-09", "Q-10", "Q-21", "Q-23"],
+      "status": "planned"
     },
     {
-      "id": "responsive-interface",
-      "what": "one collision-free top-bar layout and bounded, scrollable sidebar inspectors at every supported width",
-      "paths": [
-        "frontend/src/app.css",
-        "frontend/src/point.css",
-        "frontend/src/texture-inspector.css",
-        "frontend/src/connect.css",
-        "frontend/tests/layout.test.js",
-        "frontend/tests-browser/connect.browser.mjs",
-        "frontend/tests-browser/harness/static-server.mjs",
-        "frontend/tests-browser/run-controls.browser.mjs"
-      ],
-      "dependsOn": [],
-      "seams": ["topbar_command_layout", "sidebar_layout", "selected_inspector_overflow", "texture_inspector_styles", "responsive_ui_regression"],
-      "decisions": ["Q-05", "Q-07", "Q-08", "Q-09", "Q-10"],
-      "status": "green"
+      "id": "browser-blend-picker",
+      "what": "accept local .blend files in model imports without adding a Blender export option",
+      "paths": ["frontend/src/file-io.js", "frontend/tests/file-io.test.js"],
+      "publicInterface": "frontend/src/file-io.js",
+      "dependsOn": ["native-blend-import"],
+      "seams": ["browser_import_formats"],
+      "decisions": ["Q-02", "Q-21", "Q-22"],
+      "status": "planned"
     },
     {
-      "id": "scene-file-runtime",
-      "what": "thread-correct Blender file jobs, safe pause/replace behavior, explicit export scope, and production round-trip coverage",
-      "paths": [
-        "frontend/src/file-io.js",
-        "frontend/tests/file-io.test.js",
-        "frontend/tests-browser/file-io.browser.mjs",
-        "src/app/file_api.py",
-        "src/app/file_api_test.py",
-        "src/app/file_operations.py",
-        "src/app/file_operations_test.py",
-        "src/app/live.py",
-        "src/app/live_test.py",
-        "src/app/scene_file_integration_test.py",
-        "src/engine/exporting.py",
-        "src/mcp_server/transports.py",
-        "src/mcp_server/transports_test.py"
-      ],
-      "publicInterface": "src/app/file_api.py",
+      "id": "viewer-preview-budget",
+      "what": "send deterministic scene-budgeted preview geometry with truthful quality metadata",
+      "paths": ["src/viewer/payloads.py", "src/viewer/payloads_test.py", "src/viewer/translate.py", "src/viewer/translate_test.py", "src/viewer/*translate*_test.py"],
+      "publicInterface": "src/viewer/payloads.py",
       "dependsOn": [],
-      "seams": ["file_ui_flow", "file_job_scheduling", "live_file_wiring", "export_operation", "blender_export_context", "file_browser_regression", "real_file_integration"],
-      "decisions": ["Q-14", "Q-15", "Q-16", "Q-17", "Q-18"],
-      "status": "green"
+      "seams": ["viewer_preview_payload", "viewer_scene_messages"],
+      "decisions": ["Q-11", "Q-12", "Q-14", "Q-15", "Q-16", "Q-20"],
+      "status": "planned"
     },
     {
-      "id": "agent-accuracy",
-      "what": "phase-focused MCP discovery, concise server workflow instructions, richer orientation, and deterministic attention-to-detail evaluations",
-      "paths": [
-        "src/mcp_server/sdk_bridge.py",
-        "src/mcp_server/sdk_bridge_test.py",
-        "src/mcp_server/registry.py",
-        "src/mcp_server/registry_test.py",
-        "src/mcp_server/session_specs.py",
-        "src/mcp_server/session_specs_test.py",
-        "src/mcp_server/README.md",
-        "src/evals/**"
-      ],
-      "publicInterface": "src/mcp_server/sdk_bridge.py",
-      "dependsOn": [],
-      "seams": ["mcp_tool_exposure", "mcp_server_guidance", "role_registry", "orientation_tool"],
-      "decisions": ["Q-19", "Q-20", "Q-21", "Q-22", "Q-23"],
-      "status": "green"
-    },
-    {
-      "id": "project-verification",
-      "what": "restore the documented whole-project gate and make skipped prerequisites distinguishable from product failures",
-      "paths": [
-        ".pipeline/check.mjs",
-        ".pipeline/check.test.mjs",
-        "CLAUDE.md",
-        "docs/features/product-robustness/FEATURE.md"
-      ],
-      "dependsOn": ["connection-startup", "responsive-interface", "scene-file-runtime", "agent-accuracy"],
-      "seams": ["project_gate"],
-      "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-24", "Q-25"],
-      "status": "green"
+      "id": "responsive-renderer",
+      "what": "make Canvas2D rendering invalidation-driven and use a temporary interaction triangle budget",
+      "paths": ["frontend/src/scene-renderer.js", "frontend/src/viewport.js", "frontend/src/main.js", "frontend/tests/scene-renderer.test.js", "frontend/tests/viewport.test.js", "frontend/tests/index.js", "frontend/tests-browser/**"],
+      "publicInterface": "frontend/src/scene-renderer.js",
+      "dependsOn": ["viewer-preview-budget"],
+      "seams": ["frontend_geometry_ingest", "renderer_schedule", "renderer_triangle_work", "browser_performance_regression"],
+      "decisions": ["Q-13", "Q-16", "Q-17", "Q-18", "Q-19", "Q-20", "Q-24", "Q-25"],
+      "status": "planned"
     }
   ]
 }
