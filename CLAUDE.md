@@ -22,14 +22,15 @@ agent-instructions file.
 
 <!-- PIPELINE:COMMANDS -->
 ```bash
-python -m pytest src -q              # backend: 609 tests + 54 conformance checks (fake AND real bpy)
-node --test frontend/tests/          # frontend: 28 tests
-python src/forge3d_cli.py doctor     # is the product actually wired and startable?
-node .pipeline/check.mjs             # the gate — reads disk, re-runs both suites
+node tools/run-pytest.mjs src -q                 # backend + deterministic agent evals
+node --test frontend/tests/                      # frontend unit suite
+node --test frontend/tests-browser/smoke.test.js # rendered UI (set PUPPETEER_EXECUTABLE_PATH if needed)
+node .pipeline/check.mjs                         # complete gate, including doctor + feature wiring
 ```
 
-`python` means `%LOCALAPPDATA%\Programs\Python\Python313\python.exe`. The `python` on PATH
-is the Windows Store alias stub and runs nothing.
+The runners discover Python 3.13 and Chrome/Edge from explicit environment overrides and
+standard install locations. Missing prerequisites are reported as `UNAVAILABLE` with exit
+code 2; product failures use exit code 1, so a missing browser can never look like a pass.
 <!-- /PIPELINE:COMMANDS -->
 
 ## Codebase map
