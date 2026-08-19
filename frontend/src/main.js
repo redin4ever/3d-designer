@@ -263,7 +263,14 @@ function main() {
   // layer and lives outside <main>, so a root scoped to the layout cannot see it. Nothing
   // here touches the socket — connecting an AI client is a one-off setup action against the
   // page's own HTTP origin, and it is deliberately not on the wire protocol.
-  attachConnectButton(document);
+  const connectController = attachConnectButton(document);
+  // Client configuration and restarts happen outside this tab. Re-check when the operator
+  // comes back so the top bar cannot stay stuck on stale "restart required" state.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && connectController) {
+      connectController.refreshStatus();
+    }
+  });
 
   setStatus('connecting');
   socket.connect();
