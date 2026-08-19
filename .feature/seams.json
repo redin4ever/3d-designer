@@ -6,7 +6,8 @@
       "file": "frontend/src/file-io.js",
       "line": 17,
       "anchor": "const MODEL_EXTENSIONS = new Set(['glb', 'gltf', 'obj', 'fbx', 'stl', 'ply', 'usd', 'usda', 'usdc']);",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-02",
       "what": "the browser-side model validator and native picker filter",
       "evidence": "the model set and picker accept list both omit blend while export uses a separate FORMATS set",
       "asks": "should .blend appear only for Import Model, with export formats unchanged?"
@@ -16,7 +17,8 @@
       "file": "src/contracts/engine.py",
       "line": 44,
       "anchor": "SUPPORTED_MODEL_EXTENSIONS: tuple[str, ...] = (",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01",
       "what": "the shared engine format contract currently used for both import and export",
       "evidence": "its docstring deliberately excludes blend because opening a Blender file would replace process scene state",
       "asks": "should native blend be an import-only format that appends data instead of opening/replacing the process scene?"
@@ -26,7 +28,8 @@
       "file": "src/importing/operations.py",
       "line": 71,
       "anchor": "if extension not in SUPPORTED_MODEL_EXTENSIONS:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-06",
       "what": "the operation-log boundary that accepts or rejects uploaded model suffixes",
       "evidence": "every browser and MCP import reaches this local-file validation before Blender",
       "asks": "should .blend use the same axis, scale and flatten options as interchange imports?"
@@ -36,7 +39,8 @@
       "file": "src/engine/model_io.py",
       "line": 32,
       "anchor": "_IMPORT_OPERATORS: dict[str, str] = {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-03",
       "what": "the Blender adapter's suffix-to-importer dispatch",
       "evidence": "all current formats call bpy operators; blend needs bpy.data.libraries loading instead of an import operator",
       "asks": "which datablocks from a blend file should appear: mesh objects only, or cameras/lights/empties too?"
@@ -46,7 +50,8 @@
       "file": "src/engine/model_io.py",
       "line": 223,
       "anchor": "    def import_model(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01",
       "what": "the atomic Blender model import transaction and post-import transform handling",
       "evidence": "created objects are tracked and rolled back on failure, then mesh transforms may be flattened",
       "asks": "should linked libraries remain linked, or should Forge3D append editable local copies?"
@@ -56,7 +61,8 @@
       "file": "src/app/file_operations.py",
       "line": 55,
       "anchor": "def _import(app: Any, context: FileJobContext) -> FileOperationResult:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-10",
       "what": "the paused owner-thread file job that turns an uploaded model into a scene operation",
       "evidence": "the job already serializes Blender work but reports only coarse start and completion progress",
       "asks": "what progress and completion feedback should a user see while a larger blend is loading and previewing?"
@@ -66,7 +72,8 @@
       "file": "src/viewer/payloads.py",
       "line": 19,
       "anchor": "def snapshot_to_payload(snap: MeshSnapshot) -> MeshPayload:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-11",
       "what": "full engine snapshots flattened into browser geometry buffers",
       "evidence": "every vertex, triangle, normal and UV is serialized even though the browser is a live preview rather than the authoritative model",
       "asks": "may the live viewer use a deterministic lower-detail proxy while Blender, saving and export keep the complete mesh?"
@@ -76,7 +83,8 @@
       "file": "src/viewer/translate.py",
       "line": 78,
       "anchor": "    def _geometry_message(self, event: SceneChangeEvent) -> ServerMessage | None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-16",
       "what": "the topology-change and full-scene messages sent after imports",
       "evidence": "an imported model is serialized synchronously as one mesh-upsert/full-scene payload",
       "asks": "should preview simplification be disclosed in the scene message and UI rather than silently dropping display triangles?"
@@ -86,7 +94,8 @@
       "file": "frontend/src/viewport.js",
       "line": 30,
       "anchor": "export function buildGeometryBuffers(mesh) {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-16",
       "what": "synchronous conversion of JSON arrays into typed viewer buffers",
       "evidence": "large payloads allocate full duplicate typed arrays on the browser main thread before the scene can draw",
       "asks": "should ingestion remain exact for already-budgeted proxies, or add progressive chunking too?"
@@ -96,7 +105,8 @@
       "file": "frontend/src/scene-renderer.js",
       "line": 246,
       "anchor": "  start() {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-17",
       "what": "the Canvas2D renderer scheduling policy",
       "evidence": "it rasterizes the entire scene every animation frame even when neither camera nor scene changed",
       "asks": "should rendering become event-driven and redraw only after scene, camera, selection or texture changes?"
@@ -106,7 +116,8 @@
       "file": "frontend/src/scene-renderer.js",
       "line": 446,
       "anchor": "  _draw() {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-13",
       "what": "the CPU triangle and pixel raster loop that blocks pointer events",
       "evidence": "every triangle is transformed, shaded, material-searched and rasterized on the browser main thread for every frame",
       "asks": "during orbit/zoom, should the viewer temporarily reduce detail and render full preview quality after interaction ends?"
@@ -116,7 +127,8 @@
       "file": "src/engine/model_io_formats_test.py",
       "line": 13,
       "anchor": "def test_every_advertised_format_writes_a_real_file(tmp_path, suffix: str) -> None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-21",
       "what": "real-Blender proof for advertised model formats",
       "evidence": "the current parametrization assumes every supported extension is exportable, which cannot be true for import-only blend",
       "asks": "should the contract split import formats from export formats and add a real blend append test?"
@@ -126,7 +138,8 @@
       "file": "frontend/tests-browser/smoke.test.js",
       "line": 677,
       "anchor": "  registerFileIoTests({ withScene, waitUntil });",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-24",
       "what": "the real-Chrome suite that already owns import UI flows",
       "evidence": "it verifies file actions but has no semi-complex mesh responsiveness budget",
       "asks": "what interaction delay should count as responsive for a semi-complex preview?"

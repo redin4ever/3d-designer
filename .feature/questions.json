@@ -1,204 +1,29 @@
 {
   "questions": [
-    {
-      "id": "Q-01",
-      "wave": "job",
-      "question": "What must feel materially better when this robustness work is complete?",
-      "assumed": "A new user can launch Forge3D, see a truthful connection state, work without colliding controls, exchange scene files reliably, and obtain designs that agents verify rather than merely claim are finished.",
-      "assumption": "A-053",
-      "seams": ["connect_startup", "file_ui_flow", "mcp_server_guidance"]
-    },
-    {
-      "id": "Q-02",
-      "wave": "job",
-      "question": "Who is the primary user for these improvements?",
-      "assumed": "A local desktop user collaborating with one MCP agent while watching and correcting a live Blender scene.",
-      "assumption": "A-053",
-      "seams": ["connect_startup", "sidebar_layout"]
-    },
-    {
-      "id": "Q-03",
-      "wave": "scope",
-      "question": "Which reported areas are required in this pass?",
-      "assumed": "Connection startup, responsive UI containment, save/open/import/export reliability, agent guidance and tool focus, accuracy evaluation, and a whole-project verification gate.",
-      "assumption": "A-053",
-      "seams": ["topbar_command_layout", "file_job_scheduling", "mcp_tool_exposure", "project_gate"]
-    },
-    {
-      "id": "Q-04",
-      "wave": "scope",
-      "question": "What remains out of scope?",
-      "assumed": "Cloud accounts, collaborative multi-writer editing, new 3D file formats, and replacing Blender's modelling engine.",
-      "assumption": "A-053",
-      "seams": ["client_detection_and_config", "export_operation"]
-    },
-    {
-      "id": "Q-05",
-      "wave": "where it lives",
-      "question": "How should top-bar commands behave when horizontal space is tight?",
-      "assumed": "Use one shared layout with no independent fixed offsets; retain primary status/actions and collapse secondary labels or actions before 529px without overlap.",
-      "assumption": "A-054",
-      "seams": ["topbar_command_layout", "responsive_ui_regression"]
-    },
-    {
-      "id": "Q-06",
-      "wave": "where it lives",
-      "question": "Where should agent connection state live?",
-      "assumed": "A compact status/action in the shared top bar, with details and repair actions in an accessible dialog.",
-      "assumption": "A-054",
-      "seams": ["connect_control_layout"]
-    },
-    {
-      "id": "Q-07",
-      "wave": "where it lives",
-      "question": "What is the minimum supported desktop viewport?",
-      "assumed": "529 CSS pixels, preserving the existing rendered regression width and requiring zero command or panel collisions there and above.",
-      "assumption": "A-054",
-      "seams": ["responsive_ui_regression"]
-    },
-    {
-      "id": "Q-08",
-      "wave": "where it lives",
-      "question": "How should chat, selected-object editing, and logs share the sidebar?",
-      "assumed": "Chat receives flexible space; object editing and logs are bounded, collapsible sections that never draw over one another.",
-      "assumption": "A-055",
-      "seams": ["sidebar_layout"]
-    },
-    {
-      "id": "Q-09",
-      "wave": "core flow",
-      "question": "What happens when selected-object controls are taller than their allocated panel?",
-      "assumed": "The inspector scrolls internally with its actions kept reachable; it does not expand across chat or logs.",
-      "assumption": "A-055",
-      "seams": ["selected_inspector_overflow"]
-    },
-    {
-      "id": "Q-10",
-      "wave": "core flow",
-      "question": "Which texture controls should be visible immediately?",
-      "assumed": "Preset and essential material/map state remain visible; mapping transforms and advanced tuning are grouped and collapsible, with styles matching the actual markup.",
-      "assumption": "A-055",
-      "seams": ["texture_inspector_styles"]
-    },
-    {
-      "id": "Q-11",
-      "wave": "core flow",
-      "question": "What should automatic connection do at application startup?",
-      "assumed": "Reconnect the live viewer socket, immediately detect supported MCP clients, and show ready, restart-required, action-required, or unavailable without waiting for a click.",
-      "assumption": "A-056",
-      "seams": ["connect_startup"]
-    },
-    {
-      "id": "Q-12",
-      "wave": "permissions",
-      "question": "May startup silently rewrite external AI-client configuration files?",
-      "assumed": "No. External config writes require an explicit Configure action; already-correct configurations are recognized automatically and never rewritten.",
-      "assumption": "A-056",
-      "seams": ["client_detection_and_config"]
-    },
-    {
-      "id": "Q-13",
-      "wave": "states",
-      "question": "What should users see after a client configuration is changed?",
-      "assumed": "A truthful restart-required state naming the affected client, plus refresh and retry actions; never claim a client is live merely because its file was written.",
-      "assumption": "A-056",
-      "seams": ["connect_startup", "client_detection_and_config"]
-    },
-    {
-      "id": "Q-14",
-      "wave": "core flow",
-      "question": "What should happen when opening or importing while an agent run is active?",
-      "assumed": "Explain that the scene will change, pause safely before mutation, serialize the operation, and remain paused afterward so the user can inspect the result.",
-      "assumption": "A-057",
-      "seams": ["file_ui_flow", "live_file_wiring"]
-    },
-    {
-      "id": "Q-15",
-      "wave": "data",
-      "question": "What should export include by default?",
-      "assumed": "The whole current scene, with explicit selection-only scope when the UI offers it; unsupported formats fail clearly without presenting a partial result as success.",
-      "assumption": "A-057",
-      "seams": ["export_operation"]
-    },
-    {
-      "id": "Q-16",
-      "wave": "data",
-      "question": "Which file journeys require production guarantees?",
-      "assumed": "Native .forge3d save/open and GLB export/import receive real-Blender round-trip coverage; every advertised format keeps unit-level validation.",
-      "assumption": "A-058",
-      "seams": ["blender_export_context", "real_file_integration"]
-    },
-    {
-      "id": "Q-17",
-      "wave": "states",
-      "question": "How should long-running file work behave?",
-      "assumed": "Return a job immediately, report progress/errors in the existing UI, but marshal every Blender mutation onto its owning thread and serialize it with agent writes.",
-      "assumption": "A-058",
-      "seams": ["file_job_scheduling", "live_file_wiring"]
-    },
-    {
-      "id": "Q-18",
-      "wave": "verification",
-      "question": "What proves the file system works rather than merely exposing menu labels?",
-      "assumed": "API lifecycle tests, browser-state tests, and a small real-Blender save/open plus GLB export/import round trip all pass and assert downloadable non-empty artifacts.",
-      "assumption": "A-058",
-      "seams": ["file_browser_regression", "real_file_integration"]
-    },
-    {
-      "id": "Q-19",
-      "wave": "agent accuracy",
-      "question": "Should agents continue seeing all 52 tools in every design phase?",
-      "assumed": "No. List orientation, inspection, promotion, and only mutation tools legal in the current phase; keep raw execution out of the default MCP catalogue while preserving explicit opt-in compatibility.",
-      "assumption": "A-059",
-      "seams": ["mcp_tool_exposure", "role_registry"]
-    },
-    {
-      "id": "Q-20",
-      "wave": "agent accuracy",
-      "question": "What workflow should every connected agent be instructed to follow?",
-      "assumed": "Orient with get_phase, prefer semantic operations, inspect ActionReport problems and assumptions, measure important dimensions, correct failures, and promote only after acceptance passes.",
-      "assumption": "A-060",
-      "seams": ["mcp_server_guidance"]
-    },
-    {
-      "id": "Q-21",
-      "wave": "agent accuracy",
-      "question": "What should get_phase provide before mutation begins?",
-      "assumed": "Current phase, callable focused catalogue, failed acceptance checks, user annotations/focus, and a concise recommended next-action sequence.",
-      "assumption": "A-060",
-      "seams": ["orientation_tool"]
-    },
-    {
-      "id": "Q-22",
-      "wave": "agent accuracy",
-      "question": "How should attention to detail be evaluated?",
-      "assumed": "Representative tasks score orientation, semantic tool choice, dimension verification, defect repair, phase completion, and export rather than relying on prompt wording or tool counts alone.",
-      "assumption": "A-061",
-      "seams": ["mcp_tool_exposure", "mcp_server_guidance", "project_gate"]
-    },
-    {
-      "id": "Q-23",
-      "wave": "existing users",
-      "question": "How should compatibility be handled for clients that expect the old catalogue?",
-      "assumed": "Tool calls remain backward compatible and server-side authorization remains authoritative; only discovery becomes phase-focused, with a documented explicit raw-tool opt-in.",
-      "assumption": "A-059",
-      "seams": ["mcp_tool_exposure", "role_registry"]
-    },
-    {
-      "id": "Q-24",
-      "wave": "verification",
-      "question": "What should one project gate verify?",
-      "assumed": "Backend and frontend suites, feature wiring, deterministic agent-accuracy checks, and environment-aware browser/Blender probes that distinguish unavailable prerequisites from actual failures.",
-      "assumption": "A-061",
-      "seams": ["project_gate"]
-    },
-    {
-      "id": "Q-25",
-      "wave": "completion",
-      "question": "What evidence is required before declaring the mission complete?",
-      "assumed": "All unit and integration suites pass; real runtime file journeys succeed; rendered collision checks pass at supported widths; connection states are truthful; the MCP catalogue and instructions pass focused accuracy evaluations; and the restored gate is green.",
-      "assumption": "A-061",
-      "seams": ["responsive_ui_regression", "real_file_integration", "mcp_server_guidance", "project_gate"]
-    }
+    {"id":"Q-01","wave":"core flow","question":"What should choosing a .blend file do to the open project?","options":["Append editable meshes","Replace the current scene"],"answer":"Append editable meshes","notes":"User answered verbatim: append","seams":["model_format_contract","blender_import_transaction"]},
+    {"id":"Q-02","wave":"scope","question":"Should .blend be offered for import only?","assumed":"Import only; export formats remain unchanged","assumption":"A-062","seams":["browser_import_formats","model_format_contract"]},
+    {"id":"Q-03","wave":"data","question":"Which Blender objects should be appended?","assumed":"Mesh objects only; skip cameras, lights, empties and other datablocks with a warning","assumption":"A-063","seams":["blender_import_dispatch"]},
+    {"id":"Q-04","wave":"data","question":"Should appended meshes stay linked to the source file?","assumed":"No; append editable local objects and data","assumption":"A-064","seams":["blender_import_transaction"]},
+    {"id":"Q-05","wave":"core flow","question":"Which parts of a multi-scene .blend should be imported?","assumed":"All mesh objects available in the file, once each","assumption":"A-065","seams":["blender_import_dispatch"]},
+    {"id":"Q-06","wave":"existing behavior","question":"How should .blend axes be interpreted?","assumed":"AUTO treats Blender files as Z-up; explicit axis overrides remain available","assumption":"A-066","seams":["import_validation","blender_import_transaction"]},
+    {"id":"Q-07","wave":"existing behavior","question":"Should scale and flatten options work for .blend?","assumed":"Yes, use the same scale and flatten behavior as other model imports","assumption":"A-067","seams":["import_validation","blender_import_transaction"]},
+    {"id":"Q-08","wave":"failure states","question":"What should happen if any part of a .blend import fails?","assumed":"Roll back every object created by that import and leave the prior scene untouched","assumption":"A-068","seams":["blender_import_transaction","file_job_import"]},
+    {"id":"Q-09","wave":"existing records","question":"How should naming conflicts with existing objects be handled?","assumed":"Keep both and let Blender assign deterministic unique names","assumption":"A-069","seams":["blender_import_transaction"]},
+    {"id":"Q-10","wave":"states","question":"What feedback should a larger import show?","assumed":"Keep the existing job feedback and report a clear completion or actionable failure","assumption":"A-070","seams":["file_job_import"]},
+    {"id":"Q-11","wave":"performance","question":"May the live viewport simplify geometry while retaining the full model?","assumed":"Yes; simplify only the transmitted preview, never Blender state, saves or exports","assumption":"A-071","seams":["viewer_preview_payload","viewer_scene_messages"]},
+    {"id":"Q-12","wave":"limits","question":"How much geometry should a settled live preview draw?","assumed":"Cap a full-scene preview at 40,000 triangles, preserving exact geometry below the cap","assumption":"A-072","seams":["viewer_preview_payload","viewer_scene_messages"]},
+    {"id":"Q-13","wave":"interaction","question":"What detail should be drawn while orbiting or zooming?","assumed":"Use at most 10,000 preview triangles during interaction, then restore the settled preview","assumption":"A-073","seams":["renderer_triangle_work"]},
+    {"id":"Q-14","wave":"accuracy","question":"How should preview triangles be selected?","assumed":"Use deterministic evenly distributed sampling with compact remapped attributes","assumption":"A-074","seams":["viewer_preview_payload"]},
+    {"id":"Q-15","wave":"accuracy","question":"How should a scene-wide preview budget be divided?","assumed":"Allocate proportionally while giving each visible mesh a fair minimum when possible","assumption":"A-075","seams":["viewer_scene_messages"]},
+    {"id":"Q-16","wave":"states","question":"Should users be told when the viewport is simplified?","assumed":"Yes; include truthful preview metadata and show a concise viewer notice","assumption":"A-076","seams":["viewer_scene_messages","frontend_geometry_ingest"]},
+    {"id":"Q-17","wave":"interaction","question":"Should an idle viewport render continuously?","assumed":"No; redraw only when scene, camera, selection, size, theme or texture state changes","assumption":"A-077","seams":["renderer_schedule"]},
+    {"id":"Q-18","wave":"interaction","question":"When should full preview detail return after movement?","assumed":"After a short 120 ms interaction-settle delay","assumption":"A-078","seams":["renderer_triangle_work"]},
+    {"id":"Q-19","wave":"states","question":"How should asynchronously loaded textures update an idle viewport?","assumed":"Texture completion explicitly invalidates and redraws the scene","assumption":"A-079","seams":["renderer_schedule"]},
+    {"id":"Q-20","wave":"existing behavior","question":"Should small models look exactly as before?","assumed":"Yes; no simplification under the preview budget","assumption":"A-080","seams":["viewer_preview_payload","renderer_triangle_work"]},
+    {"id":"Q-21","wave":"scope","question":"Should .blend appear as an export choice?","assumed":"No; native Blender files are import-only in this feature","assumption":"A-081","seams":["model_format_contract","real_format_regression"]},
+    {"id":"Q-22","wave":"limits","question":"Should the upload-size limit change for .blend?","assumed":"No; retain the existing 512 MB safety limit","assumption":"A-082","seams":["browser_import_formats"]},
+    {"id":"Q-23","wave":"failure states","question":"What should a corrupt or unreadable .blend produce?","assumed":"A named import error with the source path and no partial scene mutation","assumption":"A-083","seams":["blender_import_transaction","file_job_import"]},
+    {"id":"Q-24","wave":"performance","question":"What responsiveness should the semi-complex regression enforce?","assumed":"Camera input is accepted within 150 ms in the real-browser test fixture","assumption":"A-084","seams":["browser_performance_regression"]},
+    {"id":"Q-25","wave":"scope","question":"Should this feature replace the Canvas2D renderer with WebGL?","assumed":"No; optimize the current renderer and keep a GPU rewrite outside this scoped fix","assumption":"A-085","seams":["frontend_geometry_ingest","renderer_schedule","renderer_triangle_work"]}
   ]
 }
