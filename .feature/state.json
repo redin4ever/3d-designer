@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Responsive semi-complex model import and native Blender .blend file import",
-  "slug": "responsive-blend-import",
-  "phase": 5,
-  "baseSha": "18a3b57505597cc23ab56a6702eed045455ea255",
-  "branch": "feat/responsive-blend-import",
-  "docsDir": "docs/features/responsive-blend-import",
+  "feature": "Contextual file dialog controls that hide export-only options during imports",
+  "slug": "contextual-file-dialog-controls",
+  "phase": 2,
+  "baseSha": "7f1a200d15579487e4228c30ce22f0656a9dcc8e",
+  "branch": "feat/contextual-file-dialog-controls",
+  "docsDir": "docs/features/contextual-file-dialog-controls",
   "startedAt": "2026-08-19",
-  "status": "finished"
+  "status": "running"
 }
