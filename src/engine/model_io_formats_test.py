@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from contracts import SUPPORTED_MODEL_EXTENSIONS
+import contracts
 from engine.model_io import ModelIOMixin
 
 
 @pytest.mark.needs_blender
-@pytest.mark.parametrize("suffix", SUPPORTED_MODEL_EXTENSIONS)
+@pytest.mark.parametrize(
+    "suffix",
+    getattr(contracts, "SUPPORTED_MODEL_EXPORT_EXTENSIONS", contracts.SUPPORTED_MODEL_EXTENSIONS),
+)
 def test_every_advertised_format_writes_a_real_file(tmp_path, suffix: str) -> None:
     """Advertising a format that reaches Blender with wrong operator options is a broken export."""
     bpy = pytest.importorskip("bpy")

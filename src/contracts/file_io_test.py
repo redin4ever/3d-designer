@@ -5,10 +5,15 @@ from __future__ import annotations
 import contracts
 
 
-def test_supported_model_extensions_match_the_editor_format_choice() -> None:
-    assert contracts.SUPPORTED_MODEL_EXTENSIONS == (
+def test_model_import_and_export_formats_are_distinct() -> None:
+    assert contracts.SUPPORTED_MODEL_EXPORT_EXTENSIONS == (
         ".glb", ".gltf", ".fbx", ".obj", ".stl", ".ply", ".usd", ".usda", ".usdc",
     )
+    assert contracts.SUPPORTED_MODEL_IMPORT_EXTENSIONS == (
+        ".glb", ".gltf", ".fbx", ".obj", ".stl", ".ply", ".usd", ".usda", ".usdc",
+        ".blend",
+    )
+    assert contracts.SUPPORTED_MODEL_EXTENSIONS == contracts.SUPPORTED_MODEL_EXPORT_EXTENSIONS
 
 
 def test_engine_contract_exposes_atomic_model_import_and_generic_export() -> None:

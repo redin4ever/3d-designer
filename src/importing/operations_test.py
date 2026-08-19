@@ -87,7 +87,7 @@ def test_import_rejects_missing_or_unsupported_files_by_name(tmp_path):
         )
     assert missing_info.value.rule == "import.file_not_found"
 
-    unsupported = tmp_path / "house.blend"
+    unsupported = tmp_path / "house.txt"
     unsupported.write_bytes(b"placeholder")
     with pytest.raises(RuleError) as unsupported_info:
         import_model_file(
@@ -100,6 +100,25 @@ def test_import_rejects_missing_or_unsupported_files_by_name(tmp_path):
             ),
         )
     assert unsupported_info.value.rule == "import.unsupported_format"
+
+
+def test_import_accepts_native_blend_as_a_local_model_source(tmp_path):
+    source = tmp_path / "house.blend"
+    source.write_bytes(b"BLENDER-v300")
+    engine = _ImportEngine(ModelImportResult(("native_mesh",)))
+
+    result = import_model_file(
+        engine,
+        Operation(
+            op_id="import-blend",
+            kind=IMPORT_OPERATION_KIND,
+            params={"path": str(source)},
+            opaque=True,
+        ),
+    )
+
+    assert result.produced_objects == ("native_mesh",)
+    assert engine.calls == [(str(source), "AUTO", 1.0, True)]
 
 
 def test_import_rejects_non_positive_unit_scale_by_name(tmp_path):
