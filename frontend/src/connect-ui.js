@@ -99,6 +99,40 @@ export function attachConnectButton(root, io = {}) {
   const fetchImpl = io.fetchImpl ?? ((...args) => globalThis.fetch(...args));
   let busy = false;
 
+  const showStatus = (state, label, description) => {
+    button.dataset.connectionState = state;
+    button.textContent = label;
+    button.setAttribute('aria-label', description);
+    button.setAttribute('title', description);
+  };
+
+  const applyDetectedState = (found) => {
+    if (!found.ok) {
+      showStatus('unavailable', 'Agent unavailable', found.error);
+      return;
+    }
+    const clients = found.clients;
+    const ready = clients.filter((client) => client.configured === true);
+    const pending = clients.filter((client) => client.configured !== true);
+    if (clients.length === 0) {
+      showStatus('unavailable', 'No agent found', 'No supported AI client was detected on this machine.');
+    } else if (pending.length === 0) {
+      const label = ready.length === 1 ? `${ready[0].label} ready` : `${ready.length} agents ready`;
+      showStatus('ready', label, `${ready.map((client) => client.label).join(', ')} configuration ready.`);
+    } else {
+      const label = clients.length === 1 ? `Set up ${clients[0].label}` : 'Set up agent';
+      const names = pending.map((client) => client.label).join(', ');
+      showStatus('action-required', label, `${names} requires configuration or an update.`);
+    }
+  };
+
+  const refreshStatus = async () => {
+    showStatus('checking', 'Checking agentâ€¦', 'Checking supported AI client configuration.');
+    const found = await loadClients(fetchImpl);
+    applyDetectedState(found);
+    return found;
+  };
+
   // Never `disabled`: disabling the element that currently has focus drops focus to the
   // body, so a keyboard user who just pressed Enter loses their place mid-action. A flag
   // plus aria-busy says the same thing to everyone and keeps the button where it was.
@@ -137,6 +171,15 @@ export function attachConnectButton(root, io = {}) {
     setBusy(true);
     const result = await connectClient(fetchImpl, client.id);
     setBusy(false);
+    if (result.ok) {
+      showStatus(
+        'restart-required',
+        `Restart ${client.label}`,
+        `${client.label} was configured and must be restarted before forge3d tools appear.`,
+      );
+    } else {
+      showStatus('action-required', `Set up ${client.label}`, result.error);
+    }
     showOutcome(result.ok ? describeSuccess(result, client) : describeFailure(result.error));
   }
 
@@ -165,4 +208,11 @@ export function attachConnectButton(root, io = {}) {
   // opener on its own, but only when nothing else has claimed it in between — putting it
   // back explicitly is one line and removes the "in between".
   dialog.addEventListener('close', () => button.focus());
+
+  // Detection is read-only and happens on attachment so the top bar tells the truth before
+  // anyone goes looking for a Connect action. External configuration writes remain behind
+  // the button click above.
+  void refreshStatus();
+
+  return { refreshStatus };
 }

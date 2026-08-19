@@ -38,7 +38,7 @@ from pathlib import Path
 from app.codex_config import format_server as format_codex_server
 from app.codex_config import write_server as write_codex_server
 
-__all__ = ["CLIENTS", "config_for", "config_path_for", "describe", "write_config"]
+__all__ = ["CLIENTS", "config_for", "config_path_for", "describe", "detect_clients", "write_config"]
 
 _SRC = Path(__file__).resolve().parents[1]
 _REPO = _SRC.parent
@@ -117,10 +117,25 @@ def _looks_installed(client: str) -> bool:
     return path.exists() or path.parent.exists()
 
 
-def _already_configured(client: str) -> bool:
+def _contains_expected(actual: object, expected: object) -> bool:
+    """Whether ``actual`` contains the command shape Forge3D currently requires.
+
+    Client-specific optional fields are allowed, but every command, argument and environment
+    value that determines which checkout starts must match. Presence alone is not readiness:
+    an old checkout under the right server name is a stale connection.
+    """
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(
+            key in actual and _contains_expected(actual[key], value)
+            for key, value in expected.items()
+        )
+    return actual == expected
+
+
+def _configuration_status(client: str) -> str:
     path = config_path_for(client)
     if not path.exists():
-        return False
+        return "needs_configuration"
     try:
         text = path.read_text(encoding="utf-8")
         data = (
@@ -129,9 +144,16 @@ def _already_configured(client: str) -> bool:
             else json.loads(text) or {}
         )
     except (OSError, ValueError):
-        return False
+        return "invalid"
     key = "mcp_servers" if CLIENTS[client].get("format") == "toml" else "mcpServers"
-    return "forge3d" in (data.get(key) or {})
+    server = (data.get(key) or {}).get("forge3d")
+    if server is None:
+        return "needs_configuration"
+    return "ready" if _contains_expected(server, _server_command()) else "needs_update"
+
+
+def _already_configured(client: str) -> bool:
+    return _configuration_status(client) == "ready"
 
 
 def detect_clients() -> list[dict]:
@@ -144,13 +166,15 @@ def detect_clients() -> list[dict]:
     for name, spec in CLIENTS.items():
         if not _looks_installed(name):
             continue
+        status = _configuration_status(name)
         found.append(
             {
                 "id": name,
                 "label": spec["label"],
                 "transport": spec["transport"],
                 "config_path": str(config_path_for(name)),
-                "configured": _already_configured(name),
+                "configured": status == "ready",
+                "status": status,
                 "note": spec["note"],
             }
         )
