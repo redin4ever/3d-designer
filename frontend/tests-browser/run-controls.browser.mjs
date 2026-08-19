@@ -27,6 +27,29 @@ export function registerRunControlTests({ test, withScene, waitUntil, greeting }
         'a labelled run control',
       );
       assert.ok(running.gap >= 8, `connection status overlaps the run control by ${-running.gap}px`);
+
+      const commandRects = await session.page.evaluate(() => {
+        const selectors = [
+          '.brand-lockup',
+          '#file-menu-button',
+          '#connection-status',
+          '#connect-button',
+          '.run-group',
+          '.settings-menu',
+        ];
+        return selectors.map((selector) => {
+          const rect = document.querySelector(selector)?.getBoundingClientRect();
+          return rect ? { selector, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+        }).filter(Boolean);
+      });
+      for (let left = 0; left < commandRects.length; left += 1) {
+        for (let right = left + 1; right < commandRects.length; right += 1) {
+          const a = commandRects[left];
+          const b = commandRects[right];
+          const overlaps = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+          assert.equal(overlaps, false, `${a.selector} overlaps ${b.selector} at 529px`);
+        }
+      }
       assert.deepEqual(running.actions, [
         { action: 'pause', disabled: false, text: 'Pause' },
         { action: 'resume', disabled: true, text: 'Run' },

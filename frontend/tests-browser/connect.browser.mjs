@@ -72,7 +72,7 @@ const clientRow = (over = {}) => ({
  * @param {{withScene: Function, waitUntil: Function}} suite the host suite's fixtures
  */
 export function registerConnectTests({ withScene, waitUntil }) {
-  test('the Connect button sits in the conversation panel, lifted rather than shouting', async () => {
+  test('agent readiness shares the command bar without shrinking the conversation', async () => {
     const s = await withScene(FULL_SCENE_GREETING);
     try {
       await waitForConnected(s);
@@ -80,14 +80,14 @@ export function registerConnectTests({ withScene, waitUntil }) {
       const look = await s.page.evaluate((selector) => {
         const button = document.querySelector(selector);
         if (!button) return null;
-        const panel = button.closest('.chat-panel') ?? button.parentElement;
+        const panel = button.closest('.controls-panel') ?? button.parentElement;
         const style = getComputedStyle(button);
         const root = getComputedStyle(document.documentElement);
         return {
           text: button.textContent.trim(),
           tag: button.tagName,
           type: button.getAttribute('type'),
-          inConversationPanel: button.closest('.chat-panel') !== null,
+          inCommandBar: button.closest('.controls-panel') !== null,
           background: style.backgroundColor,
           panelBackground: getComputedStyle(panel).backgroundColor,
           boxShadow: style.boxShadow,
@@ -107,7 +107,7 @@ export function registerConnectTests({ withScene, waitUntil }) {
       assert.equal(look.text, 'Connect');
       assert.equal(look.tag, 'BUTTON');
       assert.equal(look.type, 'button', 'an untyped button inside a form would submit it');
-      assert.ok(look.inConversationPanel, 'the button belongs to the conversation panel');
+      assert.ok(look.inCommandBar, 'agent readiness belongs to the shared command bar');
       assert.notEqual(
         look.background,
         look.panelBackground,
