@@ -75,7 +75,7 @@
       "dependsOn": [],
       "seams": ["mcp_tool_exposure", "mcp_server_guidance", "role_registry", "orientation_tool"],
       "decisions": ["Q-19", "Q-20", "Q-21", "Q-22", "Q-23"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "project-verification",

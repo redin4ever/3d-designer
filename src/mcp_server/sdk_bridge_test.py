@@ -85,6 +85,31 @@ def test_the_declared_catalogue_survives_json(sdk, specs) -> None:
         json.dumps(tool.model_dump(by_alias=True, exclude_none=True))
 
 
+def test_default_discovery_is_phase_focused_and_omits_raw(orchestrator) -> None:
+    """A fresh blockout session should not ask the model to choose among the whole
+    cross-phase catalogue. It gets construction plus the small verification core, while
+    later-phase and unrestricted tools remain out of normal discovery."""
+    visible = sdk_bridge.focused_tool_specs(orchestrator)
+
+    assert {"set_tool_focus", "get_phase", "list_objects", "describe_object"} <= set(visible)
+    assert {"add_primitive", "add_wall"} <= set(visible)
+    assert "add_railing" not in visible
+    assert "export_scene" not in visible
+    assert "raw_execute" not in visible
+    assert len(visible) < 30
+
+
+def test_server_instructions_encode_the_verified_design_loop() -> None:
+    instructions = sdk_bridge.SERVER_INSTRUCTIONS
+
+    for required in (
+        "get_phase", "semantic", "ActionReport", "assumptions", "inspect", "measure",
+        "repair", "acceptance", "promote",
+    ):
+        assert required.lower() in instructions.lower(), required
+    assert len(instructions) <= 700
+
+
 # ------------------------------------------------------------------ calling through
 
 def test_a_read_only_call_takes_no_write_lease(sdk, specs, orchestrator, fake_scene) -> None:
@@ -234,6 +259,7 @@ def test_build_server_produces_a_server_the_installed_sdk_can_run(sdk, orchestra
     options = server.create_initialization_options()
     assert options.server_name == "blender-agent-mcp"
     assert options.capabilities.tools is not None, "the server does not advertise tools"
+    assert options.instructions == sdk_bridge.SERVER_INSTRUCTIONS
 
 
 def test_an_sdk_without_the_2_0_callback_api_is_refused_by_name(sdk, orchestrator) -> None:

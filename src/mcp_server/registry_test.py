@@ -8,7 +8,9 @@ next pass implements them.
 
 from __future__ import annotations
 
-from contracts import ToolRole
+import pytest
+
+from contracts import Phase, ToolRole
 from mcp_server import build_registry, tools_for
 
 
@@ -183,6 +185,26 @@ def test_raw_tool_is_visible_only_under_admin() -> None:
             assert "raw_execute" in names
         else:
             assert "raw_execute" not in names, role
+
+
+def test_refine_repair_focus_contains_verification_not_unrelated_construction() -> None:
+    """Focus is a discovery aid, not an arbitrary cap: every repair operation remains,
+    the orientation core remains, and unrelated refine construction is absent."""
+    from mcp_server.registry import focused_tools
+
+    names = {spec.name for spec in focused_tools(Phase.REFINE, ToolRole.REPAIR)}
+
+    assert {"repair", "fix_normals", "close_visual_gap"} <= names
+    assert {"get_phase", "get_operator_context", "describe_object", "promote_phase"} <= names
+    assert "add_railing" not in names
+    assert "raw_execute" not in names
+
+
+def test_focus_must_be_legal_in_the_current_phase() -> None:
+    from mcp_server.registry import focused_tools
+
+    with pytest.raises(ValueError, match="export.*blockout"):
+        focused_tools(Phase.BLOCKOUT, ToolRole.EXPORT)
 
 
 # ------------------------------------------------------------------------ descriptions
