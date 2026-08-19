@@ -42,6 +42,7 @@ import { registerConnectTests } from './connect.browser.mjs';
 import { registerGizmoTests } from './gizmo.browser.mjs';
 import { registerFileIoTests } from './file-io.browser.mjs';
 import { registerRunControlTests } from './run-controls.browser.mjs';
+import { registerPerformanceTests } from './performance.browser.mjs';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NARROW = { width: 360, height: 720 };
@@ -676,6 +677,7 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   registerGizmoTests({ test, withScene, waitUntil, greeting: FULL_SCENE_GREETING });
   registerFileIoTests({ withScene, waitUntil });
   registerRunControlTests({ test, withScene, waitUntil, greeting: FULL_SCENE_GREETING });
+  registerPerformanceTests({ withScene });
 
   // ---- pointing, priority and the edit tools --------------------------------------
   //

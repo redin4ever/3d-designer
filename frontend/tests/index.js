@@ -28,6 +28,7 @@ import './log.test.js';
 import './picking.test.js';
 import './point-outline.test.js';
 import './raster.test.js';
+import './render-scheduler.test.js';
 import './socket.test.js';
 import './tokens.test.js';
 import './texture-inspector.test.js';
