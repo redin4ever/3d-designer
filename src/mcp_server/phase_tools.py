@@ -117,11 +117,38 @@ def get_phase(*, orchestrator: Any) -> dict[str, Any]:
             "fix these before promote_phase will advance"
         )
 
+    from .registry import focused_tools
+
+    operator_focus = list(getattr(orchestrator, "focus", ()) or ())
+    annotation_images = list(
+        getattr(orchestrator, "held_annotation_images", lambda: ())() or ()
+    )
+    next_actions: list[str] = []
+    if operator_focus or annotation_images:
+        next_actions.append(
+            "Review get_operator_context before changing the operator's focused area."
+        )
+    for result in failing:
+        if result.suggested_operation and result.suggested_operation not in next_actions:
+            next_actions.append(result.suggested_operation)
+    next_actions.append(
+        "Inspect affected objects and measure critical dimensions, angles, gaps, clipping, "
+        "and defects before declaring this pass complete."
+    )
+    if can and next_phase:
+        next_actions.append("Call promote_phase only after the final visual and measured check.")
+    elif can:
+        next_actions.append("Switch focus to export and run the export budget check.")
+
     return {
         "phase": phase.value,
         "next_phase": next_phase,
         "roles_legal_now": sorted(role.value for role in roles_for_phase(phase)),
         "tools_callable_now": _tools_callable_in(phase),
+        "focused_tools": sorted(spec.name for spec in focused_tools(phase)),
+        "operator_focus": operator_focus,
+        "operator_annotation_images": annotation_images,
+        "next_actions": next_actions,
         "can_promote": can,
         "acceptance": [_render(r) for r in results],
         "failing": [_render(r) for r in failing],

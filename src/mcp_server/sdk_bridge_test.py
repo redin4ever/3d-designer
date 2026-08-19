@@ -99,6 +99,11 @@ def test_default_discovery_is_phase_focused_and_omits_raw(orchestrator) -> None:
     assert len(visible) < 30
 
 
+def test_raw_discovery_requires_explicit_server_opt_in(orchestrator) -> None:
+    assert "raw_execute" not in sdk_bridge.focused_tool_specs(orchestrator)
+    assert "raw_execute" in sdk_bridge.focused_tool_specs(orchestrator, expose_raw=True)
+
+
 def test_server_instructions_encode_the_verified_design_loop() -> None:
     instructions = sdk_bridge.SERVER_INSTRUCTIONS
 

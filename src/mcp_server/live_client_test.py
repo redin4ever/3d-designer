@@ -156,6 +156,14 @@ async def _drive(export_path: str, errlog: Any) -> dict[str, Any]:
             async with ClientSession(read, write) as session:
                 log["initialize"] = await session.initialize()
                 log["tools"] = (await session.list_tools()).tools
+                log["raw_default"] = await session.call_tool("raw_execute", {"source": "x = 1"})
+                log["focus_inspect"] = await session.call_tool(
+                    "set_tool_focus", {"focus": "inspect"},
+                )
+                log["inspect_tools"] = (await session.list_tools()).tools
+                log["focus_blockout"] = await session.call_tool(
+                    "set_tool_focus", {"focus": "blockout"},
+                )
                 await _blockout(session, log)
                 await _promote_to_polish(session, log)
                 log["export"] = await session.call_tool(
@@ -187,28 +195,37 @@ def test_a_real_client_completes_the_handshake(journey) -> None:
     info = journey["initialize"].server_info
     assert info.name == "blender-agent-mcp"
     assert journey["initialize"].capabilities.tools is not None
+    assert "get_phase" in journey["initialize"].instructions
 
 
-def test_tools_list_returns_the_real_catalogue_with_each_tools_role(journey) -> None:
+def test_tools_list_returns_the_focused_catalogue_with_each_tools_role(journey) -> None:
     """A client renders what ``tools/list`` returns and nothing else. Names an agent cannot
     see are names it cannot call, and a tool with no role is one it cannot reason about
     before being refused."""
     by_name = {tool.name: tool for tool in journey["tools"]}
 
     assert {"get_phase", "list_objects", "describe_object", "promote_phase"} <= set(by_name)
-    assert {"add_primitive", "add_wall", "export_scene"} <= set(by_name)
+    assert {"set_tool_focus", "add_primitive", "add_wall"} <= set(by_name)
+    assert {"add_railing", "export_scene", "raw_execute"}.isdisjoint(by_name)
     assert by_name["add_primitive"].meta["roles"] == ["blockout"]
     assert by_name["get_phase"].meta["roles"] == ["inspect"]
-    assert by_name["export_scene"].meta["roles"] == ["export"]
     assert by_name["add_primitive"].input_schema["properties"]["kind"]["enum"]
 
 
-def test_the_raw_execution_tool_reaches_the_client_unnarrowed(journey) -> None:
-    """Gate A 7.2 chose unrestricted arbitrary code execution for connected agents, with
-    the CVSS 9.0 precedent stated in the option text, and 7.4 chose unrestricted filesystem
-    access. Quietly withholding that capability at the transport — a sandbox, an allowlist,
-    an AST check — would be as much a defect as never building it."""
-    assert "raw_execute" in {tool.name for tool in journey["tools"]}
+def test_raw_execution_is_absent_and_uncallable_without_operator_opt_in(journey) -> None:
+    """Unrestricted execution is a deliberate server-owner capability, not default model
+    context. It is absent from discovery and direct calls until explicitly enabled."""
+    assert "raw_execute" not in {tool.name for tool in journey["tools"]}
+    assert journey["raw_default"].is_error is True
+    assert journey["raw_default"].structured_content["rule"] == "mcp.unknown_tool"
+
+
+def test_focus_switch_changes_discovery_without_hiding_orientation(journey) -> None:
+    assert journey["focus_inspect"].is_error is False
+    names = {tool.name for tool in journey["inspect_tools"]}
+    assert {"measure_distance", "defect_report", "set_tool_focus", "get_phase"} <= names
+    assert "add_primitive" not in names
+    assert journey["focus_blockout"].is_error is False
 
 
 def test_get_phase_round_trips_and_parses(journey) -> None:

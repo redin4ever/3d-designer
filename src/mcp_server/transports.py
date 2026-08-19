@@ -49,7 +49,7 @@ SERVER_INFO: dict[str, Any] = {
 }
 
 
-def _warn_if_exposed(host: str) -> None:
+def _warn_if_exposed(host: str, *, expose_raw: bool = False) -> None:
     """ADR-009 in one line, before anything binds.
 
     Gate A 7.2 chose unrestricted arbitrary code execution for connected agents and 7.4
@@ -62,16 +62,21 @@ def _warn_if_exposed(host: str) -> None:
     is told even on a machine where the server cannot start at all.
     """
     if host not in _LOOPBACK_HOSTS:
+        capability = (
+            "including explicitly enabled unrestricted raw code execution and full "
+            "filesystem access"
+            if expose_raw
+            else "including scene-mutating semantic operations"
+        )
         _LOG.warning(
-            "serve_http binding to non-loopback host %r exposes every registered tool — "
-            "including unrestricted raw code execution and full filesystem access — to "
-            "anything that can route to this host. There is no sandbox and no "
-            "authentication layer (ADR-009).",
-            host,
+            "serve_http binding to non-loopback host %r exposes every discovered tool — "
+            "%s — to anything that can route to this host. There is no authentication "
+            "layer (ADR-009).",
+            host, capability,
         )
 
 
-def serve_stdio(orchestrator: Any) -> None:
+def serve_stdio(orchestrator: Any, *, expose_raw: bool = False) -> None:
     """Run the MCP server over stdio until the client disconnects.
 
     Blocking — call it from a process's own entry point (``python -m mcp_server``), never
@@ -86,6 +91,7 @@ def serve_stdio(orchestrator: Any) -> None:
     sdk = load_sdk("stdio")
     server = build_server(
         sdk, orchestrator, name=SERVER_INFO["name"], version=SERVER_INFO["version"],
+        expose_raw=expose_raw,
     )
 
     import anyio
@@ -103,6 +109,7 @@ def http_app(
     host: str = "127.0.0.1",
     path: str = DEFAULT_HTTP_PATH,
     json_response: bool = False,
+    expose_raw: bool = False,
 ) -> Any:
     """The streamable-HTTP endpoint as a plain ASGI application, bound to nothing.
 
@@ -114,10 +121,11 @@ def http_app(
     page the user visits could reach this port through their browser, and every tool here
     runs arbitrary code (ADR-009).
     """
-    _warn_if_exposed(host)
+    _warn_if_exposed(host, expose_raw=expose_raw)
     sdk = load_sdk("streamable HTTP")
     server = build_server(
         sdk, orchestrator, name=SERVER_INFO["name"], version=SERVER_INFO["version"],
+        expose_raw=expose_raw,
     )
     return server.streamable_http_app(
         streamable_http_path=path, host=host, json_response=json_response,
@@ -131,13 +139,14 @@ def serve_http(
     port: int = DEFAULT_HTTP_PORT,
     path: str = DEFAULT_HTTP_PATH,
     maintenance: Any = None,
+    expose_raw: bool = False,
 ) -> None:
     """Run the MCP server over streamable HTTP until interrupted. Blocking.
 
     Binds loopback by default; see :func:`_warn_if_exposed` for what a non-loopback host
     actually means here.
     """
-    app = http_app(orchestrator, host=host, path=path)
+    app = http_app(orchestrator, host=host, path=path, expose_raw=expose_raw)
 
     import uvicorn
 

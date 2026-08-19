@@ -21,9 +21,10 @@ The 1.x ``Server.list_tools()`` / ``Server.call_tool()`` **decorators** are gone
 verified against the installed package, not from memory, and that removal is exactly what
 had left both transports unable to serve anything.
 
-**What crosses the boundary in each direction.** Outbound: every registered tool, with its
-role and mutating flag in ``_meta`` so a client can reason about a tool before being refused
-by it. Inbound: a tool name and arguments, which go straight to ``dispatch`` — validation,
+**What crosses the boundary in each direction.** Outbound: one complete phase-relevant
+specialist role plus orientation tools, with role and mutating flag in ``_meta``. The
+client can switch discovery focus without changing authorization. Inbound: a tool name
+and arguments, which go straight to ``dispatch`` — validation,
 authorisation, the write lock and execution are its business and are not re-implemented
 here. What *is* decided here is the one thing ``dispatch`` cannot know: that a live session
 is a single logical writer (see :data:`LEASE_HOLDER`), and that a refusal must come back as
@@ -36,16 +37,20 @@ import importlib
 import inspect
 import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from contracts import RuleError, ToolSpec
+from contracts import RuleError, ToolRole, ToolSpec
 
 from .dispatch import dispatch
-from .registry import build_registry
+from .registry import build_registry, focused_tools
 from .validation import validate_params
 
-__all__ = ["LEASE_HOLDER", "SdkModules", "load_sdk", "tool_specs", "sdk_tools", "call_tool", "build_server"]
+__all__ = [
+    "LEASE_HOLDER", "SERVER_INSTRUCTIONS", "SdkModules", "load_sdk", "tool_specs",
+    "focused_tool_specs", "sdk_tools", "call_tool", "build_server",
+]
 
 _LOG = logging.getLogger(__name__)
 
@@ -58,6 +63,43 @@ writer that keeps renewing its own. Same-holder re-acquire renews rather than co
 connection; a second *process* still contends properly, which is ADR-007's actual guarantee.
 The limits of that model are stated in this module's ``CLAUDE.md`` and are real.
 """
+
+SERVER_INSTRUCTIONS = (
+    "Forge3D builds measured Blender scenes. Start or recover with get_phase, then use "
+    "set_tool_focus and semantic tools for the current task. After every mutation, read "
+    "the ActionReport problems and assumptions; inspect affected objects, measure critical "
+    "dimensions and gaps, and repair defects before continuing. Check operator focus. "
+    "Promote only when live acceptance checks pass; a successful call is not proof that "
+    "the design is visually complete. Use raw execution only when the server owner has "
+    "explicitly enabled it."
+)
+
+_FOCUS_ROLES = tuple(role for role in ToolRole if role is not ToolRole.ADMIN)
+_FOCUS_SPEC = ToolSpec(
+    name="set_tool_focus",
+    description=(
+        "Change which complete semantic role appears in tools/list for this session. Use "
+        "repair for defects, align for placement, inspect for measurements, and export for "
+        "delivery. The role must be legal in the current phase; this changes discovery, "
+        "not authorization or scene state."
+    ),
+    roles=(ToolRole.INSPECT,),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "focus": {
+                "type": "string",
+                "enum": [role.value for role in _FOCUS_ROLES],
+                "description": "The specialist tool group to show.",
+            },
+        },
+        "required": ["focus"],
+        "additionalProperties": False,
+    },
+    handler=None,
+    mutating=False,
+    examples=("show repair tools", "switch to measurement and inspection"),
+)
 
 _SDK_MISSING = (
     "the `mcp` Python SDK is not importable (pip install mcp) — {transport} needs it to "
@@ -130,7 +172,7 @@ def _sdk_version() -> str:
         return "unknown"
 
 
-def tool_specs() -> dict[str, ToolSpec]:
+def tool_specs(*, include_raw: bool = True) -> dict[str, ToolSpec]:
     """Every registered tool, by name, across every role.
 
     Flattened deliberately: MCP has one flat tool namespace per connection, and *which*
@@ -138,7 +180,31 @@ def tool_specs() -> dict[str, ToolSpec]:
     listing time. Hiding is also what ``_cap.py`` did before Gate B 3.3 deleted it, and it
     made three core operations invisible to every agent with the whole suite green.
     """
-    return {spec.name: spec for specs in build_registry().values() for spec in specs}
+    return {
+        spec.name: spec
+        for specs in build_registry(include_raw=include_raw).values()
+        for spec in specs
+    }
+
+
+def focused_tool_specs(
+    orchestrator: Any,
+    focus: ToolRole | None = None,
+    *,
+    expose_raw: bool = False,
+) -> dict[str, ToolSpec]:
+    """The small, phase-relevant catalogue returned by ``tools/list``.
+
+    Calls remain backed by the full semantic registry for compatibility. Discovery is the
+    accuracy boundary: one complete specialist role, five orientation tools, and the
+    focus switch. Raw execution joins it only through an explicit server-owner opt-in.
+    """
+    specs = {
+        spec.name: spec
+        for spec in focused_tools(orchestrator.phase, focus, include_raw=expose_raw)
+    }
+    specs[_FOCUS_SPEC.name] = _FOCUS_SPEC
+    return specs
 
 
 def sdk_tools(sdk: SdkModules, specs: Iterable[ToolSpec]) -> list[Any]:
@@ -240,8 +306,15 @@ def call_tool(
     """
     try:
         spec = specs.get(name)
+        if spec is None:
+            shortlist = ", ".join(focused_tool_specs(orchestrator))
+            raise RuleError(
+                rule="mcp.unknown_tool",
+                detail=f"no callable tool named {name!r} is exposed by this server",
+                suggestion=f"call get_phase() or choose one of the focused tools: {shortlist}",
+            )
         lease = None
-        if spec is not None and spec.mutating:
+        if spec.mutating:
             validate_params(name, spec.input_schema, arguments)
             lease = orchestrator.acquire(LEASE_HOLDER, orchestrator.phase)
         return _result(sdk, dispatch(name, arguments, orchestrator=orchestrator, lease=lease))
@@ -259,37 +332,82 @@ def _accepts_callbacks(server_class: Any) -> bool:
     return "on_list_tools" in parameters and "on_call_tool" in parameters
 
 
-def build_server(sdk: SdkModules, orchestrator: Any, *, name: str, version: str) -> Any:
-    """The SDK server object, with this product's whole tool catalogue behind it.
+def build_server(
+    sdk: SdkModules,
+    orchestrator: Any,
+    *,
+    name: str,
+    version: str,
+    expose_raw: bool | None = None,
+) -> Any:
+    """The SDK server object, with phase-focused discovery and compatible calls.
 
     Both transports run the same object — ADR-003 chose dual transport so that a local
     editor and a consumer subscription reach identical behaviour, and two wirings would be
     two chances for them to drift.
 
-    The catalogue is collected **once**, at build time, rather than per request: every
-    source it collects from is static, constructed data, and rebuilding it inside
-    ``tools/list`` would re-import five optional sibling modules on every keystroke of a
-    client that lists eagerly.
+    The complete callable catalogue is collected once. The much smaller declaration is
+    rebuilt when listed because phase and focus are live session state. Set
+    ``FORGE3D_EXPOSE_RAW_TOOLS=1`` (or pass ``expose_raw=True``) to deliberately expose
+    unrestricted execution; it is otherwise absent from both discovery and calls.
     """
     server_class = getattr(sdk.server, "Server", None)
     if server_class is None or not _accepts_callbacks(server_class):
         raise RuntimeError(_SDK_INCOMPATIBLE.format(version=_sdk_version()))
 
-    specs = tool_specs()
-    declared = sdk_tools(sdk, specs.values())
+    if expose_raw is None:
+        expose_raw = os.getenv("FORGE3D_EXPOSE_RAW_TOOLS", "").strip().lower() in {
+            "1", "true", "yes", "on",
+        }
+    specs = tool_specs(include_raw=expose_raw)
+    focus: ToolRole | None = None
 
     async def on_list_tools(_ctx: Any, _params: Any) -> Any:
-        return sdk.types.ListToolsResult(tools=declared)
+        visible = focused_tool_specs(orchestrator, focus, expose_raw=expose_raw)
+        return sdk.types.ListToolsResult(tools=sdk_tools(sdk, visible.values()))
 
-    async def on_call_tool(_ctx: Any, params: Any) -> Any:
-        return call_tool(
+    async def on_call_tool(ctx: Any, params: Any) -> Any:
+        nonlocal focus
+        arguments = dict(params.arguments or {})
+        if params.name == _FOCUS_SPEC.name:
+            try:
+                validate_params(_FOCUS_SPEC.name, _FOCUS_SPEC.input_schema, arguments)
+                requested = ToolRole(arguments["focus"])
+                visible = focused_tool_specs(orchestrator, requested, expose_raw=expose_raw)
+            except (RuleError, ValueError) as refused:
+                error = refused if isinstance(refused, RuleError) else RuleError(
+                    rule="mcp.illegal_tool_focus",
+                    detail=str(refused),
+                    suggestion="call get_phase() and choose one of roles_legal_now except admin",
+                )
+                return _refusal(sdk, error)
+            focus = requested
+            notifier = getattr(getattr(ctx, "session", None), "send_tool_list_changed", None)
+            if callable(notifier):
+                await notifier()
+            return _result(sdk, {
+                "ok": True,
+                "phase": orchestrator.phase.value,
+                "focus": focus.value,
+                "visible_tools": list(visible),
+                "next": "use semantic tools, then inspect and measure every affected area",
+            })
+
+        result = call_tool(
             sdk, params.name, dict(params.arguments or {}),
             specs=specs, orchestrator=orchestrator,
         )
+        if params.name == "promote_phase" and not result.is_error:
+            focus = None
+            notifier = getattr(getattr(ctx, "session", None), "send_tool_list_changed", None)
+            if callable(notifier):
+                await notifier()
+        return result
 
     return server_class(
         name,
         version=version,
+        instructions=SERVER_INSTRUCTIONS,
         on_list_tools=on_list_tools,
         on_call_tool=on_call_tool,
     )

@@ -74,7 +74,8 @@ SESSION_SPECS: tuple[ToolSpec, ...] = (
         name="get_phase",
         description=(
             "Where this session is and what it may do: the current phase, the roles legal "
-            "in it, every tool callable right now, and each of the phase's acceptance "
+            "in it, the focused discovery tools, operator focus, next actions, every tool "
+            "callable right now, and each of the phase's acceptance "
             "queries with the ones that currently fail — each failure naming its subject, "
             "measured value, threshold and the operation that would fix it. Call this "
             "first in a new session, and after any refusal you did not expect."

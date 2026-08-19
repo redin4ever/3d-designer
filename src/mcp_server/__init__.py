@@ -26,12 +26,13 @@ from __future__ import annotations
 
 from .dispatch import dispatch
 from .images import downscale_image
-from .registry import build_registry, tools_for
+from .registry import build_registry, focused_tools, tools_for
 from .transports import SERVER_INFO, http_app, serve_http, serve_stdio
 
 __all__ = [
     "build_registry",
     "tools_for",
+    "focused_tools",
     "dispatch",
     "serve_stdio",
     "serve_http",

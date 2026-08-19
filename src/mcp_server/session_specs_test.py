@@ -5,7 +5,7 @@ from mcp_server.phase_tools import get_phase
 
 
 def test_get_phase_returns_focus_visible_tools_and_next_actions(orchestrator) -> None:
-    orchestrator.focus = ("roof", "front_window")
+    orchestrator.set_focus(("roof", "front_window"))
 
     result = get_phase(orchestrator=orchestrator)
 

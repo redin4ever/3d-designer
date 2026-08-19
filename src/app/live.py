@@ -307,7 +307,7 @@ def serve_frontend(
 def run_live(
     *,
     prefer_blender: bool = True,
-    include_raw: bool = True,
+    include_raw: bool = False,
     ports: dict[str, int] | None = None,
     open_browser: bool = True,
     seed: bool = True,
@@ -390,6 +390,7 @@ def run_live(
             host="127.0.0.1",
             port=ports["mcp"],
             maintenance=(operation_dispatcher.drain if web is not None else None),
+            expose_raw=include_raw,
         )
     except KeyboardInterrupt:
         print("\n  Stopped.", file=sys.stderr)

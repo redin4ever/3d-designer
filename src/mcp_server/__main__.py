@@ -28,7 +28,13 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-blender", action="store_true", help="force the in-memory engine")
-    parser.add_argument("--no-raw", action="store_true", help="omit the raw-execution tool")
+    parser.add_argument(
+        "--raw", action="store_true",
+        help="explicitly expose unrestricted raw code execution (disabled by default)",
+    )
+    parser.add_argument(
+        "--no-raw", action="store_false", dest="raw", help=argparse.SUPPRESS,
+    )
     parser.add_argument("--no-viewer", action="store_true", help="do not attach the live view")
     return parser.parse_args(argv)
 
@@ -80,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
 
         app = build_app(
             prefer_blender=not args.no_blender,
-            include_raw=not args.no_raw,
+            include_raw=args.raw,
             attach_viewer=not args.no_viewer,
         )
         # stderr, always: on stdio it is the only stream a person will ever see, and on
@@ -95,9 +101,9 @@ def main(argv: list[str] | None = None) -> int:
         from .transports import serve_http, serve_stdio
 
         if args.http:
-            serve_http(app.orchestrator, host=args.host, port=args.port)
+            serve_http(app.orchestrator, host=args.host, port=args.port, expose_raw=args.raw)
         else:
-            serve_stdio(app.orchestrator)
+            serve_stdio(app.orchestrator, expose_raw=args.raw)
     return 0
 
 
