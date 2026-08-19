@@ -13,3 +13,5 @@ The user explicitly requested that export-only options disappear while importing
 | Q-17–Q-20 | Browser-test import/export; keep payloads and responsive behavior unchanged; unknown actions expose no action-specific controls. | Assumed narrow regression boundary. |
 
 Detailed reversible assumptions are in [assumptions.md](assumptions.md). The user's wording was: “some options shouldnt show when importing ( ones used for exporting ) which do fix that”.
+
+Decision coverage: Q-01, Q-02, Q-03, Q-04, Q-05, Q-06, Q-07, Q-08, Q-09, Q-10, Q-11, Q-12, Q-13, Q-14, Q-15, Q-16, Q-17, Q-18, Q-19, Q-20.

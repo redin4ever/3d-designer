@@ -26,8 +26,8 @@
     {
       "id": "file-dialog-browser-regression",
       "file": "frontend/tests-browser/file-io.browser.mjs",
-      "line": 11,
-      "anchor": "export function registerFileIoTests({ withScene, waitUntil }) {",
+      "line": 91,
+      "anchor": "test('Ctrl+O opens the project picker and Ctrl+Shift+S opens Save As', async () => {",
       "status": "wired",
       "decision": "Q-17",
       "what": "the real-browser coverage for the rendered File menu and native dialog",

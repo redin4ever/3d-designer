@@ -19,6 +19,7 @@ Labels and controls hide together using native hidden semantics and `aria-hidden
 - 210 frontend unit tests passed.
 - 35 real-Chrome tests passed, including Import-to-Export mode switching.
 - `frontend/src/file-io.js` passed Node syntax checking.
+- The complete project pipeline passed backend/evals, frontend, Chrome, doctor, and feature wiring checks.
 
 ## Noticed but not done
 
