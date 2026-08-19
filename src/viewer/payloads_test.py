@@ -103,3 +103,36 @@ def test_transform_payload_carries_scale_and_object_id() -> None:
 
     assert payload.object_id == "scaled"
     assert payload.scale == (2.0, 2.0, 2.0)
+
+
+def test_preview_budget_selects_distributed_triangles_and_compacts_attributes() -> None:
+    vertices = [Vec3(float(i), float(i % 2), 0) for i in range(8)]
+    triangles = [
+        (0, 1, 2), (1, 2, 3), (2, 3, 4),
+        (3, 4, 5), (4, 5, 6), (5, 6, 7),
+    ]
+    snap = MeshSnapshot(
+        object_id="dense",
+        vertices=vertices,
+        triangles=triangles,
+        normals=[Vec3(0, 0, 1) for _ in vertices],
+        uvs=[(i / 8, 0.5) for i in range(8)],
+        material_slots=("a", "b"),
+        triangle_materials=(0, 0, 0, 1, 1, 1),
+    )
+
+    first = snapshot_to_payload(snap, triangle_budget=2)
+    second = snapshot_to_payload(snap, triangle_budget=2)
+
+    assert first == second
+    assert first.triangle_count == 2
+    assert first.indices == [0, 1, 2, 3, 4, 5]
+    assert len(first.positions) == 18
+    assert len(first.normals or []) == 18
+    assert len(first.uvs or []) == 12
+    assert first.groups == ((0, 3, 0), (3, 3, 1))
+
+
+def test_preview_budget_keeps_small_meshes_byte_for_byte_exact() -> None:
+    snap = _quad_snapshot()
+    assert snapshot_to_payload(snap, triangle_budget=2) == snapshot_to_payload(snap)

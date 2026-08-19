@@ -6,7 +6,7 @@ Client-message routing (``handle_client``) is covered separately in ``client_tes
 
 from __future__ import annotations
 
-from contracts import ChangeKind, SceneChangeEvent, ServerMessageType
+from contracts import ChangeKind, MeshSnapshot, SceneChangeEvent, ServerMessageType, Vec3
 
 from viewer import ViewerBridge
 
@@ -32,6 +32,32 @@ def test_full_scene_on_an_empty_scene_has_no_meshes(real_scene) -> None:
 
     assert message.meshes == ()
     assert message.object_ids == ()
+
+
+def test_full_scene_shares_preview_budget_and_discloses_source_quality(fake_scene, monkeypatch) -> None:
+    import viewer.translate as translate
+
+    monkeypatch.setattr(translate, "VIEWER_TRIANGLE_BUDGET", 2)
+    vertices = [Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(1, 1, 0), Vec3(0, 1, 0)]
+    snapshots = tuple(
+        MeshSnapshot(
+            object_id=name,
+            vertices=vertices,
+            triangles=[(0, 1, 2), (0, 2, 3)],
+        )
+        for name in ("left", "right")
+    )
+    fake_scene.set_objects(*snapshots)
+
+    message = ViewerBridge(fake_scene).full_scene()
+
+    assert [mesh.triangle_count for mesh in message.meshes] == [1, 1]
+    assert message.data["preview"] == {
+        "simplified": True,
+        "source_triangles": 4,
+        "preview_triangles": 2,
+        "budget": 2,
+    }
 
 
 def test_full_resync_event_resends_every_object_currently_in_the_engine(fake_scene, make_snapshot) -> None:
