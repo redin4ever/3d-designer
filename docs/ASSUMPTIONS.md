@@ -653,13 +653,13 @@ reversible option; each is recorded here rather than asked, because the gate had
 ## A-072 — Settled preview budget is 40,000 triangles
 
 - **Feature:** responsive-blend-import
-- **Assumed:** scenes below this remain exact and larger scenes use a deterministic proxy.
-- **Blast radius / reversal:** viewer bandwidth/detail; tune one budget constant.
+- **Assumed:** transmitted scenes below this remain exact and larger scenes use a deterministic proxy; dense scenes draw 500 distributed triangles through Canvas2D's native wireframe rasterizer.
+- **Blast radius / reversal:** viewer bandwidth/detail; tune the payload and raster budget constants independently.
 
 ## A-073 — Interaction budget is 10,000 triangles
 
 - **Feature:** responsive-blend-import
-- **Assumed:** orbit and zoom temporarily draw at most 10,000 already-received preview triangles.
+- **Assumed:** orbit and zoom draw at most 10,000 already-received preview triangles, subject to the lower Canvas2D safety cap.
 - **Blast radius / reversal:** interactive visual detail; tune or disable the draw budget.
 
 ## A-074 — Preview sampling is deterministic and distributed

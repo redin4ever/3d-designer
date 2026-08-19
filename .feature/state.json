@@ -3,7 +3,7 @@
   "skill": "add-feature",
   "feature": "Responsive semi-complex model import and native Blender .blend file import",
   "slug": "responsive-blend-import",
-  "phase": 4,
+  "phase": 5,
   "baseSha": "18a3b57505597cc23ab56a6702eed045455ea255",
   "branch": "feat/responsive-blend-import",
   "docsDir": "docs/features/responsive-blend-import",

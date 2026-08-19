@@ -111,6 +111,15 @@ function main() {
     },
   );
 
+  function reportPreviewQuality(message) {
+    const preview = message.data?.preview;
+    if (!preview?.simplified) return;
+    pushLog(
+      'preview simplified for responsiveness — full model preserved for editing and export',
+      'status',
+    );
+  }
+
   function handleServerMessage(message) {
     switch (message.type) {
       case ServerMessageType.HELLO:
@@ -121,6 +130,7 @@ function main() {
         clearViewportState(viewportState, renderer);
         applyMeshUpsert(viewportState, { meshes: message.meshes }, renderer);
         applyTransformUpdate(viewportState, { transforms: message.transforms }, renderer);
+        reportPreviewQuality(message);
         pushLog(`full scene — ${message.meshes?.length ?? 0} objects`, 'status');
         break;
       case ServerMessageType.MESH_UPSERT:
@@ -135,6 +145,7 @@ function main() {
         // always did both; this case did not.
         applyTransformUpdate(viewportState, { transforms: message.transforms }, renderer);
         pointing.reconcileTransforms(message.transforms);
+        reportPreviewQuality(message);
         break;
       case ServerMessageType.TRANSFORM_UPDATE:
         sceneDirty = true;

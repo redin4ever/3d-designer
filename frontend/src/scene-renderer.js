@@ -23,6 +23,13 @@ import { hitTestMoveAxis, projectMoveGizmo } from './gizmo.js';
 import { paintIdOutline } from './point-outline.js';
 import { clearFrame, createFrame, drawTexturedTriangle, drawTriangle } from './raster.js';
 import { createIdIndex } from './picking.js';
+import {
+  createInvalidationScheduler,
+  CANVAS_TRIANGLE_BUDGET,
+  distributedTriangleIndexes,
+  INTERACTION_SETTLE_MS,
+  INTERACTION_TRIANGLE_BUDGET,
+} from './render-scheduler.js';
 import { createTextureCache, sampleRgba as sampleTexture } from './texture-renderer.js';
 
 function readColor(name, fallback) {
@@ -67,6 +74,8 @@ export class SceneRenderer {
     this._running = false;
     this._rafId = null;
     this._lastFrameAt = 0;
+    this._interactionActive = false;
+    this._interactionTimer = null;
     this.camera = new OrbitCamera();
     this._dragging = false;
     this._lastPointerX = 0;
@@ -112,6 +121,14 @@ export class SceneRenderer {
     this._activeMoveAxis = null;
     this._moveGizmo = null;
     this._probeCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    this._scheduler = createInvalidationScheduler({
+      requestFrame: (callback) => requestAnimationFrame(callback),
+      cancelFrame: (id) => cancelAnimationFrame(id),
+      draw: (now) => {
+        this._lastFrameAt = now;
+        this._draw();
+      },
+    });
     this._bindPointer();
     this._resizeObserver = new ResizeObserver(() => this._resize());
     this._resizeObserver.observe(canvas);
@@ -131,6 +148,11 @@ export class SceneRenderer {
       canvas: readColor('--canvas', this._colors.canvas),
     };
     this._rgbCache.clear(); // the tokens just changed; the resolved bytes are stale
+    this.invalidate();
+  }
+
+  invalidate() {
+    this._scheduler.invalidate();
   }
 
   createNode(objectId, geometry, materials, groups) {
@@ -147,13 +169,17 @@ export class SceneRenderer {
     this.nodes.set(handle.handleId, handle);
     for (const definition of Object.values(handle.materialDefinitions)) {
       const albedo = definition.maps?.find((map) => map.channel === 'albedo');
-      if (albedo && !albedo.path.startsWith('builtin://')) this._textureCache.load(albedo.path);
+      if (albedo && !albedo.path.startsWith('builtin://')) {
+        this._textureCache.load(albedo.path).then(() => this.invalidate());
+      }
     }
+    this.invalidate();
     return handle;
   }
 
   updateTransform(handle, position, quaternion, scale) {
     handle.transform = { position, quaternion, scale };
+    this.invalidate();
   }
 
   removeNode(handle) {
@@ -164,10 +190,12 @@ export class SceneRenderer {
     this._hovered.delete(handle.id);
     this._selected.delete(handle.id);
     this._focused.delete(handle.id);
+    this.invalidate();
   }
 
   setHighlighted(handle, on) {
     handle.highlighted = on;
+    this.invalidate();
   }
 
   /**
@@ -180,31 +208,37 @@ export class SceneRenderer {
    */
   setFocused(objectIds) {
     this._focused = new Set(objectIds ?? []);
+    this.invalidate();
   }
 
   /** The visible part currently under the point cursor; cleared as soon as it leaves. */
   setHovered(objectIds) {
     this._hovered = new Set(objectIds ?? []);
+    this.invalidate();
   }
 
   /** Click, lasso and keyboard selections that stay visible until explicitly cleared. */
   setSelected(objectIds) {
     this._selected = new Set(objectIds ?? []);
+    this.invalidate();
   }
 
   /** Keep transform interaction state separate from selection and presentation highlights. */
   setToolMode(mode) {
     this._toolMode = mode;
     if (mode !== 'move') this._activeMoveAxis = null;
+    this.invalidate();
   }
 
   setMoveEnabled(enabled) {
     this._moveEnabled = Boolean(enabled);
     if (!this._moveEnabled) this._activeMoveAxis = null;
+    this.invalidate();
   }
 
   setActiveMoveAxis(axis) {
     this._activeMoveAxis = axis;
+    this.invalidate();
   }
 
   get moveGizmo() {
@@ -224,6 +258,7 @@ export class SceneRenderer {
     const handle = [...this.nodes.values()].find((node) => node.id === objectId);
     if (!handle) return false;
     handle.transform = { ...handle.transform, position: [...position] };
+    this.invalidate();
     return true;
   }
 
@@ -231,11 +266,13 @@ export class SceneRenderer {
     const position = this.objectPosition(objectId);
     if (!position) return false;
     this.camera.focusOn(position);
+    this.invalidate();
     return true;
   }
 
   resetView() {
     this.camera.reset();
+    this.invalidate();
   }
 
   /** The current colour+depth+id frame, for picking. Null before the first draw. */
@@ -248,19 +285,14 @@ export class SceneRenderer {
     this.refreshTheme();
     this._running = true;
     this._lastFrameAt = performance.now();
-    const tick = (now) => {
-      if (!this._running) return;
-      this._lastFrameAt = now;
-      this._draw();
-      this._rafId = requestAnimationFrame(tick);
-    };
-    this._rafId = requestAnimationFrame(tick);
+    this._scheduler.start();
   }
 
   stop() {
     this._running = false;
-    if (this._rafId) cancelAnimationFrame(this._rafId);
-    this._rafId = null;
+    this._scheduler.stop();
+    if (this._interactionTimer !== null) clearTimeout(this._interactionTimer);
+    this._interactionTimer = null;
   }
 
   _resize() {
@@ -269,6 +301,23 @@ export class SceneRenderer {
     this.canvas.width = Math.max(1, Math.round(rect.width * dpr));
     this.canvas.height = Math.max(1, Math.round(rect.height * dpr));
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.invalidate();
+  }
+
+  _beginInteraction() {
+    if (this._interactionTimer !== null) clearTimeout(this._interactionTimer);
+    this._interactionTimer = null;
+    this._interactionActive = true;
+    this.invalidate();
+  }
+
+  _settleInteraction() {
+    if (this._interactionTimer !== null) clearTimeout(this._interactionTimer);
+    this._interactionTimer = setTimeout(() => {
+      this._interactionTimer = null;
+      this._interactionActive = false;
+      this.invalidate();
+    }, INTERACTION_SETTLE_MS);
   }
 
   _bindPointer() {
@@ -277,6 +326,7 @@ export class SceneRenderer {
       this._lastPointerX = event.clientX;
       this._lastPointerY = event.clientY;
       this.canvas.setPointerCapture(event.pointerId);
+      this._beginInteraction();
     });
 
     // Incremental deltas rather than "current minus drag-start", because the pitch clamp
@@ -287,10 +337,12 @@ export class SceneRenderer {
       this.camera.drag(event.clientX - this._lastPointerX, event.clientY - this._lastPointerY);
       this._lastPointerX = event.clientX;
       this._lastPointerY = event.clientY;
+      this.invalidate();
     });
 
     const release = () => {
       this._dragging = false;
+      this._settleInteraction();
     };
     this.canvas.addEventListener('pointerup', release);
     this.canvas.addEventListener('pointercancel', release);
@@ -301,7 +353,10 @@ export class SceneRenderer {
       'wheel',
       (event) => {
         event.preventDefault();
+        this._beginInteraction();
         this.camera.zoomByWheel(event.deltaY);
+        this.invalidate();
+        this._settleInteraction();
       },
       { passive: false },
     );
@@ -324,7 +379,10 @@ export class SceneRenderer {
       const action = keys[event.key];
       if (!action) return;
       event.preventDefault();
+      this._beginInteraction();
       action();
+      this.invalidate();
+      this._settleInteraction();
     });
   }
 
@@ -475,6 +533,17 @@ export class SceneRenderer {
     let radius = 1;
     const allWorld = new Map();
     const pointedIds = new Set();
+    const totalTriangles = [...this.nodes.values()].reduce(
+      (sum, handle) => sum + handle.geometry.triangleCount,
+      0,
+    );
+    const drawBudget = this._interactionActive
+      ? Math.min(CANVAS_TRIANGLE_BUDGET, INTERACTION_TRIANGLE_BUDGET)
+      : CANVAS_TRIANGLE_BUDGET;
+    const interactionTriangles = totalTriangles > drawBudget
+      ? new Set(distributedTriangleIndexes(totalTriangles, drawBudget))
+      : null;
+    let globalTriangleIndex = 0;
     for (const handle of this.nodes.values()) {
       const world = this._worldVertices(handle);
       allWorld.set(handle.handleId, world);
@@ -501,6 +570,55 @@ export class SceneRenderer {
       return [width / 2 + x * f, height / 2 - y * f, invW];
     };
 
+    // Dense scenes use the browser's native Canvas2D path rasterizer. The exact software
+    // depth/id raster below is excellent for picking small scenes, but its per-pixel loops
+    // can monopolize the UI thread on imported meshes. This path keeps orbit/zoom live;
+    // authoritative geometry and the richer server preview remain unchanged.
+    if (totalTriangles > CANVAS_TRIANGLE_BUDGET) {
+      const dpr = window.devicePixelRatio || 1;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = this._colors.canvas;
+      ctx.fillRect(0, 0, width, height);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(1, dpr);
+
+      for (const handle of this.nodes.values()) {
+        const world = allWorld.get(handle.handleId);
+        const { indices } = handle.geometry;
+        const isPointed = this._selected.has(handle.id) || this._hovered.has(handle.id);
+        const focused = this._focused.has(handle.id);
+        const base = isPointed ? this._colors.pointed
+          : focused ? this._colors.marked
+            : handle.highlighted ? this._colors.accent : this._colors.muted;
+        ctx.beginPath();
+        for (let i = 0; i < indices.length; i += 3) {
+          const includeTriangle = !interactionTriangles || interactionTriangles.has(globalTriangleIndex);
+          globalTriangleIndex += 1;
+          if (!includeTriangle) continue;
+          const a = world[indices[i]];
+          const b = world[indices[i + 1]];
+          const c = world[indices[i + 2]];
+          if (!a || !b || !c) continue;
+          for (const [ca, cb, cc] of clipTriangleNear(a, b, c, nearPlane)) {
+            const pa = project(ca); const pb = project(cb); const pc = project(cc);
+            if (![...pa, ...pb, ...pc].every(Number.isFinite)) continue;
+            ctx.moveTo(pa[0], pa[1]);
+            ctx.lineTo(pb[0], pb[1]);
+            ctx.lineTo(pc[0], pc[1]);
+            ctx.closePath();
+          }
+        }
+        ctx.globalAlpha = isPointed || focused || handle.highlighted ? 0.92 : 0.56;
+        ctx.strokeStyle = base;
+        ctx.stroke();
+      }
+      ctx.restore();
+      this._drawMoveOverlay({ cameraDistance: camDist, focalLength: focal, width, height, dpr });
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return;
+    }
+
     for (const handle of this.nodes.values()) {
       const world = allWorld.get(handle.handleId);
       const { indices } = handle.geometry;
@@ -513,25 +631,9 @@ export class SceneRenderer {
       const id = this.ids.idFor(handle.id);
       if (isPointed) pointedIds.add(id);
 
-      for (let i = 0; i < indices.length; i += 3) {
-        const a = world[indices[i]];
-        const b = world[indices[i + 1]];
-        const c = world[indices[i + 2]];
-        if (!a || !b || !c) continue;
-
-        const shade = shadeFactor(triangleNormal(a, b, c));
-        const rgb = this._shaded(base, background, shade);
-        const triangleIndex = i / 3;
-        const group = handle.groups?.find((candidate) => {
-          const start = candidate.start ?? candidate[0];
-          const count = candidate.count ?? candidate[1];
-          return i >= start && i < start + count;
-        });
-        const materialIndex = group ? (group.material_index ?? group[2]) : 0;
-        const materialName = handle.materials?.[materialIndex];
+      const materialStates = (handle.materials ?? []).map((materialName) => {
         const material = handle.materialDefinitions?.[materialName];
         const albedo = material?.maps?.find((map) => map.channel === 'albedo');
-        const hasUv = handle.geometry.uvs?.length === handle.geometry.vertexCount * 2;
         const texture = albedo?.path?.startsWith('builtin://')
           ? { builtin: materialName }
           : albedo ? this._textureCache.get(albedo.path) : null;
@@ -541,6 +643,36 @@ export class SceneRenderer {
           const baseValue = 70 + (seed % 100);
           return [baseValue + cell * 34, baseValue + cell * 20, Math.max(35, baseValue - 30), 255];
         };
+        return {
+          sampler: texture?.builtin
+            ? builtinSample
+            : texture ? (sampleUv) => sampleTexture(texture, sampleUv, material.transform ?? {}) : null,
+        };
+      });
+      let groupIndex = 0;
+
+      for (let i = 0; i < indices.length; i += 3) {
+        const includeTriangle = !interactionTriangles || interactionTriangles.has(globalTriangleIndex);
+        globalTriangleIndex += 1;
+        if (!includeTriangle) continue;
+        const a = world[indices[i]];
+        const b = world[indices[i + 1]];
+        const c = world[indices[i + 2]];
+        if (!a || !b || !c) continue;
+
+        const shade = shadeFactor(triangleNormal(a, b, c));
+        const rgb = this._shaded(base, background, shade);
+        while (groupIndex < (handle.groups?.length ?? 0)) {
+          const candidate = handle.groups[groupIndex];
+          const start = candidate.start ?? candidate[0];
+          const count = candidate.count ?? candidate[1];
+          if (i < start + count) break;
+          groupIndex += 1;
+        }
+        const group = handle.groups?.[groupIndex];
+        const materialIndex = group ? (group.material_index ?? group[2]) : 0;
+        const materialState = materialStates[materialIndex] ?? {};
+        const hasUv = handle.geometry.uvs?.length === handle.geometry.vertexCount * 2;
 
         // No sort, no subdivision, no seam inflation. The depth buffer decides visibility
         // per pixel, so draw order does not matter and none of those are needed.
@@ -551,9 +683,8 @@ export class SceneRenderer {
           const pa = [...project(ca), ca[3], ca[4]];
           const pb = [...project(cb), cb[3], cb[4]];
           const pc = [...project(cc), cc[3], cc[4]];
-          if (!isPointed && !focused && !handle.highlighted && hasUv && texture) {
-            const sampler = texture.builtin ? builtinSample : (sampleUv) => sampleTexture(texture, sampleUv, material.transform ?? {});
-            drawTexturedTriangle(frame, pa, pb, pc, sampler, id, shade);
+          if (!isPointed && !focused && !handle.highlighted && hasUv && materialState.sampler) {
+            drawTexturedTriangle(frame, pa, pb, pc, materialState.sampler, id, shade);
           } else {
             drawTriangle(frame, pa, pb, pc, rgb, id);
           }

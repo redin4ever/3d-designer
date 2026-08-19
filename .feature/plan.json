@@ -33,12 +33,12 @@
     {
       "id": "responsive-renderer",
       "what": "make Canvas2D rendering invalidation-driven and use a temporary interaction triangle budget",
-      "paths": ["frontend/src/scene-renderer.js", "frontend/src/viewport.js", "frontend/src/main.js", "frontend/tests/scene-renderer.test.js", "frontend/tests/viewport.test.js", "frontend/tests/index.js", "frontend/tests-browser/**"],
+      "paths": ["frontend/src/scene-renderer.js", "frontend/src/render-scheduler.js", "frontend/src/viewport.js", "frontend/src/main.js", "frontend/tests/render-scheduler.test.js", "frontend/tests/viewport.test.js", "frontend/tests/index.js", "frontend/tests-browser/**"],
       "publicInterface": "frontend/src/scene-renderer.js",
       "dependsOn": ["viewer-preview-budget"],
       "seams": ["frontend_geometry_ingest", "renderer_schedule", "renderer_triangle_work", "browser_performance_regression"],
       "decisions": ["Q-13", "Q-16", "Q-17", "Q-18", "Q-19", "Q-20", "Q-24", "Q-25"],
-      "status": "planned"
+      "status": "green"
     }
   ]
 }

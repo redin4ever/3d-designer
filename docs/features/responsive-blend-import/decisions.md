@@ -16,8 +16,8 @@
 - **Q-09 / A-069:** naming conflicts keep both objects using Blender’s unique-name policy.
 - **Q-10 / A-070:** retain job feedback and provide a clear completion or actionable failure.
 - **Q-11 / A-071:** simplification is viewport-only; authoritative Blender, save, and export geometry stays complete.
-- **Q-12 / A-072:** settled full-scene previews cap at 40,000 triangles and remain exact below that limit.
-- **Q-13 / A-073:** interaction draws at most 10,000 preview triangles before restoring settled detail.
+- **Q-12 / A-072:** transmitted full-scene previews cap at 40,000 triangles and remain exact below that limit; the software canvas uses a smaller adaptive draw cap.
+- **Q-13 / A-073:** interaction draws at most 10,000 preview triangles; the Canvas safety cap may be lower.
 - **Q-14 / A-074:** deterministic, evenly distributed triangle sampling compacts all referenced attributes.
 - **Q-15 / A-075:** divide the scene budget proportionally with a fair per-mesh minimum when possible.
 - **Q-16 / A-076:** preview simplification is disclosed in wire metadata and a concise viewer notice.
