@@ -357,6 +357,14 @@ function setVisible(node, visible) {
   node.setAttribute('aria-hidden', String(!visible));
 }
 
+const CONTROLS_BY_ACTION = Object.freeze({
+  'open-project': ['source'],
+  'save-project': ['filename'],
+  'save-as': ['filename'],
+  'import-model': ['source', 'import-settings'],
+  'export-model': ['filename', 'profile', 'scope', 'format'],
+});
+
 function actionMethod(controller, action, context) {
   if (action === 'open-project') return controller.openProject(context.file);
   if (action === 'save-project') return controller.saveProject({ filename: context.filename });
@@ -383,7 +391,6 @@ export function attachFileMenu(root, options = {}) {
   const sourceUpInput = root.querySelector('[data-file-source-up]');
   const unitScaleInput = root.querySelector('[data-file-unit-scale]');
   const flattenInput = root.querySelector('[data-file-flatten]');
-  const advancedImport = root.querySelector('[data-file-import-settings]');
   const controller = options.controller ?? createFileController({
     ...options,
     documentImpl,
@@ -409,13 +416,16 @@ export function attachFileMenu(root, options = {}) {
 
   const showDialog = (action) => {
     activeAction = action;
+    const visibleControls = new Set(CONTROLS_BY_ACTION[action] ?? []);
+    dialog?.querySelectorAll('[data-file-control]').forEach((node) => {
+      setVisible(node, visibleControls.has(node.dataset.fileControl));
+    });
     const title = dialog?.querySelector('[data-file-dialog-title]');
     if (title) title.textContent = action.replaceAll('-', ' ');
     if (fileInput) {
       fileInput.value = '';
       fileInput.accept = action === 'import-model' ? MODEL_IMPORT_ACCEPT : '.forge3d,.json';
     }
-    if (advancedImport) advancedImport.hidden = action !== 'import-model';
     if (dialog?.showModal && !dialog.open) dialog.showModal();
     if ((action === 'open-project' || action === 'import-model') && fileInput) {
       if (fileInput.showPicker) fileInput.showPicker();

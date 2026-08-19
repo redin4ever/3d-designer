@@ -268,24 +268,25 @@
       aria-labelledby="file-io-title">
     <h2 id="file-io-title" class="file-io-dialog-title" data-file-dialog-title>File</h2>
     <div class="file-io-dialog-body">
-      <label class="file-io-field" for="file-io-input">Local file</label>
-        <input id="file-io-input" data-file-input type="file" />
-      <label class="file-io-field" for="file-io-filename">Download name</label>
-        <input id="file-io-filename" data-file-filename value="scene.forge3d" autocomplete="off" />
-      <label class="file-io-field" for="file-io-profile">Target profile</label>
-        <select id="file-io-profile" data-file-profile>
+      <label class="file-io-field" for="file-io-input" data-file-control="source">Local file</label>
+        <input id="file-io-input" data-file-input data-file-control="source" type="file" />
+      <label class="file-io-field" for="file-io-filename" data-file-control="filename">Download name</label>
+        <input id="file-io-filename" data-file-filename data-file-control="filename"
+            value="scene.forge3d" autocomplete="off" />
+      <label class="file-io-field" for="file-io-profile" data-file-control="profile">Target profile</label>
+        <select id="file-io-profile" data-file-profile data-file-control="profile">
           <option value="generic">Generic metres</option>
           <option value="roblox">Roblox</option>
           <option value="unity">Unity</option>
           <option value="unreal">Unreal</option>
         </select>
-      <label class="file-io-field" for="file-io-scope">Export scope</label>
-        <select id="file-io-scope" data-file-scope>
+      <label class="file-io-field" for="file-io-scope" data-file-control="scope">Export scope</label>
+        <select id="file-io-scope" data-file-scope data-file-control="scope">
           <option value="scene">Whole scene</option>
           <option value="selection">Current selection</option>
         </select>
-      <label class="file-io-field" for="file-io-format">Format</label>
-        <select id="file-io-format" data-file-format>
+      <label class="file-io-field" for="file-io-format" data-file-control="format">Format</label>
+        <select id="file-io-format" data-file-format data-file-control="format">
           <option value="glb">GLB</option>
           <option value="gltf">glTF</option>
           <option value="fbx">FBX</option>
@@ -296,7 +297,7 @@
           <option value="usda">USDA</option>
           <option value="usdc">USDC</option>
         </select>
-      <details class="file-io-advanced" data-file-import-settings hidden>
+      <details class="file-io-advanced" data-file-import-settings data-file-control="import-settings" hidden>
         <summary>Import settings</summary>
         <label class="file-io-field" for="file-io-source-up">Source up axis</label>
         <select id="file-io-source-up" data-file-source-up>
