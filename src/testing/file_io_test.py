@@ -23,8 +23,8 @@ def test_fake_import_is_deterministic_and_collision_safe(tmp_path) -> None:
 
 
 def test_fake_import_rejects_bad_inputs_before_touching_the_scene(tmp_path) -> None:
-    source = tmp_path / "House.blend"
-    source.write_bytes(b"BLENDER")
+    source = tmp_path / "House.txt"
+    source.write_bytes(b"unsupported")
     engine = FakeEngine()
 
     with pytest.raises(EngineError, match="supported"):
@@ -33,6 +33,17 @@ def test_fake_import_rejects_bad_inputs_before_touching_the_scene(tmp_path) -> N
         engine.import_model(str(source.with_suffix(".obj")), unit_scale=0)
 
     assert engine.list_objects() == []
+
+
+def test_fake_import_accepts_native_blend_like_the_real_engine_contract(tmp_path) -> None:
+    source = tmp_path / "House.blend"
+    source.write_bytes(b"BLENDER")
+    engine = FakeEngine()
+
+    result = engine.import_model(str(source))
+
+    assert result.object_ids == ("House",)
+    assert engine.exists("House")
 
 
 def test_fake_generic_export_records_the_format_and_conversion(tmp_path) -> None:
