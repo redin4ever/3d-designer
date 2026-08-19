@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Product robustness: collision-free UI, automatic resilient agent connection, dependable scene import/export, and higher-accuracy agent design guidance",
-  "slug": "product-robustness",
-  "phase": 5,
-  "baseSha": "9070fb79c01cfcffc6b276ec3602045ae20e1847",
-  "branch": "feat/product-robustness",
-  "docsDir": "docs/features/product-robustness",
+  "feature": "Responsive semi-complex model import and native Blender .blend file import",
+  "slug": "responsive-blend-import",
+  "phase": 2,
+  "baseSha": "18a3b57505597cc23ab56a6702eed045455ea255",
+  "branch": "feat/responsive-blend-import",
+  "docsDir": "docs/features/responsive-blend-import",
   "startedAt": "2026-08-19",
-  "status": "finished"
+  "status": "running"
 }
