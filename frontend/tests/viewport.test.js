@@ -72,6 +72,17 @@ test('buildGeometryBuffers rejects a triangle_count that disagrees with the inde
   assert.throws(() => buildGeometryBuffers(bad), /triangle_count/);
 });
 
+test('buildGeometryBuffers reuses already-typed preview buffers without another allocation', () => {
+  const mesh = quadMesh();
+  mesh.positions = new Float32Array(mesh.positions);
+  mesh.indices = new Uint32Array(mesh.indices);
+
+  const geometry = buildGeometryBuffers(mesh);
+
+  assert.strictEqual(geometry.positions, mesh.positions);
+  assert.strictEqual(geometry.indices, mesh.indices);
+});
+
 test('transform_update moves an existing node without rebuilding its buffers', () => {
   const state = createViewportState();
   const renderer = makeFakeRenderer();
