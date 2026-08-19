@@ -9,12 +9,11 @@
 }
 
 .connect-button {
-  position: fixed;
-  inset-block-start: var(--space-xxs);
-  inset-inline-end: calc(var(--control-size) + var(--space-xs));
-  z-index: 46;
+  position: static;
+  min-inline-size: 0;
+  max-inline-size: 9rem;
   min-block-size: var(--control-size);
-  padding-inline: var(--space-md);
+  padding-inline: var(--space-sm);
   border: var(--hairline-size) solid var(--hairline-strong);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -23,9 +22,11 @@
   cursor: pointer;
   font-size: var(--text-caption);
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.connect-button::after { content: ' Viewer'; }
 .connect-button:hover { background: var(--surface-2); color: var(--ink); }
 
 .viewport-actions {
@@ -192,8 +193,7 @@
 }
 
 @media (max-width: 768px) {
-  .connect-button { padding-inline: var(--space-xs); }
-  .connect-button::after { content: ''; }
+  .connect-button { max-inline-size: 7rem; padding-inline: var(--space-xs); }
   .viewport-actions { inset-inline-end: var(--space-xs); }
   .connect-dialog {
     inline-size: calc(100% - var(--space-md));

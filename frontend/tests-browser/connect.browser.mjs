@@ -104,7 +104,7 @@ export function registerConnectTests({ withScene, waitUntil }) {
       }, CONNECT_BUTTON);
 
       assert.ok(look, 'there is no Connect button on the page at all');
-      assert.equal(look.text, 'Connect');
+      assert.match(look.text, /agent|ready|set up/i, 'startup should expose detected connection state');
       assert.equal(look.tag, 'BUTTON');
       assert.equal(look.type, 'button', 'an untyped button inside a form would submit it');
       assert.ok(look.inCommandBar, 'agent readiness belongs to the shared command bar');

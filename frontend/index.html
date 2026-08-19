@@ -107,6 +107,8 @@
         </div>
       </div>
 
+      <button type="button" id="connect-button" class="connect-button" aria-describedby="connect-dialog-note">Connect</button>
+
       <div class="settings-menu">
         <button type="button" class="settings-button" aria-label="Editor settings" title="Editor settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8 3.5-2.1-1.1.1-2.4-2.5-1.5-2 1.3L11.4 5H8.6L7.5 8.3l-2-1.3L3 8.5l.1 2.4L1 12l2.1 1.1-.1 2.4L5.5 17l2-1.3 1.1 3.3h2.8l1.1-3.3 2 1.3 2.5-1.5-.1-2.4L20 12Z" /></svg>
@@ -157,7 +159,6 @@
       <section class="chat-panel" aria-labelledby="chat-heading">
         <div class="panel-header">
           <h2 id="chat-heading" class="panel-heading">Conversation</h2>
-          <button type="button" id="connect-button" class="connect-button" aria-describedby="connect-dialog-note">Connect</button>
           <div class="viewport-actions" aria-label="Viewport actions">
             <button type="button" class="btn quiet" data-action="frame-selection">Frame selection</button>
             <button type="button" class="btn quiet" data-action="reset-view">Reset view</button>
@@ -229,14 +230,15 @@
               <label>Roughness <input type="file" data-texture-channel="roughness" accept=".png,.jpg,.jpeg,.webp" /></label>
               <label>Metallic <input type="file" data-texture-channel="metallic" accept=".png,.jpg,.jpeg,.webp" /></label>
             </div>
-            <div class="texture-transform">
+            <details class="texture-transform">
+              <summary>Mapping transform</summary>
               <label>Repeat X <input type="number" data-texture-field="repeat-x" min="0.01" step="0.1" value="1" /></label>
               <label>Repeat Y <input type="number" data-texture-field="repeat-y" min="0.01" step="0.1" value="1" /></label>
               <label>Rotation <input type="number" data-texture-field="rotation" step="1" value="0" /></label>
               <label>Offset X <input type="number" data-texture-field="offset-x" step="0.1" value="0" /></label>
               <label>Offset Y <input type="number" data-texture-field="offset-y" step="0.1" value="0" /></label>
               <label>Slot <input type="number" data-texture-field="slot" min="0" step="1" value="0" /></label>
-            </div>
+            </details>
             <button type="button" class="btn primary texture-apply" data-action="apply-texture">Apply to selection</button>
             <p data-texture-status role="status">Select one or more parts, then choose a texture.</p>
           </section>

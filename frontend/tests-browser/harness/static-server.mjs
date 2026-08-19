@@ -41,6 +41,13 @@ export async function startStaticServer(rootDir) {
       res.end('{"materials":[]}');
       return;
     }
+    if (urlPath === '/api/clients') {
+      requests.push({ path: urlPath, status: 200 });
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end('{"clients":[]}');
+      return;
+    }
     const relative = normalize(urlPath).replace(/^([/\\])+/, '');
     const target = resolve(join(root, relative === '' ? 'index.html' : relative));
 

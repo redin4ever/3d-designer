@@ -27,12 +27,13 @@
         "frontend/index.html",
         "frontend/tests/layout.test.js",
         "frontend/tests-browser/connect.browser.mjs",
+        "frontend/tests-browser/harness/static-server.mjs",
         "frontend/tests-browser/run-controls.browser.mjs"
       ],
       "dependsOn": [],
       "seams": ["topbar_command_layout", "sidebar_layout", "selected_inspector_overflow", "texture_inspector_styles", "responsive_ui_regression"],
       "decisions": ["Q-05", "Q-07", "Q-08", "Q-09", "Q-10"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "scene-file-runtime",

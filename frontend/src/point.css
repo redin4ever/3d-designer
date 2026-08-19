@@ -169,9 +169,14 @@
 
 .transform-body {
   position: relative;
+  min-block-size: 0;
   display: grid;
+  align-content: start;
   gap: var(--space-xs);
   padding: var(--space-xs) var(--space-sm);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .selected-object-row {
@@ -228,19 +233,11 @@
 
 .move-axis-controls,
 .transform-actions {
-  position: absolute;
-  inset-block-start: var(--viewport-header-size);
-  inset-inline-end: var(--space-xs);
-  z-index: 4;
+  position: static;
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-xxs);
-  opacity: 0;
-  pointer-events: none;
 }
-
-.transform-actions { inset-block-start: calc(var(--viewport-header-size) + var(--touch-target)); }
-.move-axis-controls:focus-within,
-.transform-actions:focus-within { opacity: 1; pointer-events: auto; }
 
 .axis-control {
   min-inline-size: var(--touch-target);

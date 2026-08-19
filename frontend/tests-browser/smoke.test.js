@@ -875,7 +875,14 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
           if (run.length > 3) runs.push(run);
         }
         return runs.slice(0, 2).map((run) => {
-          const [x, y] = run[Math.floor(run.length / 2)];
+          const [x] = run[Math.floor(run.length / 2)];
+          const interior = [];
+          for (let y = 2; y < canvas.height - 2; y += 1) {
+            if (at(x, y) !== background && at(x - 1, y) !== background && at(x + 1, y) !== background) {
+              interior.push(y);
+            }
+          }
+          const y = interior[Math.floor(interior.length / 2)];
           return {
             clientX: rect.left + ((x + 0.5) * rect.width) / canvas.width,
             clientY: rect.top + ((y + 0.5) * rect.height) / canvas.height,

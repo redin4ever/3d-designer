@@ -223,16 +223,19 @@ canvas:focus-visible,
 .controls-panel {
   position: fixed;
   inset-block-start: 0;
-  inset-inline: 0;
+  inset-inline-end: var(--space-xxs);
   z-index: 40;
   block-size: var(--topbar-size);
-  pointer-events: none;
+  max-inline-size: calc(100vw - 13rem);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  pointer-events: auto;
 }
 
 .run-group {
-  position: absolute;
-  inset-block-start: var(--space-xxs);
-  inset-inline-end: calc(var(--control-size) + var(--space-sm));
+  position: static;
   block-size: var(--control-size);
   display: flex;
   align-items: center;
@@ -254,11 +257,8 @@ canvas:focus-visible,
 .control-row { gap: var(--space-xxs); }
 
 .settings-menu {
-  position: fixed;
-  inset-block-start: var(--space-xxs);
-  inset-inline-end: var(--space-xxs);
+  position: relative;
   z-index: 45;
-  pointer-events: auto;
 }
 
 .settings-button {
@@ -392,7 +392,10 @@ textarea:focus { border-color: var(--hairline-strong); }
   grid-column: 3;
   grid-row: 1;
   display: grid;
-  grid-template-rows: var(--inspector-transform-size) minmax(0, 1fr) var(--inspector-log-size);
+  grid-template-rows:
+    clamp(14rem, 42vh, 24rem)
+    minmax(0, 1fr)
+    var(--inspector-log-size);
   border-inline-start: var(--hairline-size) solid var(--hairline);
   background: var(--surface-1);
   overflow: hidden;
@@ -410,6 +413,11 @@ textarea:focus { border-color: var(--hairline-strong); }
   border-radius: 0;
   box-shadow: none;
   overflow: hidden;
+}
+
+.transform-panel {
+  display: grid;
+  grid-template-rows: var(--viewport-header-size) minmax(0, 1fr);
 }
 
 .panel-heading {
@@ -466,6 +474,10 @@ textarea:focus { border-color: var(--hairline-strong); }
   body { overflow: auto; }
 
   .topbar { position: sticky; inset-block-start: 0; }
+  .controls-panel {
+    max-inline-size: calc(100vw - 10.5rem);
+    gap: var(--space-xxs);
+  }
   .layout {
     min-block-size: calc(100vh - var(--topbar-size));
     grid-template-columns: var(--tool-rail-size) minmax(0, 1fr);
@@ -487,7 +499,7 @@ textarea:focus { border-color: var(--hairline-strong); }
   .settings-popover { inline-size: min(var(--sidebar-size), calc(100vw - var(--space-md))); }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .run-state-label { display: none; }
   .status-pill {
     inline-size: var(--control-size);
@@ -497,6 +509,10 @@ textarea:focus { border-color: var(--hairline-strong); }
     color: transparent;
     font-size: 0;
   }
+}
+
+@media (max-width: 480px) {
+  .connect-button { max-inline-size: 5.5rem; }
 }
 
 @media (pointer: coarse) {
