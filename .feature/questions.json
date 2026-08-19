@@ -1,29 +1,204 @@
 {
   "questions": [
-    {"id":"Q-01","wave":"job","question":"What should the capability improve first?","assumed":"Silhouette-critical hard-surface forms that primitives cannot represent","assumption":"A-045","seams":["operation_dispatch"]},
-    {"id":"Q-02","wave":"job","question":"Who should be able to use it?","assumed":"Connected agents and local asset scripts through the same operation","assumption":"A-045","seams":["public_api","composition_root_reachability"]},
-    {"id":"Q-03","wave":"scope","question":"How many new visible construction tools should this add?","assumed":"One add_profiled_solid tool covering extrusion and lofting","assumption":"A-045","seams":["operation_dispatch","tool_schema","app_visible_count","mcp_visible_count"]},
-    {"id":"Q-04","wave":"scope","question":"Which forge failures should become the first regression?","assumed":"The anvil silhouette and tapered extraction hood","assumption":"A-052","seams":["forge_regression"]},
-    {"id":"Q-05","wave":"reachability","question":"During which phase should agents see the tool?","assumed":"REFINE","assumption":"A-045","seams":["tool_schema"]},
-    {"id":"Q-06","wave":"geometry","question":"How should the caller describe shape?","assumed":"Ordered local 2D profiles at ordered offsets along one world axis","assumption":"A-046","seams":["json_shape_coercion","parameter_validation"]},
-    {"id":"Q-07","wave":"geometry","question":"Which axes should be supported?","assumed":"X, Y and Z with one documented winding convention","assumption":"A-046","seams":["parameter_validation"]},
-    {"id":"Q-08","wave":"geometry","question":"How does an extrusion differ from a loft?","assumed":"Two identical profiles extrude; changing profiles loft","assumption":"A-045","seams":["operation_dispatch"]},
-    {"id":"Q-09","wave":"geometry","question":"Which profile class should be guaranteed first?","assumed":"Closed convex profiles","assumption":"A-047","seams":["parameter_validation"]},
-    {"id":"Q-10","wave":"geometry","question":"How are vertices connected between stations?","assumed":"Equal vertex counts with explicit index correspondence","assumption":"A-047","seams":["parameter_validation"]},
-    {"id":"Q-11","wave":"geometry","question":"Should the tool sort station offsets?","assumed":"No; require strictly increasing offsets and reject mistakes","assumption":"A-048","seams":["parameter_validation"]},
-    {"id":"Q-12","wave":"states","question":"What happens when a section is malformed?","assumed":"Reject before creating any object and name the station/point rule","assumption":"A-048","seams":["parameter_validation"]},
-    {"id":"Q-13","wave":"states","question":"May the tool silently reverse winding or resize a section?","assumed":"No silent geometry correction","assumption":"A-048","seams":["parameter_validation"]},
-    {"id":"Q-14","wave":"geometry","question":"Should the station run produce open ends or a closed solid?","assumed":"Cap both ends for a closed manifold solid","assumption":"A-047","seams":["runtime_acceptance"]},
-    {"id":"Q-15","wave":"geometry","question":"How should beveling be controlled?","assumed":"An explicit non-negative width; zero means no bevel","assumption":"A-048","seams":["assumption_sweep"]},
-    {"id":"Q-16","wave":"assembly","question":"Should a call produce one object or an auto-joined assembly?","assumed":"One deterministic mesh; callers compose editable parts","assumption":"A-050","seams":["public_api","forge_export"]},
-    {"id":"Q-17","wave":"assembly","question":"Should the shape operation assign materials?","assumed":"No; use existing material operations on stable object ids","assumption":"A-050","seams":["tool_schema"]},
-    {"id":"Q-18","wave":"verification","question":"Which facts should block phase promotion?","assumed":"Positive volume and absence of structural topology defects","assumption":"A-049","seams":["runtime_acceptance"]},
-    {"id":"Q-19","wave":"verification","question":"Should geometry checks claim the result looks realistic?","assumed":"No; render inspection remains explicit aesthetic evidence","assumption":"A-049","seams":["forge_regression"]},
-    {"id":"Q-20","wave":"compatibility","question":"Should primitives or existing replay behavior change?","assumed":"No; the feature is additive","assumption":"A-045","seams":["operation_dispatch"]},
-    {"id":"Q-21","wave":"compatibility","question":"Is one additional REFINE tool acceptable despite catalogue growth?","assumed":"Yes; update both ledgers deliberately and add no hidden cap","assumption":"A-045","seams":["app_visible_count","mcp_visible_count"]},
-    {"id":"Q-22","wave":"documentation","question":"Which examples keep the operation broadly useful?","assumed":"Forge, architecture and furniture examples","assumption":"A-045","seams":["ops_documentation"]},
-    {"id":"Q-23","wave":"export","question":"Should exported hero assemblies stay editable?","assumed":"Yes; preserve separate fitted parts in BLEND and GLB","assumption":"A-050","seams":["forge_export"]},
-    {"id":"Q-24","wave":"quality","question":"What visual target should guide the forge rebuild?","assumed":"Historically plausible silhouette with game-ready section density","assumption":"A-051","seams":["forge_regression"]},
-    {"id":"Q-25","wave":"completion","question":"What evidence proves this improvement landed?","assumed":"Unit, wiring, Blender, full-suite, feature-gate and visual render evidence","assumption":"A-052","seams":["composition_root_reachability","forge_regression","forge_export"]}
+    {
+      "id": "Q-01",
+      "wave": "job",
+      "question": "What must feel materially better when this robustness work is complete?",
+      "assumed": "A new user can launch Forge3D, see a truthful connection state, work without colliding controls, exchange scene files reliably, and obtain designs that agents verify rather than merely claim are finished.",
+      "assumption": "A-053",
+      "seams": ["connect_startup", "file_ui_flow", "mcp_server_guidance"]
+    },
+    {
+      "id": "Q-02",
+      "wave": "job",
+      "question": "Who is the primary user for these improvements?",
+      "assumed": "A local desktop user collaborating with one MCP agent while watching and correcting a live Blender scene.",
+      "assumption": "A-053",
+      "seams": ["connect_startup", "sidebar_layout"]
+    },
+    {
+      "id": "Q-03",
+      "wave": "scope",
+      "question": "Which reported areas are required in this pass?",
+      "assumed": "Connection startup, responsive UI containment, save/open/import/export reliability, agent guidance and tool focus, accuracy evaluation, and a whole-project verification gate.",
+      "assumption": "A-053",
+      "seams": ["topbar_command_layout", "file_job_scheduling", "mcp_tool_exposure", "project_gate"]
+    },
+    {
+      "id": "Q-04",
+      "wave": "scope",
+      "question": "What remains out of scope?",
+      "assumed": "Cloud accounts, collaborative multi-writer editing, new 3D file formats, and replacing Blender's modelling engine.",
+      "assumption": "A-053",
+      "seams": ["client_detection_and_config", "export_operation"]
+    },
+    {
+      "id": "Q-05",
+      "wave": "where it lives",
+      "question": "How should top-bar commands behave when horizontal space is tight?",
+      "assumed": "Use one shared layout with no independent fixed offsets; retain primary status/actions and collapse secondary labels or actions before 529px without overlap.",
+      "assumption": "A-054",
+      "seams": ["topbar_command_layout", "responsive_ui_regression"]
+    },
+    {
+      "id": "Q-06",
+      "wave": "where it lives",
+      "question": "Where should agent connection state live?",
+      "assumed": "A compact status/action in the shared top bar, with details and repair actions in an accessible dialog.",
+      "assumption": "A-054",
+      "seams": ["connect_control_layout"]
+    },
+    {
+      "id": "Q-07",
+      "wave": "where it lives",
+      "question": "What is the minimum supported desktop viewport?",
+      "assumed": "529 CSS pixels, preserving the existing rendered regression width and requiring zero command or panel collisions there and above.",
+      "assumption": "A-054",
+      "seams": ["responsive_ui_regression"]
+    },
+    {
+      "id": "Q-08",
+      "wave": "where it lives",
+      "question": "How should chat, selected-object editing, and logs share the sidebar?",
+      "assumed": "Chat receives flexible space; object editing and logs are bounded, collapsible sections that never draw over one another.",
+      "assumption": "A-055",
+      "seams": ["sidebar_layout"]
+    },
+    {
+      "id": "Q-09",
+      "wave": "core flow",
+      "question": "What happens when selected-object controls are taller than their allocated panel?",
+      "assumed": "The inspector scrolls internally with its actions kept reachable; it does not expand across chat or logs.",
+      "assumption": "A-055",
+      "seams": ["selected_inspector_overflow"]
+    },
+    {
+      "id": "Q-10",
+      "wave": "core flow",
+      "question": "Which texture controls should be visible immediately?",
+      "assumed": "Preset and essential material/map state remain visible; mapping transforms and advanced tuning are grouped and collapsible, with styles matching the actual markup.",
+      "assumption": "A-055",
+      "seams": ["texture_inspector_styles"]
+    },
+    {
+      "id": "Q-11",
+      "wave": "core flow",
+      "question": "What should automatic connection do at application startup?",
+      "assumed": "Reconnect the live viewer socket, immediately detect supported MCP clients, and show ready, restart-required, action-required, or unavailable without waiting for a click.",
+      "assumption": "A-056",
+      "seams": ["connect_startup"]
+    },
+    {
+      "id": "Q-12",
+      "wave": "permissions",
+      "question": "May startup silently rewrite external AI-client configuration files?",
+      "assumed": "No. External config writes require an explicit Configure action; already-correct configurations are recognized automatically and never rewritten.",
+      "assumption": "A-056",
+      "seams": ["client_detection_and_config"]
+    },
+    {
+      "id": "Q-13",
+      "wave": "states",
+      "question": "What should users see after a client configuration is changed?",
+      "assumed": "A truthful restart-required state naming the affected client, plus refresh and retry actions; never claim a client is live merely because its file was written.",
+      "assumption": "A-056",
+      "seams": ["connect_startup", "client_detection_and_config"]
+    },
+    {
+      "id": "Q-14",
+      "wave": "core flow",
+      "question": "What should happen when opening or importing while an agent run is active?",
+      "assumed": "Explain that the scene will change, pause safely before mutation, serialize the operation, and remain paused afterward so the user can inspect the result.",
+      "assumption": "A-057",
+      "seams": ["file_ui_flow", "live_file_wiring"]
+    },
+    {
+      "id": "Q-15",
+      "wave": "data",
+      "question": "What should export include by default?",
+      "assumed": "The whole current scene, with explicit selection-only scope when the UI offers it; unsupported formats fail clearly without presenting a partial result as success.",
+      "assumption": "A-057",
+      "seams": ["export_operation"]
+    },
+    {
+      "id": "Q-16",
+      "wave": "data",
+      "question": "Which file journeys require production guarantees?",
+      "assumed": "Native .forge3d save/open and GLB export/import receive real-Blender round-trip coverage; every advertised format keeps unit-level validation.",
+      "assumption": "A-058",
+      "seams": ["blender_export_context", "real_file_integration"]
+    },
+    {
+      "id": "Q-17",
+      "wave": "states",
+      "question": "How should long-running file work behave?",
+      "assumed": "Return a job immediately, report progress/errors in the existing UI, but marshal every Blender mutation onto its owning thread and serialize it with agent writes.",
+      "assumption": "A-058",
+      "seams": ["file_job_scheduling", "live_file_wiring"]
+    },
+    {
+      "id": "Q-18",
+      "wave": "verification",
+      "question": "What proves the file system works rather than merely exposing menu labels?",
+      "assumed": "API lifecycle tests, browser-state tests, and a small real-Blender save/open plus GLB export/import round trip all pass and assert downloadable non-empty artifacts.",
+      "assumption": "A-058",
+      "seams": ["file_browser_regression", "real_file_integration"]
+    },
+    {
+      "id": "Q-19",
+      "wave": "agent accuracy",
+      "question": "Should agents continue seeing all 52 tools in every design phase?",
+      "assumed": "No. List orientation, inspection, promotion, and only mutation tools legal in the current phase; keep raw execution out of the default MCP catalogue while preserving explicit opt-in compatibility.",
+      "assumption": "A-059",
+      "seams": ["mcp_tool_exposure", "role_registry"]
+    },
+    {
+      "id": "Q-20",
+      "wave": "agent accuracy",
+      "question": "What workflow should every connected agent be instructed to follow?",
+      "assumed": "Orient with get_phase, prefer semantic operations, inspect ActionReport problems and assumptions, measure important dimensions, correct failures, and promote only after acceptance passes.",
+      "assumption": "A-060",
+      "seams": ["mcp_server_guidance"]
+    },
+    {
+      "id": "Q-21",
+      "wave": "agent accuracy",
+      "question": "What should get_phase provide before mutation begins?",
+      "assumed": "Current phase, callable focused catalogue, failed acceptance checks, user annotations/focus, and a concise recommended next-action sequence.",
+      "assumption": "A-060",
+      "seams": ["orientation_tool"]
+    },
+    {
+      "id": "Q-22",
+      "wave": "agent accuracy",
+      "question": "How should attention to detail be evaluated?",
+      "assumed": "Representative tasks score orientation, semantic tool choice, dimension verification, defect repair, phase completion, and export rather than relying on prompt wording or tool counts alone.",
+      "assumption": "A-061",
+      "seams": ["mcp_tool_exposure", "mcp_server_guidance", "project_gate"]
+    },
+    {
+      "id": "Q-23",
+      "wave": "existing users",
+      "question": "How should compatibility be handled for clients that expect the old catalogue?",
+      "assumed": "Tool calls remain backward compatible and server-side authorization remains authoritative; only discovery becomes phase-focused, with a documented explicit raw-tool opt-in.",
+      "assumption": "A-059",
+      "seams": ["mcp_tool_exposure", "role_registry"]
+    },
+    {
+      "id": "Q-24",
+      "wave": "verification",
+      "question": "What should one project gate verify?",
+      "assumed": "Backend and frontend suites, feature wiring, deterministic agent-accuracy checks, and environment-aware browser/Blender probes that distinguish unavailable prerequisites from actual failures.",
+      "assumption": "A-061",
+      "seams": ["project_gate"]
+    },
+    {
+      "id": "Q-25",
+      "wave": "completion",
+      "question": "What evidence is required before declaring the mission complete?",
+      "assumed": "All unit and integration suites pass; real runtime file journeys succeed; rendered collision checks pass at supported widths; connection states are truthful; the MCP catalogue and instructions pass focused accuracy evaluations; and the restored gate is green.",
+      "assumption": "A-061",
+      "seams": ["responsive_ui_regression", "real_file_integration", "mcp_server_guidance", "project_gate"]
+    }
   ]
 }

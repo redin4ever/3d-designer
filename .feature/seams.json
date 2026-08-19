@@ -6,7 +6,8 @@
       "file": "frontend/src/app.css",
       "line": 223,
       "anchor": ".controls-panel {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-05",
       "what": "the fixed top bar that independently positions run, status, settings, file, and connection controls",
       "evidence": "run controls are absolutely positioned inside a full-width fixed panel while connection controls use a separate fixed positioning system",
       "asks": "which controls must remain visible at narrow widths, and which may collapse into an overflow menu?"
@@ -16,7 +17,8 @@
       "file": "frontend/src/connect.css",
       "line": 11,
       "anchor": ".connect-button {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-06",
       "what": "the top-right connection control that can occupy the same space as run and settings controls",
       "evidence": "the button is fixed to a top-right inset without participating in the top bar layout",
       "asks": "should connection state live as a compact status in the top bar or as an action inside the settings area?"
@@ -26,7 +28,8 @@
       "file": "frontend/src/app.css",
       "line": 389,
       "anchor": ".sidebar {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-08",
       "what": "the three-row sidebar layout shared by chat, selected-object controls, and logs",
       "evidence": "the selected-object row has a fixed 152px allocation although it now contains texture controls as well as transforms",
       "asks": "how much persistent space should chat, object editing, and logs each receive, and which sections may collapse?"
@@ -36,7 +39,8 @@
       "file": "frontend/src/point.css",
       "line": 170,
       "anchor": ".transform-body {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-09",
       "what": "the selected-object inspector body that contains transform and texture editing",
       "evidence": "the growing body has no bounded scrolling while its parent clips overflow",
       "asks": "should long object controls scroll in place, expand the sidebar row, or use collapsible sections?"
@@ -46,7 +50,8 @@
       "file": "frontend/src/texture-inspector.css",
       "line": 1,
       "anchor": ".texture-inspector {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-10",
       "what": "the texture editor styling inside the selected-object panel",
       "evidence": "the stylesheet expects BEM-named descendants while the rendered markup uses texture-presets, texture-maps, and texture-transform classes",
       "asks": "which texture controls should be immediately visible and which advanced controls should be collapsed by default?"
@@ -56,7 +61,8 @@
       "file": "frontend/src/main.js",
       "line": 266,
       "anchor": "attachConnectButton(document);",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-11",
       "what": "the application startup point for agent-client detection and connection status",
       "evidence": "startup only installs a click handler; client detection and configuration do not run until the user clicks",
       "asks": "should startup only detect and report clients, or also rewrite detected clients' MCP configuration files automatically?"
@@ -66,7 +72,8 @@
       "file": "src/app/connect.py",
       "line": 137,
       "anchor": "def detect_clients() -> list[dict]:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-12",
       "what": "detection and configuration of Codex, Claude, and Cursor clients",
       "evidence": "the backend can identify configured clients and write their external config, but newly written Codex configuration still requires a client restart",
       "asks": "which external client files may Forge3D modify without a click, and how should restart-required state be communicated?"
@@ -76,7 +83,8 @@
       "file": "frontend/src/file-io.js",
       "line": 354,
       "anchor": "export function attachFileMenu(root, options = {}) {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-14",
       "what": "the user-facing save, open, import, and export workflow",
       "evidence": "the menu submits jobs while scene-replacing operations are forbidden during a running agent session, leaving the failure to appear after submission",
       "asks": "should scene-changing operations auto-pause and remain paused, or require the user to pause before choosing a file?"
@@ -86,7 +94,8 @@
       "file": "src/app/file_api.py",
       "line": 143,
       "anchor": "self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix=\"forge3d-file\")",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-17",
       "what": "the asynchronous job runner used for file operations",
       "evidence": "real Blender export fails because bpy operators are invoked from this worker thread instead of Blender's owning thread",
       "asks": "should file work remain visibly asynchronous with progress and cancellation while Blender execution is marshalled safely to its owning thread?"
@@ -96,7 +105,8 @@
       "file": "src/app/live.py",
       "line": 286,
       "anchor": "httpd.file_jobs = FileJobManager(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-17",
       "what": "the live composition root connecting browser file jobs to Blender-backed operations",
       "evidence": "the HTTP server creates a generic threaded job manager even though the live engine has thread affinity",
       "asks": "should the browser keep receiving job ids and progress while all Blender mutations are serialized with agent commands?"
@@ -106,7 +116,8 @@
       "file": "src/app/file_operations.py",
       "line": 109,
       "anchor": "def _export(app: Any, context: FileJobContext) -> FileOperationResult:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-15",
       "what": "the application callback that turns an export request into a downloadable artifact",
       "evidence": "it delegates directly to the Blender exporter from whichever thread executes the file job",
       "asks": "should export default to the whole scene or the current selection, and what should users receive when one requested format is unsupported?"
@@ -116,7 +127,8 @@
       "file": "src/engine/exporting.py",
       "line": 88,
       "anchor": "bpy.ops.export_scene.gltf(",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-16",
       "what": "the real Blender glTF/GLB operator whose context and thread requirements determine whether export succeeds",
       "evidence": "a live GLB export reproducibly fails inside Blender because the worker thread has no active-object context",
       "asks": "which production formats must have real-Blender round-trip guarantees rather than mock-only coverage?"
@@ -126,7 +138,8 @@
       "file": "src/mcp_server/sdk_bridge.py",
       "line": 133,
       "anchor": "def tool_specs() -> dict[str, ToolSpec]:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-19",
       "what": "the catalogue of tools exposed to an agent in every MCP list-tools response",
       "evidence": "the current bridge flattens all role registries, so the agent sees 52 tools even though the architecture describes a smaller phase-specific surface",
       "asks": "should agents see only orientation plus the tools legal for the current design phase, or keep the entire catalogue visible?"
@@ -136,7 +149,8 @@
       "file": "src/mcp_server/sdk_bridge.py",
       "line": 262,
       "anchor": "def build_server(sdk: SdkModules, orchestrator: Any, *, name: str, version: str) -> Any:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-20",
       "what": "the MCP server construction point where concise workflow instructions can guide every connected agent",
       "evidence": "the installed MCP SDK supports server instructions, but Forge3D currently supplies none",
       "asks": "which accuracy loop should be mandatory: orient, construct semantically, inspect measurements, correct reported problems, then promote?"
@@ -146,7 +160,8 @@
       "file": "src/mcp_server/registry.py",
       "line": 124,
       "anchor": "def build_registry(*, include_raw: bool = True) -> dict[ToolRole, tuple[ToolSpec, ...]]:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-19",
       "what": "the role partitions and catalogue-size policy used to guide tool choice",
       "evidence": "the registry warns that blockout and refine exceed the intended accuracy band but deliberately keeps the oversized lists",
       "asks": "may this robustness pass supersede the earlier decision to keep every legal tool visible when that reduces agent selection accuracy?"
@@ -156,7 +171,8 @@
       "file": "src/mcp_server/session_specs.py",
       "line": 74,
       "anchor": "name=\"get_phase\",",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-21",
       "what": "the orientation tool agents are already told to call before editing",
       "evidence": "its description says to call it first, but no server-level instruction or evaluation verifies that agents follow the workflow",
       "asks": "what minimum context and next-action guidance should agents receive before they can mutate a scene?"
@@ -166,7 +182,8 @@
       "file": "frontend/tests-browser/run-controls.browser.mjs",
       "line": 8,
       "anchor": "test('Pause and Run never overlap status and only the valid action is enabled', async () => {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-07",
       "what": "the rendered-layout regression suite for narrow viewports and control collisions",
       "evidence": "it checks run controls against status at 529px but does not check connection, settings, file, or sidebar inspector collisions",
       "asks": "what is the smallest supported desktop width, and should controls collapse before any overlap is possible?"
@@ -176,7 +193,8 @@
       "file": "frontend/tests-browser/file-io.browser.mjs",
       "line": 12,
       "anchor": "test('File menu exposes native project/model actions and keeps the dialog named', async () => {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-18",
       "what": "the rendered browser coverage for file menu actions and state",
       "evidence": "the browser test verifies labels and dialog accessibility but not a real save/open/import/export round trip",
       "asks": "which complete file journeys must be verified through the UI before this feature is considered dependable?"
@@ -186,7 +204,8 @@
       "file": "src/app/scene_file_integration_test.py",
       "line": 56,
       "anchor": "def test_live_http_routes_create_poll_and_download_a_project_job(tmp_path) -> None:",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-18",
       "what": "the HTTP integration tests for live project and model jobs",
       "evidence": "the test uses a fake engine, so it cannot detect Blender thread-affinity failures seen in the live application",
       "asks": "should CI include a small real-Blender file round trip in addition to fast fake-engine coverage?"
@@ -196,7 +215,8 @@
       "file": "CLAUDE.md",
       "line": 28,
       "anchor": "node .pipeline/check.mjs             # the gate \u2014 reads disk, re-runs both suites",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-24",
       "what": "the documented whole-project verification command agents are expected to run",
       "evidence": "the documented gate currently fails because .pipeline/check.mjs is absent, allowing agents to stop without the promised cross-suite check",
       "asks": "should one restored command verify backend, frontend, browser availability, wiring, and feature state with clear skipped-versus-failed reporting?"

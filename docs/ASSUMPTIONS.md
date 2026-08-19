@@ -549,3 +549,106 @@ reversible option; each is recorded here rather than asked, because the gate had
   variable-section horizontal and vertical lofting.
 - **Blast radius:** blacksmith generator and its regression test.
 - **Reversal:** the generator remains declarative and can replace additional props incrementally.
+
+## A-053 — Robust local collaboration is the product boundary
+
+- **Feature:** product-robustness
+- **Assumed:** make the local desktop workflow dependable end to end: truthful connection
+  state, contained controls, reliable scene files, measurement-led agent work, and one
+  authoritative verification command. Cloud accounts, multi-writer collaboration, new file
+  formats, and replacing Blender are outside this pass.
+- **Why:** these are the failures the user reported and the smallest boundary that fixes the
+  actual workflow rather than isolated symptoms.
+- **Blast radius:** frontend composition, live application wiring, MCP bridge, tests, docs.
+- **Reversal:** expand transports or collaboration separately without weakening these local
+  guarantees.
+
+## A-054 — One responsive command layout down to 529px
+
+- **Feature:** product-robustness
+- **Assumed:** top-bar status and commands participate in one layout. Secondary labels/actions
+  collapse before space runs out, and rendered tests prohibit overlap at the existing 529px
+  regression width and every larger supported desktop width.
+- **Why:** independent fixed offsets are the direct cause of controls crossing one another.
+- **Blast radius:** top-bar CSS, connection control, browser layout tests.
+- **Reversal:** raise the supported minimum width only as an explicit product decision.
+
+## A-055 — Sidebar sections contain their own growth
+
+- **Feature:** product-robustness
+- **Assumed:** chat is flexible; selected-object editing and logs are bounded/collapsible. Long
+  object controls scroll inside their panel, essential texture state stays visible, and advanced
+  mapping controls group cleanly without drawing over adjacent sections.
+- **Why:** the fixed 152px inspector and mismatched texture selectors currently clip a much
+  larger control surface.
+- **Blast radius:** sidebar, point-edit, texture-inspector CSS and rendered tests.
+- **Reversal:** move advanced material editing into a dedicated view later.
+
+## A-056 — Automatic detection, truthful state, explicit external writes
+
+- **Feature:** product-robustness
+- **Assumed:** startup reconnects the live viewer and detects supported clients without a click.
+  Correct configurations become ready automatically; missing or stale external configurations
+  require an explicit Configure action, after which the UI reports restart-required until the
+  client is actually reloaded.
+- **Why:** silent edits to Codex, Claude, or Cursor configuration are an external side effect,
+  and writing a file does not hot-connect clients that require restart.
+- **Blast radius:** connect API/UI, startup state machine, connection tests.
+- **Reversal:** a future explicit user preference may authorize automatic config repair.
+
+## A-057 — Scene replacement pauses safely; exports are explicit
+
+- **Feature:** product-robustness
+- **Assumed:** open/import explains the scene replacement, pauses before mutation, serializes the
+  change, and remains paused for inspection. Export defaults to the whole scene, with explicit
+  selection scope where offered; unsupported output never masquerades as partial success.
+- **Why:** submitting a doomed background job while an agent is running is late, confusing error
+  handling and risks concurrent scene mutation.
+- **Blast radius:** file menu flow, live controls, operation validation.
+- **Reversal:** add an explicit resume-after-import preference once race-free behavior is proven.
+
+## A-058 — Blender work stays asynchronous to users but synchronous to Blender
+
+- **Feature:** product-robustness
+- **Assumed:** the browser keeps the current job/progress model, while Blender-backed callbacks
+  are marshalled to the engine-owning thread and serialized with agent writes. Native project
+  and GLB journeys receive small real-Blender round-trip tests in addition to fake-engine tests.
+- **Why:** a live GLB export failed reproducibly because a worker thread had no valid Blender
+  context; mocks cannot reveal that class of defect.
+- **Blast radius:** file job executor, live composition root, runtime integration tests.
+- **Reversal:** isolate Blender in a dedicated process later while retaining the same job API.
+
+## A-059 — Phase-focused MCP discovery replaces the 52-tool flat list
+
+- **Feature:** product-robustness
+- **Assumed:** MCP discovery includes orientation, inspection, promotion, and mutation tools legal
+  in the current phase. Raw execution is excluded by default but remains an explicit deployment
+  opt-in; direct calls remain protected by existing authorization for compatibility.
+- **Why:** the code currently flattens all roles despite already having phase-aware registry
+  logic, increasing tool-selection noise and advertising calls that will be refused.
+- **Blast radius:** MCP registry/bridge, catalogue tests and documentation.
+- **Reversal:** a compatibility flag can restore the full catalogue without removing phase-aware
+  discovery.
+
+## A-060 — Agents receive a short mandatory verification loop
+
+- **Feature:** product-robustness
+- **Assumed:** server instructions and get_phase direct agents to orient, use semantic operations,
+  inspect ActionReport problems and recorded assumptions, measure important dimensions, correct
+  failures, and promote only after acceptance passes.
+- **Why:** Forge3D already has measurable acceptance and detailed reports, but the MCP server does
+  not teach clients to use them.
+- **Blast radius:** MCP server instructions, orientation response, SDK bridge tests.
+- **Reversal:** tune wording using evaluation results without changing the workflow contract.
+
+## A-061 — Accuracy and robustness are evaluated as workflows
+
+- **Feature:** product-robustness
+- **Assumed:** representative deterministic scenarios score orientation, semantic tool choice,
+  dimensional verification, repair, promotion, and export. A restored project gate runs backend,
+  frontend, wiring, and accuracy checks, and labels unavailable browser/Blender prerequisites
+  separately from product failures.
+- **Why:** a tool count or a green mock suite did not catch the live exporter defect and cannot
+  prove attention to detail.
+- **Blast radius:** evaluation fixtures, browser/runtime tests, `.pipeline/check.mjs`, docs.
+- **Reversal:** add model-driven evaluations on top of the deterministic baseline later.
