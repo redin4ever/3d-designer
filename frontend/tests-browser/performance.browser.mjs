@@ -44,7 +44,7 @@ export function registerPerformanceTests({ withScene }) {
     try {
       await waitForConnected(session);
       await session.page.waitForFunction(
-        () => [...document.querySelectorAll('#event-log li')].some((node) => /preview simplified/i.test(node.textContent)),
+        () => [...document.querySelectorAll('#action-log li')].some((node) => /preview simplified/i.test(node.textContent)),
       );
       const latency = await session.page.evaluate(() => new Promise((resolve) => {
         const started = performance.now();
