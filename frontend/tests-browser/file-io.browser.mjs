@@ -21,12 +21,14 @@ export function registerFileIoTests({ withScene, waitUntil }) {
           dialog: Boolean(dialog),
           labelled: Boolean(dialog?.getAttribute('aria-label') || dialog?.getAttribute('aria-labelledby')),
           actions: [...document.querySelectorAll('[data-file-action]')].map((node) => node.dataset.fileAction),
+          exportScope: document.querySelector('[data-file-scope]')?.value ?? null,
         };
       });
       assert.ok(view.button, 'the File menu button is missing');
       assert.ok(view.dialog, 'the file dialog is missing');
       assert.ok(view.labelled, 'the native dialog needs an accessible name');
       assert.deepEqual(view.actions, ['open-project', 'save-project', 'save-as', 'import-model', 'export-model']);
+      assert.equal(view.exportScope, 'scene', 'Export must not silently switch to the current selection');
     } finally {
       await session.dispose();
     }

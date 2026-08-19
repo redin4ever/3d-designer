@@ -47,9 +47,9 @@ test('local file validation rejects URLs, text values, unsupported extensions, a
   assert.equal(validateLocalFile(file('huge.glb', MAX_FILE_BYTES + 1)).ok, false);
 });
 
-test('export uses selected ids when present and the full scene otherwise', () => {
+test('export defaults to the whole scene and requires explicit selection scope', () => {
   assert.deepEqual(
-    buildExportPayload({ selectedIds: ['beam_04', 'beam_04', 'post_02'], format: 'gltf' }),
+    buildExportPayload({ selectedIds: ['beam_04', 'beam_04', 'post_02'], scope: 'selection', format: 'gltf' }),
     {
       action: 'export-model',
       profile: 'generic',
@@ -59,6 +59,13 @@ test('export uses selected ids when present and the full scene otherwise', () =>
     },
   );
   assert.deepEqual(buildExportPayload({ selectedIds: [], profile: 'generic', format: 'glb' }), {
+    action: 'export-model',
+    profile: 'generic',
+    format: 'glb',
+    scope: 'scene',
+    object_ids: [],
+  });
+  assert.deepEqual(buildExportPayload({ selectedIds: ['selected-but-not-requested'], format: 'glb' }), {
     action: 'export-model',
     profile: 'generic',
     format: 'glb',
@@ -115,7 +122,7 @@ test('export posts generic profile and polls until a Blob download is available'
     pollInterval: 0,
   });
 
-  const result = await controller.exportModel({ selectedIds: ['part-1'], format: 'glb' });
+  const result = await controller.exportModel({ selectedIds: ['part-1'], scope: 'selection', format: 'glb' });
 
   assert.equal(result.ok, true);
   assert.deepEqual(JSON.parse(calls[0].init.body), {
