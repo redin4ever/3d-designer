@@ -153,3 +153,72 @@ def test_real_blender_glb_job_round_trips_on_the_engine_owner_thread(tmp_path) -
         manager.close()
         dispatcher.close()
         app.engine.reset()
+
+
+def test_real_blend_upload_preserves_placement_and_reaches_the_viewer(tmp_path) -> None:
+    """Binary upload -> owner thread -> scene log -> visible mesh, using a real .blend."""
+    import pytest
+
+    bpy = pytest.importorskip("bpy")
+    from app import build_app
+    from app.file_api import FileJobManager, OwnerThreadDispatcher
+    from app.file_operations import build_file_operations
+    from contracts import ServerMessageType
+
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    source_mesh = bpy.data.meshes.new("uploaded_mesh")
+    source_mesh.from_pydata([(0, 0, 0), (1, 0, 0), (0, 1, 0)], [], [(0, 1, 2)])
+    source_parent = bpy.data.objects.new("uploaded_parent", None)
+    source_parent.location.x = 4
+    source_object = bpy.data.objects.new("uploaded_part", source_mesh)
+    source_object.parent = source_parent
+    source_object.location.x = 3
+    source = tmp_path / "uploaded.blend"
+    bpy.data.libraries.write(str(source), {source_mesh, source_parent, source_object})
+    bpy.data.objects.remove(source_object, do_unlink=True)
+    bpy.data.objects.remove(source_parent, do_unlink=True)
+    bpy.data.meshes.remove(source_mesh)
+
+    app = build_app(prefer_blender=True, attach_viewer=True)
+    app.engine.reset()
+    app.viewer.pending()
+    dispatcher = OwnerThreadDispatcher()
+    manager = FileJobManager(
+        tmp_path / "blend-jobs",
+        operations=build_file_operations(app),
+        operation_runner=dispatcher.call,
+    )
+    try:
+        body = source.read_bytes()
+        started = manager.submit(
+            {
+                "content-type": "application/octet-stream",
+                "x-forge3d-action": "import-model",
+                "x-forge3d-filename": source.name,
+                "x-forge3d-size": str(len(body)),
+                "x-forge3d-flatten": "true",
+            },
+            body,
+        )
+        deadline = time.monotonic() + 15
+        result = manager.get(started["job_id"])
+        while result["status"] not in {"complete", "failed", "cancelled"}:
+            dispatcher.drain()
+            if time.monotonic() > deadline:
+                raise AssertionError(f"real Blender import did not finish: {result!r}")
+            time.sleep(0.005)
+            result = manager.get(started["job_id"])
+
+        assert result["status"] == "complete", result
+        snapshot = app.engine.snapshot("uploaded_part")
+        assert sorted(vertex.x for vertex in snapshot.vertices) == [7.0, 7.0, 8.0]
+        assert app.scene.document.operations[-1].kind == "import_model_file"
+        messages = app.viewer.pending()
+        upserts = [message for message in messages if message.type is ServerMessageType.MESH_UPSERT]
+        assert len(upserts) == 1
+        assert upserts[0].object_ids == ("uploaded_part",)
+    finally:
+        manager.close()
+        dispatcher.close()
+        app.engine.reset()

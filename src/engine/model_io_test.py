@@ -114,6 +114,44 @@ def test_blend_import_appends_editable_meshes_without_replacing_scene(tmp_path: 
 
 
 @pytest.mark.needs_blender
+def test_blend_import_flattens_evaluated_world_placement_and_shared_meshes(tmp_path: Path) -> None:
+    """A regular .blend hierarchy must not collapse to the origin when appended."""
+    bpy = pytest.importorskip("bpy")
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+
+    shared = bpy.data.meshes.new("shared_library_mesh")
+    shared.from_pydata([(0, 0, 0), (1, 0, 0), (0, 1, 0)], [], [(0, 1, 2)])
+    parent = bpy.data.objects.new("library_parent", None)
+    parent.location.x = 10
+    left = bpy.data.objects.new("left_instance", shared)
+    left.parent = parent
+    left.location.x = -3
+    right = bpy.data.objects.new("right_instance", shared)
+    right.parent = parent
+    right.location.x = 2
+
+    target = tmp_path / "placed-instances.blend"
+    bpy.data.libraries.write(str(target), {parent, left, right, shared})
+    for obj in (left, right, parent):
+        bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.meshes.remove(shared)
+
+    result = ModelIOMixin().import_model(str(target), flatten=True)
+
+    assert result.object_ids == ("left_instance", "right_instance")
+    imported_left = bpy.data.objects["left_instance"]
+    imported_right = bpy.data.objects["right_instance"]
+    assert imported_left.parent is None
+    assert imported_right.parent is None
+    assert imported_left.data is not imported_right.data
+    assert imported_left.matrix_world.is_identity
+    assert imported_right.matrix_world.is_identity
+    assert sorted(vertex.co.x for vertex in imported_left.data.vertices) == [7.0, 7.0, 8.0]
+    assert sorted(vertex.co.x for vertex in imported_right.data.vertices) == [12.0, 12.0, 13.0]
+
+
+@pytest.mark.needs_blender
 def test_export_duplicates_selected_meshes_and_cleans_temporary_objects(tmp_path: Path) -> None:
     bpy = pytest.importorskip("bpy")
     bpy.ops.object.select_all(action="SELECT")
