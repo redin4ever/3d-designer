@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { attachConnectButton } from '../src/connect-ui.js';
+
+test('main refreshes agent readiness when the app becomes visible again', () => {
+  const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(source, /const connectController = attachConnectButton\(document\)/);
+  assert.match(source, /visibilitychange/);
+  assert.match(source, /connectController\.refreshStatus\(\)/);
+});
 
 class FakeButton {
   constructor() {
