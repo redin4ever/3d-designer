@@ -14,7 +14,8 @@ export const FILE_ACTIONS = Object.freeze([
 ]);
 
 const PROJECT_EXTENSIONS = new Set(['forge3d', 'json']);
-const MODEL_EXTENSIONS = new Set(['glb', 'gltf', 'obj', 'fbx', 'stl', 'ply', 'usd', 'usda', 'usdc']);
+export const MODEL_IMPORT_ACCEPT = '.glb,.gltf,.obj,.fbx,.stl,.ply,.usd,.usda,.usdc,.blend';
+const MODEL_EXTENSIONS = new Set(MODEL_IMPORT_ACCEPT.split(',').map((item) => item.slice(1)));
 const FORMATS = new Set(['glb', 'gltf', 'obj', 'fbx', 'stl', 'ply', 'usd', 'usda', 'usdc']);
 const PROFILES = new Set(['generic', 'roblox', 'unity', 'unreal']);
 
@@ -412,7 +413,7 @@ export function attachFileMenu(root, options = {}) {
     if (title) title.textContent = action.replaceAll('-', ' ');
     if (fileInput) {
       fileInput.value = '';
-      fileInput.accept = action === 'import-model' ? '.glb,.gltf,.obj,.fbx,.stl,.ply,.usd,.usda,.usdc' : '.forge3d,.json';
+      fileInput.accept = action === 'import-model' ? MODEL_IMPORT_ACCEPT : '.forge3d,.json';
     }
     if (advancedImport) advancedImport.hidden = action !== 'import-model';
     if (dialog?.showModal && !dialog.open) dialog.showModal();

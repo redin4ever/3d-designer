@@ -18,7 +18,7 @@
       "dependsOn": ["native-blend-import"],
       "seams": ["browser_import_formats"],
       "decisions": ["Q-02", "Q-21", "Q-22"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "viewer-preview-budget",
