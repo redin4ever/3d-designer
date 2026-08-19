@@ -28,8 +28,12 @@
  *   materials: readonly string[], groups: readonly (readonly [number, number, number])[]}}
  */
 export function buildGeometryBuffers(mesh) {
-  const positions = Float32Array.from(mesh.positions ?? []);
-  const indices = Uint32Array.from(mesh.indices ?? []);
+  const positions = mesh.positions instanceof Float32Array
+    ? mesh.positions
+    : Float32Array.from(mesh.positions ?? []);
+  const indices = mesh.indices instanceof Uint32Array
+    ? mesh.indices
+    : Uint32Array.from(mesh.indices ?? []);
 
   if (positions.length % 3 !== 0) {
     throw new Error(
@@ -45,6 +49,13 @@ export function buildGeometryBuffers(mesh) {
   const vertexCount = positions.length / 3;
   const triangleCount = indices.length / 3;
 
+  if (mesh.uvs && mesh.uvs.length !== vertexCount * 2) {
+    throw new Error(
+      `mesh ${mesh.object_id ?? '?'}: uvs length ${mesh.uvs.length} does not match ` +
+        `${vertexCount} vertices`,
+    );
+  }
+
   if (typeof mesh.triangle_count === 'number' && mesh.triangle_count !== triangleCount) {
     throw new Error(
       `mesh ${mesh.object_id ?? '?'}: triangle_count ${mesh.triangle_count} does not match the ` +
@@ -55,11 +66,16 @@ export function buildGeometryBuffers(mesh) {
   return {
     positions,
     indices,
-    normals: mesh.normals ? Float32Array.from(mesh.normals) : null,
-    uvs: mesh.uvs ? Float32Array.from(mesh.uvs) : null,
+    normals: mesh.normals instanceof Float32Array
+      ? mesh.normals
+      : mesh.normals ? Float32Array.from(mesh.normals) : null,
+    uvs: mesh.uvs instanceof Float32Array
+      ? mesh.uvs
+      : mesh.uvs ? Float32Array.from(mesh.uvs) : null,
     vertexCount,
     triangleCount,
     materials: mesh.materials ?? [],
+    materialDefinitions: mesh.material_definitions ?? {},
     groups: mesh.groups ?? [],
   };
 }

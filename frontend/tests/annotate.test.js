@@ -27,6 +27,26 @@ test('selecting parts replaces the selection rather than accumulating', () => {
   assert.deepEqual([...state.selection], ['tread']);
 });
 
+test('modifier selection toggles parts without losing the rest of the selection', () => {
+  const state = createPointState();
+  setSelection(state, ['railing']);
+
+  setSelection(state, ['tread'], { toggle: true });
+  assert.deepEqual([...state.selection], ['railing', 'tread']);
+
+  setSelection(state, ['railing'], { toggle: true });
+  assert.deepEqual([...state.selection], ['tread']);
+});
+
+test('an empty modifier pick preserves the existing selection', () => {
+  const state = createPointState();
+  setSelection(state, ['railing']);
+
+  setSelection(state, [], { toggle: true });
+
+  assert.deepEqual([...state.selection], ['railing']);
+});
+
 test('circling several parts selects all of them', () => {
   const state = createPointState();
 

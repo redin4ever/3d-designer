@@ -110,6 +110,7 @@ def start_viewer(app: Any, host: str, port: int) -> str:
         import viewer as viewer_module
 
         server = viewer_module.serve(app.scene, app.orchestrator, host=host, port=port)
+        app.viewer = server.bridge
 
         # The arrow the whole live view was missing. `ViewerBridge.report_action` already
         # knew how to turn an ActionReport into HIGHLIGHT / LOG / PROBLEMS messages and
@@ -147,7 +148,7 @@ def start_viewer(app: Any, host: str, port: int) -> str:
 def serve(args: argparse.Namespace) -> int:
     from app import build_app
 
-    app = build_app(prefer_blender=not args.no_blender, include_raw=not args.no_raw)
+    app = build_app(prefer_blender=not args.no_blender, include_raw=args.raw)
     print(app.describe(), file=sys.stderr)
 
     if not args.no_viewer:
@@ -155,7 +156,7 @@ def serve(args: argparse.Namespace) -> int:
     else:
         print("  live view: off (--no-viewer)", file=sys.stderr)
 
-    if args.http and args.host not in ("127.0.0.1", "localhost", "::1"):
+    if args.raw and args.http and args.host not in ("127.0.0.1", "localhost", "::1"):
         # ADR-009: connected agents get unrestricted code execution and unrestricted
         # filesystem access, by explicit decision. On loopback the trust boundary is the
         # user's own machine. Off loopback it is whoever can route to this port.
@@ -171,10 +172,12 @@ def serve(args: argparse.Namespace) -> int:
         if args.http:
             from mcp_server import serve_http
 
-            return serve_http(app.orchestrator, host=args.host, port=args.port) or 0
+            return serve_http(
+                app.orchestrator, host=args.host, port=args.port, expose_raw=args.raw,
+            ) or 0
         from mcp_server import serve_stdio
 
-        return serve_stdio(app.orchestrator) or 0
+        return serve_stdio(app.orchestrator, expose_raw=args.raw) or 0
     except Exception as exc:  # noqa: BLE001
         print(f"\n  Could not start the server: {exc}", file=sys.stderr)
         print("  Run `forge3d doctor` to see which pieces are missing.", file=sys.stderr)
@@ -220,7 +223,7 @@ def run(args: argparse.Namespace) -> int:
 
     return run_live(
         prefer_blender=not args.no_blender,
-        include_raw=not args.no_raw,
+        include_raw=args.raw,
         ports={"mcp": args.port, "viewer": args.viewer_port, "web": args.web_port},
         open_browser=not args.no_browser,
         seed=not args.empty,
@@ -246,7 +249,11 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--viewer-port", type=int, default=8766)
     r.add_argument("--web-port", type=int, default=8767)
     r.add_argument("--no-blender", action="store_true", help="force the in-memory engine")
-    r.add_argument("--no-raw", action="store_true", help="omit the unrestricted-execution tool")
+    r.add_argument(
+        "--raw", action="store_true",
+        help="explicitly expose unrestricted raw code execution (disabled by default)",
+    )
+    r.add_argument("--no-raw", action="store_false", dest="raw", help=argparse.SUPPRESS)
     r.add_argument("--no-browser", action="store_true", help="do not open a browser window")
     r.add_argument("--empty", action="store_true",
                    help="start with an empty scene instead of the demo geometry")
@@ -256,7 +263,11 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--no-blender", action="store_true", help="force the in-memory engine")
-    s.add_argument("--no-raw", action="store_true", help="omit the unrestricted-execution tool")
+    s.add_argument(
+        "--raw", action="store_true",
+        help="explicitly expose unrestricted raw code execution (disabled by default)",
+    )
+    s.add_argument("--no-raw", action="store_false", dest="raw", help=argparse.SUPPRESS)
     # Gate B 1.3 chose auto-start, so this is opt-OUT. The live view stays on loopback for
     # the same reason the MCP HTTP transport does (A-005, ADR-009): a connected agent has
     # unrestricted execution, and nothing about that is safe to expose off-host.

@@ -5,8 +5,8 @@ implementation-facing.
 
 ## Status
 
-**GREEN.** `node --test frontend/tests/` passes 164/164 (also `npm run test:frontend`), plus
-`npm run test:frontend:browser` for 22 smoke tests in real Chromium via Puppeteer.
+**GREEN.** `node --test frontend/tests/` passes 180/180 (also `npm run test:frontend`), plus
+`npm run test:frontend:browser` for 30 smoke tests in real Chromium via Puppeteer.
 The module tests are pure logic — no browser, no WebGL, no real WebSocket. The browser
 suite exists because that purity is also a blind spot: it is how a camera that could only
 turn left and right shipped.

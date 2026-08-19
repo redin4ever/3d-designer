@@ -1,0 +1,98 @@
+.texture-inspector {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: var(--hairline-size) solid var(--hairline);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm) / var(--leading-body) var(--font-text);
+}
+
+.texture-inspector h3 {
+  margin: 0;
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-controls);
+}
+
+.texture-presets,
+.texture-maps,
+.texture-transform {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.texture-presets {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.texture-maps,
+.texture-transform[open] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.texture-maps label,
+.texture-transform label {
+  min-inline-size: 0;
+  display: grid;
+  gap: var(--space-xxs);
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+
+.texture-transform summary {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.texture-inspector button,
+.texture-inspector input,
+.texture-inspector select {
+  min-height: var(--touch-target);
+  color: var(--ink);
+  background: var(--surface-1);
+  border: var(--hairline-size) solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+.texture-inspector button {
+  padding: 0 var(--space-sm);
+  cursor: pointer;
+}
+
+.texture-inspector button:hover,
+.texture-inspector button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.texture-inspector button:focus-visible,
+.texture-inspector input:focus-visible,
+.texture-inspector select:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.texture-inspector input,
+.texture-inspector select {
+  width: 100%;
+  padding: 0 var(--space-xs);
+}
+
+.texture-inspector [data-texture-status] {
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+
+.texture-inspector [data-texture-status][data-kind='error'] {
+  color: var(--accent-hover);
+}
+
+.texture-inspector[aria-disabled='true'] {
+  opacity: 0.56;
+  pointer-events: none;
+}

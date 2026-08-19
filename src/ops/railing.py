@@ -34,7 +34,8 @@ from __future__ import annotations
 from contracts import EngineProtocol, Operation, OperationResult, Vec3
 
 from ._defaults import resolve_dimensions
-from ._geom import box_mesh, oriented_box_between
+from ._geom import box_mesh
+from ._rail_sweep import mitered_rectangular_sweep
 from .validation import validate_params
 
 __all__ = ["add_railing"]
@@ -109,18 +110,11 @@ def add_railing(engine: EngineProtocol, op: Operation) -> OperationResult:
     )
     engine.delete(bal_src_id)
 
-    # -- top rail: swept along the path, elevated by `height`, one segment per leg ----
+    # -- top rail: one continuous sweep with a shared miter ring at every bend ----------
     elevated = [p + Vec3(0.0, 0.0, height) for p in path]
     rail_name = f"{op.op_id}_top_rail"
-    first_verts, first_faces = oriented_box_between(elevated[0], elevated[1], rail_w, rail_d)
-    rail_id = engine.create_mesh(rail_name, first_verts, first_faces)
-
-    extra_rail_ids = []
-    for a, b in zip(elevated[1:], elevated[2:]):
-        verts, faces = oriented_box_between(a, b, rail_w, rail_d)
-        extra_rail_ids.append(engine.create_mesh(f"{op.op_id}_rail_part", verts, faces))
-    if extra_rail_ids:
-        engine.join(rail_id, extra_rail_ids)
+    rail_verts, rail_faces = mitered_rectangular_sweep(elevated, rail_w, rail_d)
+    rail_id = engine.create_mesh(rail_name, rail_verts, rail_faces)
 
     produced = tuple(post_ids) + tuple(baluster_ids) + (rail_id,)
     return OperationResult(

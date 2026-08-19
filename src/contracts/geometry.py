@@ -259,6 +259,8 @@ class MeshSnapshot:
     mesh as empty and defeats every polygon-budget warning for that object."""
 
     material_slots: Sequence[str] = ()
+    material_definitions: dict[str, dict] = field(default_factory=dict)
+    """Serializable PBR texture definitions keyed by material slot name."""
     triangle_materials: Sequence[int] | None = None
     """Per-triangle index into ``material_slots``. Required when more than one slot is
     present: without it a multi-material mesh cannot be split for rendering, and the

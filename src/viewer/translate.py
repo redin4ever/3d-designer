@@ -19,10 +19,76 @@ from contracts import (
 
 from .payloads import snapshot_to_payload, transform_payload
 
-__all__ = ["TranslateMixin", "enumerate_object_ids"]
+__all__ = ["TranslateMixin", "allocate_preview_budgets", "enumerate_object_ids"]
+
+VIEWER_TRIANGLE_BUDGET = 40_000
 
 _BUFFER_KINDS = (ChangeKind.OBJECTS_ADDED, ChangeKind.OBJECTS_MODIFIED, ChangeKind.TOPOLOGY_CHANGED)
 _RESYNC_KINDS = (ChangeKind.FULL_RESYNC, ChangeKind.ROLLBACK)
+
+
+def allocate_preview_budgets(
+    snapshots: tuple[MeshSnapshot, ...] | list[MeshSnapshot],
+    total_budget: int,
+) -> tuple[int, ...]:
+    """Allocate a deterministic scene/message budget without starving small meshes."""
+
+    counts = [snapshot.triangle_count for snapshot in snapshots]
+    total = sum(counts)
+    if total <= total_budget:
+        return tuple(counts)
+    allocation = [0] * len(counts)
+    positive = [index for index, count in enumerate(counts) if count > 0]
+    if total_budget <= 0 or not positive:
+        return tuple(allocation)
+    if total_budget < len(positive):
+        ordered = sorted(positive, key=lambda index: snapshots[index].object_id)
+        for index in ordered[:total_budget]:
+            allocation[index] = 1
+        return tuple(allocation)
+
+    for index in positive:
+        allocation[index] = 1
+    remaining = total_budget - len(positive)
+    capacities = [max(0, count - 1) for count in counts]
+    capacity_total = sum(capacities)
+    if capacity_total == 0:
+        return tuple(allocation)
+    quotas = [remaining * capacity / capacity_total for capacity in capacities]
+    for index, quota in enumerate(quotas):
+        allocation[index] += min(capacities[index], int(quota))
+    leftover = total_budget - sum(allocation)
+    order = sorted(
+        positive,
+        key=lambda index: (-(quotas[index] - int(quotas[index])), snapshots[index].object_id),
+    )
+    for index in order:
+        if leftover == 0:
+            break
+        if allocation[index] < counts[index]:
+            allocation[index] += 1
+            leftover -= 1
+    return tuple(allocation)
+
+
+def _preview_payloads(
+    snapshots: tuple[MeshSnapshot, ...] | list[MeshSnapshot],
+) -> tuple[tuple, dict[str, object]]:
+    budgets = allocate_preview_budgets(snapshots, VIEWER_TRIANGLE_BUDGET)
+    meshes = tuple(
+        snapshot_to_payload(snapshot, triangle_budget=budget)
+        for snapshot, budget in zip(snapshots, budgets, strict=True)
+    )
+    source_triangles = sum(snapshot.triangle_count for snapshot in snapshots)
+    preview_triangles = sum(mesh.triangle_count for mesh in meshes)
+    return meshes, {
+        "preview": {
+            "simplified": preview_triangles < source_triangles,
+            "source_triangles": source_triangles,
+            "preview_triangles": preview_triangles,
+            "budget": VIEWER_TRIANGLE_BUDGET,
+        }
+    }
 
 
 def enumerate_object_ids(scene: object) -> tuple[str, ...]:
@@ -88,12 +154,14 @@ class TranslateMixin:
         kind = event.kind
         if kind in _BUFFER_KINDS:
             snaps = self._snapshots_for(event)
+            meshes, preview_data = _preview_payloads(snaps)
             return ServerMessage(
                 type=ServerMessageType.MESH_UPSERT,
                 seq=self._next_seq(),
-                meshes=tuple(snapshot_to_payload(s) for s in snaps),
+                meshes=meshes,
                 transforms=tuple(transform_payload(s) for s in snaps),
                 object_ids=event.object_ids,
+                data=preview_data,
             )
         if kind is ChangeKind.TRANSFORMS_ONLY:
             snaps = self._snapshots_for(event)
@@ -170,10 +238,12 @@ class TranslateMixin:
         """
         object_ids = enumerate_object_ids(self._scene)
         snapshots = [self._scene.snapshot_of(oid) for oid in object_ids]
+        meshes, preview_data = _preview_payloads(snapshots)
         return ServerMessage(
             type=ServerMessageType.FULL_SCENE,
             seq=self._next_seq() if seq is None else seq,
-            meshes=tuple(snapshot_to_payload(s) for s in snapshots),
+            meshes=meshes,
             transforms=tuple(transform_payload(s) for s in snapshots),
             object_ids=tuple(object_ids),
+            data=preview_data,
         )

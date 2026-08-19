@@ -43,6 +43,18 @@ function noClientsOutcome() {
   };
 }
 
+function alreadyReadyOutcome(clients) {
+  const labels = clients.map((client) => client.label).join(', ');
+  return {
+    tone: 'ok',
+    title: clients.length === 1 ? `${labels} is configured.` : 'AI clients are configured.',
+    lines: [
+      `${labels} already has the current forge3d server configuration.`,
+      'No external file was rewritten. If its tools are not visible, restart that client and refresh this status.',
+    ],
+  };
+}
+
 /**
  * Decide what pressing Connect should actually do with the clients the backend found.
  *
@@ -64,6 +76,9 @@ function noClientsOutcome() {
 export function planConnect(clients) {
   const found = Array.isArray(clients) ? clients.filter(isClient) : [];
   if (found.length === 0) return { action: 'none', clients: found, outcome: noClientsOutcome() };
+  if (found.every((client) => client.configured === true)) {
+    return { action: 'none', clients: found, outcome: alreadyReadyOutcome(found) };
+  }
   if (found.length === 1) return { action: 'connect', client: found[0], clients: found };
   return { action: 'choose', clients: found };
 }

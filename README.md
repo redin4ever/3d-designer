@@ -30,7 +30,7 @@ The model keeps intent, taste, and sequencing. The tool keeps the geometry.
 
 ```bash
 python src/forge3d_cli.py doctor        # what is installed, and is it wired?
-python src/forge3d_cli.py serve         # stdio — Claude Desktop / Claude Code / Cursor
+python src/forge3d_cli.py serve         # stdio — Claude Desktop / Claude Code / Cursor / Codex
 python src/forge3d_cli.py serve --http  # streamable HTTP — ChatGPT developer-mode connector
 ```
 
@@ -45,7 +45,7 @@ exercise the system, never enough to produce an asset.
 
 | | |
 |---|---|
-| **Build** | primitives, walls, floors, openings, staircases, railings, arrays along curves, LOD chains, grid-aligned modular kits |
+| **Build** | primitives, walls, floors, openings, detailed gable roofs and chimneys, landing-derived supported staircases, continuous-miter railings, arrays along curves, LOD chains, grid-aligned modular kits |
 | **Fix** | boundary holes, non-manifold edges and vertices, loose and duplicate vertices, flipped normals, disconnected shells, visual gaps between parts |
 | **Align** | parallel, perpendicular, coplanar, plumb, flush, grid snap, exact angles — quaternion-composed, so hundreds of small agent edits do not accumulate gimbal error |
 | **Detail** | heuristic bevels on edges that would plausibly catch light, panel lines, greebles with deliberate rest zones, roughness variation, physically-plausible albedo |

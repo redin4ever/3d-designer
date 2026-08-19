@@ -28,6 +28,10 @@ def build_registry(*, include_raw: bool = True) -> dict[ToolRole, tuple[ToolSpec
 def tools_for(role: ToolRole) -> tuple[ToolSpec, ...]
     # role's slice of the default registry (include_raw=True)
 
+def focused_tools(phase: Phase, focus: ToolRole | None = None,
+                  *, include_raw: bool = False) -> tuple[ToolSpec, ...]
+    # one complete specialist role plus the orientation/verification core used by MCP
+
 def dispatch(name: str, params: dict, *, role=None, orchestrator, lease=None) -> dict
     # find tool -> validate params -> lease required? -> authorise (phase + lease) ->
     # execute -> JSON-serialisable result.  `role` is accepted and IGNORED (ADR-013).
@@ -52,7 +56,8 @@ SERVER_INFO: dict
 ```
 
 `python -m mcp_server` is the entry point (`__main__.py`): stdio by default, `--http` for a
-streamable-HTTP connector, `--host/--port/--no-blender/--no-raw/--no-viewer` alongside.
+streamable-HTTP connector, `--host/--port/--no-blender/--no-viewer` alongside. Raw code
+execution is off by default; `--raw` is the explicit, unrestricted opt-in.
 `live_client_test.py` drives exactly this command with the SDK's own client.
 
 ## Layout
@@ -61,7 +66,7 @@ One file per responsibility:
 
 | File | Owns |
 |---|---|
-| `registry.py` | `build_registry`, `tools_for` — collects content, partitions by role |
+| `registry.py` | complete role registry plus phase/focus discovery views |
 | `authorize.py` | who may call what, right now: the phase gate and the lease's grant |
 | `context.py` | how a handler declared here reaches the live engine/orchestrator |
 | `export_specs.py` | `export`'s two specs, re-issued with real handlers (ADR-014) |
@@ -84,9 +89,9 @@ One file per responsibility:
   a tool the lease does not hold or the phase does not permit raises
   `contracts.PhaseViolation`. Before this, `unwrap_uvs` (POLISH) and `add_railing` (REFINE)
   both ran in a session that had never left `blockout`.
-- **This is not a security boundary.** ADR-009 gives every connected agent arbitrary code
-  execution and full disk access by explicit user choice. Nothing here sandboxes, allowlists
-  or AST-checks anything, and any doc implying otherwise is wrong.
+- **Raw execution is explicit.** Normal MCP startup omits `raw_execute` from discovery and
+  calls. `--raw` enables unrestricted code and filesystem access; nothing then sandboxes,
+  allowlists, or AST-checks it.
 - **A caller with no write lease reaches `INSPECT` tools and nothing else** — that is what
   lets any number of readers run beside the one writer (ADR-007).
 - **`dispatch` never mutates without a live write lease.** A missing lease raises
@@ -112,9 +117,9 @@ One file per responsibility:
   opaque failure Gate A 4.2 was asked about. `sdk_bridge.call_tool` catches `RuleError` and
   returns `isError: true` carrying `{rule, detail, suggestion}`; anything that was *not* a
   `RuleError` still gets a rule (`mcp.unhandled_failure`) and never a traceback.
-- **Every tool is declared to the client with its role and mutating flag** in `_meta`. A
-  client has no other way to learn either, and both change what an agent should do before it
-  calls.
+- **Every discovered tool carries its role and mutating flag** in `_meta`. Discovery shows
+  the current phase's complete specialist role plus orientation tools; `set_tool_focus`
+  switches roles without changing authorization or scene state.
 - **Both transports run the same server object.** ADR-003 chose dual transport so a local
   editor and a consumer subscription get identical behaviour; two wirings would be two
   chances to drift.
@@ -131,22 +136,25 @@ Recorded counts, pinned by `registry_test.py::test_the_visible_tool_count_of_eve
 
 | Role | Tools | |
 |---|---|---|
-| `blockout` | 5 | |
-| `refine` | 4 | |
+| `blockout` | 18 | includes texture operations and model import |
+| `refine` | 21 | includes textures, model import, surface details, fitted impact heads, and profiled solids |
 | `repair` | 8 | |
 | `align` | 7 | |
-| `detail` | 4 | bevel, panel lines, greebles, plus the bevel-topology cleanup (Gate B 3.4) |
-| `polish` | 2 | |
-| `inspect` | 9 | **over 8** — `measure`'s six tools plus this module's three session tools |
+| `detail` | 8 | detail and texture tools plus model import |
+| `polish` | 6 | UV/bake and texture tools plus model import |
+| `inspect` | 12 | **over 8** — measurement, session, texture discovery, and surface-angle tools |
 | `export` | 2 | |
 | `admin` | 2 | |
 
-**`inspect` is the one role over 8, and it is over deliberately (Gate B 3.3).** Crossing the
-band is logged by `build_registry` every time it happens; it is never trimmed. That is the
+**Several complete roles are over 8, deliberately (Gate B 3.3).** Crossing the
+band is logged by `build_registry`; no operation inside a selected role is trimmed. MCP
+no longer combines every phase and role into one flat decision surface: default discovery
+is 24 tools in blockout, 27 in refine, 14 in detail, and 12 in polish (including
+`set_tool_focus`). That is the
 change from the previous pass: a `_cap.py` used to round-robin each role down to eight, and
 it silently hid `repair`, `make_plumb` and `close_visual_gap` — three core operations — from
 every agent that would have called them, with every suite green. The real fix for `REFINE`'s
-19 tools was splitting `REPAIR` and `ALIGN` out of it in `contracts.ToolRole`; capping was
+20 tools was splitting `REPAIR` and `ALIGN` out of it in `contracts.ToolRole`; capping was
 the symptom. `_cap.py` is deleted.
 
 If you add a tool and this table is wrong, update the table and the test. Updating it is the
@@ -175,9 +183,8 @@ signature can express. The callbacks hand our schema through untouched.
 
 ## What this module deliberately does not do
 
-- No sandbox, allowlist or AST check on `raw_execute` — that decision belongs to `raw`
-  (ADR-009); this module routes the call through the write lock like any other mutating tool
-  and marks it opaque.
+- No sandbox, allowlist or AST check after `--raw` opts into `raw_execute`; this module routes
+  the call through the write lock like any other mutating tool and marks it opaque.
 - No real image codec (PNG/JPEG). `downscale_image` operates on binary PPM (`P6`) bytes —
   this codebase has no Pillow dependency; see `images.py`'s module docstring.
 - No live-verified session against the SDK — see above.

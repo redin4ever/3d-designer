@@ -233,6 +233,7 @@ class MeshPayload:
     run. Empty means the whole mesh uses ``materials[0]``."""
 
     triangle_count: int = 0
+    material_definitions: dict[str, dict] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

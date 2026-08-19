@@ -127,6 +127,7 @@ from .conformance_surfacing import (
     check_mark_seams_changes_the_subsequent_unwrap,
     check_unwrap_produces_uvs_in_unit_range,
 )
+from .conformance_text import check_create_text_is_centered_mesh, check_create_text_rejects_empty_text
 from .conformance_validation import (
     check_array_along_curve_rejects_a_curve_with_fewer_than_two_points,
     check_array_along_curve_rejects_non_positive_spacing,
@@ -143,6 +144,8 @@ from .conformance_validation import (
 
 #: Every check that holds for any conforming ``EngineProtocol``. Both test files call these.
 UNIVERSAL_CHECKS = (
+    check_create_text_is_centered_mesh,
+    check_create_text_rejects_empty_text,
     check_snapshot_carries_vertices_no_face_references,
     check_snapshot_triangulates_a_quad_mesh,
     check_primitive_has_expected_world_bounds,

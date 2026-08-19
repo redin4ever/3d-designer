@@ -30,15 +30,15 @@ RECORDED_TOOL_COUNTS: dict[str, int] = {
     # blockout and refine both gained the seven direct edits added at Q-14 — move, rotate,
     # scale, delete, duplicate, rename, set material. Updated deliberately, which is the
     # measurement Gate B 3.3 asked for; not capped, which is the one response ruled out.
-    "blockout": 12,
-    "refine": 11,
+    "blockout": 18,
+    "refine": 21,
     "repair": 8,
     "align": 7,
-    "detail": 4,
-    "polish": 2,
+    "detail": 8,
+    "polish": 6,
     # +1: get_operator_context (Q-03) — the tool that returns an annotation image,
     # which an ActionReport is text and cannot carry.
-    "inspect": 10,
+    "inspect": 12,
     "export": 2,
     "admin": 2,
 }
@@ -72,6 +72,11 @@ def test_every_operation_module_reaches_the_registry() -> None:
     handlers = build_handlers()
     for kind in (
         "add_railing",        # ops
+        "add_gable_roof",     # semantic architectural blockout
+        "add_chimney",        # complete architectural roof penetration
+        "add_impact_head",    # fitted mechanical hard-surface assembly
+        "add_profiled_solid", # exact extrusion and variable-section lofting
+        "add_staircase_to_landing",  # relation-derived architectural refine
         "repair",             # gaps
         "make_plumb",         # align
         "apply_edge_treatment",  # detail

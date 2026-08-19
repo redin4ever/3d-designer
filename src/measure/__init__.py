@@ -14,6 +14,7 @@ from .metrics import (
     dimensions,
     distance,
     gap_width,
+    surface_angle,
     triangle_count,
     volume,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "distance",
     "angle_between",
     "gap_width",
+    "surface_angle",
     "volume",
     "triangle_count",
     # topology

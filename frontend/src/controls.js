@@ -26,6 +26,17 @@ export function buildResumeMessage() {
   return { type: ClientMessageType.RESUME, data: {} };
 }
 
+/**
+ * Describe which persistent run control is valid now. Pause and Run remain in stable
+ * positions for muscle memory; disabled state prevents contradictory commands, and a
+ * disconnected toolbar stays discoverable without pretending it can act.
+ */
+export function runControlPresentation({ connected = false, runState = 'running' } = {}) {
+  if (!connected) return { label: 'Unavailable', pauseDisabled: true, runDisabled: true };
+  if (runState === 'paused') return { label: 'Paused', pauseDisabled: true, runDisabled: false };
+  return { label: 'Running', pauseDisabled: false, runDisabled: true };
+}
+
 export function buildRequestFullSceneMessage() {
   return { type: ClientMessageType.REQUEST_FULL_SCENE, data: {} };
 }
@@ -100,11 +111,21 @@ export function buildSetCadenceMessage(cadence) {
 export function attachControls(root, io) {
   const pauseButton = root.querySelector('[data-action="pause"]');
   const resumeButton = root.querySelector('[data-action="resume"]');
+  const runStateLabel = root.querySelector('[data-run-state-label]');
   const rollbackForm = root.querySelector('[data-action="rollback-form"]');
   const rollbackStepsInput = root.querySelector('[data-field="rollback-steps"]');
   const redirectForm = root.querySelector('[data-action="redirect-form"]');
   const redirectInput = root.querySelector('[data-field="redirect-text"]');
   const cadenceSelect = root.querySelector('[data-field="cadence"]');
+  let runContext = { connected: false, runState: 'running' };
+
+  const renderRunControl = (patch = {}) => {
+    runContext = { ...runContext, ...patch };
+    const presentation = runControlPresentation(runContext);
+    if (runStateLabel) runStateLabel.textContent = presentation.label;
+    if (pauseButton) pauseButton.disabled = presentation.pauseDisabled;
+    if (resumeButton) resumeButton.disabled = presentation.runDisabled;
+  };
 
   // Returns whether the message was actually queued: false if it failed validation, and
   // false if `send` reported it never left (the socket is down). Callers use that to
@@ -141,4 +162,7 @@ export function attachControls(root, io) {
   cadenceSelect?.addEventListener('change', () => {
     guarded(() => buildSetCadenceMessage(cadenceSelect.value));
   });
+
+  renderRunControl();
+  return { setRunState: renderRunControl };
 }

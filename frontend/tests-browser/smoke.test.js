@@ -39,6 +39,10 @@ import {
 } from './harness/open-page.mjs';
 import { probeCanvas, waitForCanvasDrawn } from './harness/canvas-probe.mjs';
 import { registerConnectTests } from './connect.browser.mjs';
+import { registerGizmoTests } from './gizmo.browser.mjs';
+import { registerFileIoTests } from './file-io.browser.mjs';
+import { registerRunControlTests } from './run-controls.browser.mjs';
+import { registerPerformanceTests } from './performance.browser.mjs';
 
 const FRONTEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NARROW = { width: 360, height: 720 };
@@ -158,7 +162,8 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
         mainHasContent: document.querySelector('main')?.querySelector('canvas') !== null,
         liveRegions: [...document.querySelectorAll('[aria-live]')].map((el) => el.id),
         labelledInputs: [...document.querySelectorAll('input, select')].every(
-          (el) => document.querySelector(`label[for="${el.id}"]`) !== null,
+          (el) => el.closest('label') !== null
+            || (el.id && document.querySelector(`label[for="${el.id}"]`) !== null),
         ),
       }));
 
@@ -483,13 +488,15 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
           };
         });
 
-      // The 3D view is the first stop, and that is deliberate: it is a control now, not
-      // decoration. Arrow keys orbit it and +/- zoom, so a keyboard user who could never
-      // reach it could never look at the thing this product exists to build. It used to be
-      // skipped entirely because a <canvas> is not focusable without tabindex.
+      // File is first because persistent Blender-style application chrome precedes the
+      // workspace. The 3D view remains the next stop and fully keyboard-operable.
+      await s.page.keyboard.press('Tab');
+      const fileMenu = await describeFocus();
+      assert.equal(fileMenu.id, 'file-menu-button');
+
       await s.page.keyboard.press('Tab');
       const viewport = await describeFocus();
-      assert.equal(viewport.id, 'viewport-canvas', `first Tab must reach the 3D view, reached ${JSON.stringify(viewport)}`);
+      assert.equal(viewport.id, 'viewport-canvas', `Tab after File must reach the 3D view, reached ${JSON.stringify(viewport)}`);
       assert.notEqual(viewport.outlineStyle, 'none', ':focus-visible must draw a ring on the view too');
 
       await s.page.keyboard.press('Tab');
@@ -667,6 +674,10 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
   // would never run. Registering into this describe gives them the seam and the one
   // browser and static server this suite already pays for.
   registerConnectTests({ withScene, waitUntil });
+  registerGizmoTests({ test, withScene, waitUntil, greeting: FULL_SCENE_GREETING });
+  registerFileIoTests({ withScene, waitUntil });
+  registerRunControlTests({ test, withScene, waitUntil, greeting: FULL_SCENE_GREETING });
+  registerPerformanceTests({ withScene });
 
   // ---- pointing, priority and the edit tools --------------------------------------
   //
@@ -710,6 +721,201 @@ describe('frontend smoke — a real browser, a real origin, a real socket', () =
       assert.notEqual(colors.marked, colors.accent, 'a mark is indistinguishable from a change highlight');
 
       assert.deepEqual(s2.pageErrors, [], 'the pointing wiring threw on load');
+    } finally {
+      await s2.dispose();
+    }
+  });
+
+  test('point mode visibly highlights hover and keeps a clicked part selected', async () => {
+    const s2 = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s2);
+      await waitForCanvasDrawn(s2.page, 500);
+      await s2.page.click('[data-action="point-mode"]');
+
+      // Find a stable interior scene pixel instead of assuming where the orbit projection
+      // put a cube. Requiring a same-colour 3x3 neighbourhood keeps the probe off an edge.
+      const sample = await s2.page.evaluate(() => {
+        const canvas = document.getElementById('viewport-canvas');
+        const ctx = canvas.getContext('2d');
+        const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const rect = canvas.getBoundingClientRect();
+        const keyAt = (x, y) => {
+          const i = (y * canvas.width + x) * 4;
+          return [...image.data.slice(i, i + 4)].join(',');
+        };
+        const background = keyAt(0, 0);
+        for (let y = 1; y < canvas.height - 1; y += 1) {
+          for (let x = 1; x < canvas.width - 1; x += 1) {
+            const key = keyAt(x, y);
+            if (key === background) continue;
+            let solid = true;
+            for (let dy = -1; dy <= 1; dy += 1) {
+              for (let dx = -1; dx <= 1; dx += 1) {
+                if (keyAt(x + dx, y + dy) !== key) solid = false;
+              }
+            }
+            if (!solid) continue;
+            return {
+              x,
+              y,
+              before: key,
+              clientX: rect.left + ((x + 0.5) * rect.width) / canvas.width,
+              clientY: rect.top + ((y + 0.5) * rect.height) / canvas.height,
+              outsideX: rect.right + 8,
+              outsideY: rect.top + 8,
+            };
+          }
+        }
+        return null;
+      });
+      assert.ok(sample, 'could not find an interior object pixel to point at');
+
+      const pixel = () =>
+        s2.page.evaluate(({ x, y }) => {
+          const canvas = document.getElementById('viewport-canvas');
+          const data = canvas.getContext('2d').getImageData(x, y, 1, 1).data;
+          return [...data].join(',');
+        }, sample);
+
+      const inkPixelCount = () =>
+        s2.page.evaluate(() => {
+          const canvas = document.getElementById('viewport-canvas');
+          const context = canvas.getContext('2d');
+          const image = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          const probe = document.createElement('canvas').getContext('2d');
+          probe.canvas.width = 1;
+          probe.canvas.height = 1;
+          probe.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+          probe.fillRect(0, 0, 1, 1);
+          const ink = probe.getImageData(0, 0, 1, 1).data;
+          let count = 0;
+          for (let index = 0; index < image.length; index += 4) {
+            if (image[index] === ink[0] && image[index + 1] === ink[1] && image[index + 2] === ink[2]) count += 1;
+          }
+          return count;
+        });
+
+      const inkBefore = await inkPixelCount();
+
+      await s2.page.mouse.move(sample.clientX, sample.clientY);
+      await waitUntil(async () => {
+        const value = await pixel();
+        return value !== sample.before ? value : null;
+      }, 'the part under the point cursor to change colour');
+      await waitUntil(async () => {
+        const count = await inkPixelCount();
+        return count >= inkBefore + 24 ? count : null;
+      }, 'hovering a part to draw a high-contrast outline');
+
+      await s2.page.mouse.click(sample.clientX, sample.clientY);
+      await waitUntil(
+        () => s2.page.$eval('#point-composer', (element) => element.hidden === false),
+        'the clicked part to become selected',
+      );
+      await s2.page.mouse.move(sample.outsideX, sample.outsideY);
+      const afterLeave = await s2.page.evaluate(({ x, y }) => {
+        const canvas = document.getElementById('viewport-canvas');
+        const data = canvas.getContext('2d').getImageData(x, y, 1, 1).data;
+        return {
+          pixel: [...data].join(','),
+          selection: document.getElementById('point-selection')?.textContent ?? '',
+          composerHidden: document.getElementById('point-composer')?.hidden,
+        };
+      }, sample);
+      assert.notEqual(
+        afterLeave.pixel,
+        sample.before,
+        `leaving the part cleared the committed selection highlight: ${JSON.stringify(afterLeave)}`,
+      );
+      assert.ok(
+        (await inkPixelCount()) >= inkBefore + 24,
+        'the committed selection needs a high-contrast outline after hover leaves',
+      );
+
+      await s2.page.click('[data-action="close-composer"]');
+      await waitUntil(async () => (await pixel()) === sample.before, 'clearing selection to restore the prior colour');
+      await waitUntil(async () => (await inkPixelCount()) === inkBefore, 'clearing the selection outline');
+      assert.deepEqual(complaints(s2).pageErrors, []);
+    } finally {
+      await s2.dispose();
+    }
+  });
+
+  test('Ctrl and Alt clicks visibly toggle multiple selected parts without enabling single-part edits', async () => {
+    const s2 = await withScene(FULL_SCENE_GREETING);
+    try {
+      await waitForConnected(s2);
+      await waitForCanvasDrawn(s2.page, 500);
+      await s2.page.click('[data-action="point-mode"]');
+      const points = await s2.page.evaluate(() => {
+        const canvas = document.getElementById('viewport-canvas');
+        const context = canvas.getContext('2d');
+        const image = context.getImageData(0, 0, canvas.width, canvas.height);
+        const rect = canvas.getBoundingClientRect();
+        const at = (x, y) => {
+          const index = (y * canvas.width + x) * 4;
+          return [...image.data.slice(index, index + 4)].join(',');
+        };
+        const background = at(0, 0);
+        const columns = [];
+        for (let x = 2; x < canvas.width - 2; x += 1) {
+          let point = null;
+          for (let y = 2; y < canvas.height - 2; y += 1) {
+            if (at(x, y) !== background && at(x - 1, y) !== background && at(x + 1, y) !== background) {
+              point = [x, y];
+              break;
+            }
+          }
+          columns.push(point);
+        }
+        const runs = [];
+        for (let index = 0; index < columns.length;) {
+          if (!columns[index]) { index += 1; continue; }
+          const run = [];
+          while (index < columns.length && columns[index]) run.push(columns[index++]);
+          if (run.length > 3) runs.push(run);
+        }
+        return runs.slice(0, 2).map((run) => {
+          const [x] = run[Math.floor(run.length / 2)];
+          const interior = [];
+          for (let y = 2; y < canvas.height - 2; y += 1) {
+            if (at(x, y) !== background && at(x - 1, y) !== background && at(x + 1, y) !== background) {
+              interior.push(y);
+            }
+          }
+          const y = interior[Math.floor(interior.length / 2)];
+          return {
+            clientX: rect.left + ((x + 0.5) * rect.width) / canvas.width,
+            clientY: rect.top + ((y + 0.5) * rect.height) / canvas.height,
+          };
+        });
+      });
+      assert.equal(points.length, 2, 'the fixture did not expose two separately selectable parts');
+
+      await s2.page.mouse.click(points[0].clientX, points[0].clientY);
+      await s2.page.keyboard.down('Control');
+      await s2.page.mouse.click(points[1].clientX, points[1].clientY);
+      await s2.page.keyboard.up('Control');
+      await waitUntil(
+        () => s2.page.$eval('#point-selection', (element) => element.textContent.includes(',')),
+        'Ctrl-click to keep both selected parts',
+      );
+      assert.equal(
+        await s2.page.$eval('#selected-object-name', (element) => element.textContent),
+        '2 parts selected',
+      );
+      assert.equal(await s2.page.$eval('[data-action="edit-delete"]', (button) => button.disabled), true);
+      assert.equal(await s2.page.$eval('[data-action="edit-duplicate"]', (button) => button.disabled), true);
+
+      await s2.page.keyboard.down('Alt');
+      await s2.page.mouse.click(points[0].clientX, points[0].clientY);
+      await s2.page.keyboard.up('Alt');
+      await waitUntil(
+        () => s2.page.$eval('#point-selection', (element) => !element.textContent.includes(',')),
+        'Alt-click to toggle one selected part off',
+      );
+      assert.deepEqual(complaints(s2).pageErrors, []);
     } finally {
       await s2.dispose();
     }

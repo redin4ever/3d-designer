@@ -41,6 +41,32 @@ def _round_trip(scene: Scene, handlers, tmp_path, name: str = "scene.json") -> S
     return Scene.load(path, FakeEngine(), handlers)
 
 
+def test_replace_with_adopts_a_prepared_project_in_place_and_resyncs(tmp_path) -> None:
+    """Opening a project keeps viewer/orchestrator references on the same Scene instance."""
+    from contracts import ChangeKind
+    from scene.geometry_snapshot import capture
+
+    live_engine = FakeEngine()
+    live_engine.create_primitive("old", "cube", Vec3(1, 1, 1))
+    live = Scene(live_engine, {}, scene_id="old-project")
+    prepared = Scene(live_engine, {}, scene_id="opened-project")
+
+    package_engine = FakeEngine()
+    package_engine.create_primitive("opened", "cube", Vec3(2, 2, 2))
+    geometry = tmp_path / "opened.geometry.json"
+    capture(package_engine, str(geometry))
+    events = []
+    live.subscribe(events.append)
+
+    returned = live.replace_with(prepared, str(geometry))
+
+    assert returned is live
+    assert live.document.scene_id == "opened-project"
+    assert tuple(live.engine.list_objects()) == ("opened",)
+    assert events[-1].kind is ChangeKind.FULL_RESYNC
+    assert events[-1].object_ids == ("opened",)
+
+
 def test_save_then_load_round_trips_the_log_head_and_checkpoints(
     engine, handlers, add_cube_op, tmp_path
 ):

@@ -163,11 +163,12 @@ def test_an_unknown_tool_name_lists_what_is_callable_now_not_the_whole_catalogue
     message = str(excinfo.value)
     assert "not_a_real_tool" in message
     assert "add_primitive" in message  # legal in blockout
+    legal_now = {spec.name for role in PHASE_ROLES[Phase.BLOCKOUT] for spec in tools_for(role)}
     illegal_now = {
         spec.name
         for role in (ToolRole.POLISH, ToolRole.DETAIL, ToolRole.EXPORT)
         for spec in tools_for(role)
-        if role not in PHASE_ROLES[Phase.BLOCKOUT]
+        if role not in PHASE_ROLES[Phase.BLOCKOUT] and spec.name not in legal_now
     }
     assert not (illegal_now & set(message.split())), "listed tools this phase cannot call"
 

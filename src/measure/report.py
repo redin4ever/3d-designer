@@ -26,7 +26,16 @@ from contracts import (
 )
 
 from .intersections import find_clipping, find_self_intersections, find_visual_gaps
-from .metrics import angle_between, bounds, dimensions, distance, gap_width, triangle_count, volume
+from .metrics import (
+    angle_between,
+    bounds,
+    dimensions,
+    distance,
+    gap_width,
+    surface_angle,
+    triangle_count,
+    volume,
+)
 from .topology import (
     find_boundary_holes,
     find_flipped_normals,
@@ -51,6 +60,7 @@ _SINGLE_METRICS = {
 _PAIR_METRICS = {
     MetricKind.DISTANCE: distance,
     MetricKind.ANGLE: angle_between,
+    MetricKind.SURFACE_ANGLE: surface_angle,
     MetricKind.GAP_WIDTH: gap_width,
 }
 

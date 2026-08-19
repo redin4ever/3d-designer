@@ -1,118 +1,141 @@
-/* The conversation panel — the transcript rows and the composer beneath them.
- *
- * Split out of app.css (which holds the page layout and the operator controls) along a
- * component seam: this is one panel with one job, and app.css was already at its Rule 2
- * budget. Same rule applies here as everywhere under frontend/src/ — every colour, size
- * and space is a var(--token) from tokens.css, never a literal.
- */
-
-.transcript {
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--space-lg) var(--space-sm);
-  overflow-y: auto;
-  flex: 1 1 auto;
-  min-height: 0;
+.chat-panel,
+.log-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  background: var(--surface-1);
+}
+
+.chat-panel,
+.transform-panel { border-block-end: var(--hairline-size) solid var(--hairline); }
+
+.transcript {
+  min-block-size: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
 }
 
 .transcript-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xxs);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-xxs) var(--space-xs);
   padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  /* An instruction can be a sentence and an object id can be one long token; neither may
-     push the sidebar sideways (the narrow-viewport smoke test asserts exactly that). */
-  overflow-wrap: anywhere;
+  border-block-end: var(--hairline-size) solid var(--hairline);
+  background: var(--surface-1);
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
+  font-weight: 400;
 }
 
-/* Operator and agent must be separable at a glance — that is what makes this a
-   transcript rather than a second log. Tinted and indented one way, plain the other. */
-.transcript-row[data-role='operator'] {
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface-2));
-  border-color: var(--accent-focus);
-  margin-left: var(--space-lg);
+.transcript-row::before {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--focus-ring-size);
+  background: var(--hairline-strong);
+  content: '';
 }
 
-.transcript-row[data-role='agent'] {
-  background: var(--surface-3);
-  margin-right: var(--space-lg);
-}
+.transcript-row[data-role='operator']::before { background: var(--accent); }
+.transcript-row[data-role='agent']::before { background: var(--success); }
+.transcript-row[data-role='operator'] { background: var(--accent-soft); }
 
-.transcript-row[data-role='system'] {
-  background: transparent;
-  border-color: transparent;
-  padding-left: 0;
-  padding-right: 0;
+.transcript-who,
+.transcript-state {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.04em;
 }
 
 .transcript-who {
-  font-family: var(--font-display);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  letter-spacing: 0.4px;
+  grid-column: 1;
+  font-weight: 600;
   text-transform: uppercase;
-  color: var(--muted);
 }
 
-.transcript-row[data-role='operator'] .transcript-who {
-  color: var(--ink-muted);
+.transcript-state {
+  grid-column: 2;
+  color: var(--ink-tertiary);
+  font-style: italic;
+  text-align: end;
 }
+
+.transcript-state:empty { display: none; }
+.transcript-row[data-state='confirmed'] .transcript-state { display: none; }
+.transcript-row[data-role='operator'] .transcript-who { color: var(--accent-hover); }
+.transcript-row[data-role='agent'] .transcript-who { color: var(--success); }
 
 .transcript-text {
-  font-size: var(--text-body-sm);
-  color: var(--ink);
+  grid-column: 1 / -1;
+  display: block;
+  margin: 0;
   white-space: pre-wrap;
-}
-
-.transcript-row[data-role='system'] .transcript-text {
-  font-family: var(--font-mono);
-  font-size: var(--text-caption);
-  color: var(--muted);
-}
-
-/* The delivery marker. aria-hidden in the DOM, so this is the only channel it has. */
-.transcript-state {
-  font-family: var(--font-mono);
-  font-size: var(--text-caption);
-  color: var(--muted);
-}
-
-.transcript-state:empty {
-  display: none;
-}
-
-.transcript-row[data-state='unconfirmed'] .transcript-state {
-  color: var(--accent-hover);
+  overflow-wrap: anywhere;
 }
 
 .composer {
-  padding: var(--space-xs) var(--space-lg) var(--space-md);
-  border-top: 1px solid var(--hairline);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xxs);
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-block-start: var(--hairline-size) solid var(--hairline);
+  background: var(--surface-1);
 }
+
+.composer label { display: none; }
 
 .composer .control-row {
-  width: 100%;
+  display: contents;
 }
 
-.composer input[type='text'] {
-  flex: 1 1 auto;
+.composer input {
+  grid-column: 1 / -1;
+  inline-size: 100%;
+  block-size: 64px;
+  padding-block: var(--space-xs);
+  align-self: stretch;
+  font-weight: 400;
 }
 
-/* Always visible, directly under the field it describes, and referenced from it by
-   aria-describedby. What "sent" means here is unusual enough that a user who misreads it
-   concludes the product is broken, so it cannot live in a tooltip. */
+.composer input::placeholder { color: var(--muted); }
+
+.composer .btn {
+  grid-column: 2;
+  grid-row: 2;
+  min-inline-size: 60px;
+}
+
 .composer-note {
-  margin: var(--space-xxs) 0 0;
-  font-size: var(--text-caption);
-  line-height: 1.4;
+  grid-column: 1;
+  grid-row: 2;
+  align-self: center;
+  margin: 0;
+  color: var(--ink-tertiary);
+  font-size: var(--text-micro);
+}
+
+.composer-note[data-state='error'] { color: var(--axis-x); }
+
+.chat-panel .panel-header::after {
+  display: none;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin-inline-end: var(--space-sm);
   color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  content: '●  Agent online';
+}
+
+body:has(#connection-status[data-status='open']) .chat-panel .panel-header::after {
+  display: inline-flex;
+  color: var(--success);
 }

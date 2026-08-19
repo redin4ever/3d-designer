@@ -14,10 +14,17 @@ refused.
 
 from __future__ import annotations
 
+from pathlib import Path
+import tempfile
+
 import pytest
 
 from contracts import Operation, Vec3
 from ops import OPS
+from textures import TextureLibrary
+
+_TEXTURE_ROOT = Path(tempfile.mkdtemp(prefix="forge3d-texture-ops-"))
+_TEXTURE_FIXTURE = Path(__file__).parents[1] / "textures" / "fixtures" / "pixel.png"
 
 # ------------------------------------------------------------------ shared fixtures/helpers
 
@@ -25,6 +32,9 @@ from ops import OPS
 #: i.e. every optional parameter omitted, so the sweep below sees every default this
 #: library carries.
 _MINIMAL_PARAMS: dict[str, dict] = {
+    "create_texture_material": {"object_id": "texture-library", "name": "create_assumption", "managed_root": str(_TEXTURE_ROOT), "maps": {"albedo": str(_TEXTURE_FIXTURE)}},
+    "update_texture_material": {"object_id": "texture-library", "name": "update_assumption", "managed_root": str(_TEXTURE_ROOT), "maps": {"albedo": str(_TEXTURE_FIXTURE)}},
+    "apply_texture_material": {"object_id": "hero", "preset": "wood", "object_ids": ["hero"]},
     # The direct edits (Q-14). Each takes an object that already exists rather than making
     # one, so they name `hero` from _seed. Included in the sweep for the same reason as
     # everything else: an operation that reports an assumption about a parameter the caller
@@ -45,6 +55,39 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "thickness": 0.2,
     },
     "add_floor": {"object_id": "floor", "width": 4.0, "depth": 3.0, "thickness": 0.15},
+    "add_gable_roof": {
+        "object_id": "roof", "origin": Vec3(0, 0, 2.4), "width": 4.0,
+        "depth": 5.0, "pitch_degrees": 30.0, "thickness": 0.16,
+        "overhang": 0.3, "trim_width": 0.12, "trim_depth": 0.16,
+        "ridge_axis": "y",
+    },
+    "add_chimney": {
+        "object_id": "chimney", "origin": Vec3(0, 0, 3), "width": 0.8,
+        "depth": 1.0, "shaft_height": 1.4, "flashing_overhang": 0.18,
+        "flashing_height": 0.16, "crown_overhang": 0.1, "crown_height": 0.14,
+        "flue_count": 2, "flue_radius": 0.11, "flue_wall_thickness": 0.025,
+        "flue_height": 0.5,
+        "rim_overhang": 0.03, "rim_height": 0.1,
+    },
+    "add_impact_head": {
+        "object_id": "maul", "origin": [0, 0, 4], "width": 3.6, "depth": 1.5,
+        "height": 1.45, "corner_chamfer": 0.22, "plate_thickness": 0.12,
+        "plate_inset": 0.26, "shoulder_depth": 0.38, "shoulder_diameter": 0.88,
+        "socket_depth": 0.16, "collar_depth": 0.20, "collar_diameter": 1.24,
+        "face_depth": 0.52, "face_diameter": 1.62, "striker_depth": 0.12,
+        "striker_socket_depth": 0.05, "striker_diameter": 0.82, "rim_depth": 0.10,
+        "rim_overhang": 0.10, "handle_socket_diameter": 0.72,
+        "handle_socket_depth": 0.20, "handle_collar_depth": 0.18,
+        "handle_collar_overhang": 0.10, "bevel_width": 0.025,
+    },
+    "add_profiled_solid": {
+        "object_id": "bracket", "origin": [1.0, 2.0, 3.0], "axis": "z",
+        "sections": [
+            {"offset": 0.0, "profile": [[-0.5, -0.3], [0.5, -0.3], [0.5, 0.3], [-0.5, 0.3]]},
+            {"offset": 1.2, "profile": [[-0.2, -0.15], [0.2, -0.15], [0.2, 0.15], [-0.2, 0.15]]},
+        ],
+        "bevel_width": 0.02,
+    },
     "add_opening": {
         "object_id": "opening",
         "wall_id": "wall",
@@ -53,6 +96,11 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "height": 2.0,
     },
     "add_staircase": {"object_id": "stair", "treads": 6, "rise": 0.18, "run": 0.28, "width": 1.0},
+    "add_staircase_to_landing": {
+        "object_id": "entry", "landing_id": "landing", "start": Vec3(0, -2, 0),
+        "treads": 6, "width": 1.0, "tread_thickness": 0.05,
+        "stringer_width": 0.1, "stringer_depth": 0.18,
+    },
     "add_railing": {
         "object_id": "rail",
         "path": [Vec3(0, 0, 0), Vec3(4, 0, 0)],
@@ -69,12 +117,27 @@ _MINIMAL_PARAMS: dict[str, dict] = {
         "count_x": 3,
         "count_y": 2,
     },
+    "add_roof_window": {
+        "object_id": "roof_detail", "roof_id": "hero", "width": 0.2, "height": 0.2,
+        "frame_width": 0.02, "depth": 0.02,
+        "horizontal_fraction": 0.5, "vertical_fraction": 0.5,
+    },
+    "add_wall_sign": {
+        "object_id": "wall_sign", "wall_id": "wall", "text": "A",
+        "toward": Vec3(2, -5, 1), "center_height": 1.5,
+        "height": 0.2, "depth": 0.02, "edge_margin": 0.1,
+    },
+    "add_facade_ribs": {
+        "object_id": "wall_ribs", "wall_id": "wall", "toward": Vec3(2, -5, 1),
+        "spacing": 1.0, "width": 0.04, "depth": 0.03, "edge_margin": 0.1,
+        "opening_clearance": 0.05, "min_segment": 0.1,
+    },
 }
 
 
 def _seed(engine) -> None:
     """The objects the target-taking operations need to already exist."""
-    from ops import add_primitive, add_wall
+    from ops import add_floor, add_primitive, add_wall
 
     add_wall(
         engine,
@@ -99,9 +162,25 @@ def _seed(engine) -> None:
                 params={"object_id": name, "kind": "cube", "size": Vec3(0.4, 0.4, 0.4)},
             ),
         )
+    add_floor(
+        engine,
+        Operation(
+            op_id="seed_landing",
+            kind="add_floor",
+            params={
+                "object_id": "landing", "width": 2.0, "depth": 1.5,
+                "thickness": 0.2, "origin": Vec3(0, 0, 1.0),
+            },
+        ),
+    )
     # The direct edits added at Q-14 target existing things rather than creating them, so the
     # sweep needs a material to exist as well as an object.
     engine.create_material("seed_paint", (0.5, 0.5, 0.5))
+    library = TextureLibrary(_TEXTURE_ROOT)
+    try:
+        library.get("update_assumption")
+    except KeyError:
+        library.create("update_assumption", {"albedo": _TEXTURE_FIXTURE})
 
 
 def _railing_op(op_id: str = "rail", **extra) -> Operation:

@@ -50,7 +50,9 @@ stays a refusal.
 from __future__ import annotations
 
 import json
+import tempfile
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from contracts import (
@@ -58,14 +60,17 @@ from contracts import (
     SCHEMA_VERSION,
     CheckCadence,
     Checkpoint,
+    ChangeKind,
     EngineProtocol,
     HandlerRegistry,
     Phase,
+    SceneChangeEvent,
     UndoBarrier,
 )
 
 from .barriers import SnapshotLedger
 from .op_codec import V1_DROPPED_FIELDS, operation_from_dict, operation_to_dict
+from .targets import TargetLedger
 
 if TYPE_CHECKING:
     from . import Scene
@@ -122,6 +127,73 @@ def _warn_about_old_schema(version: int, path: str) -> None:
 
 class PersistenceMixin:
     """``save``/``load``. See the module docstring for the chosen file format."""
+
+    def replace_with(self, prepared: "Scene", geometry_path: str) -> "Scene":
+        """Atomically adopt a validated project while preserving this live Scene object.
+
+        Viewer and orchestrator instances subscribe to this object, so replacing the
+        Python instance would leave both attached to the closed project. Package loading
+        prepares a separate Scene without mutating the engine; this method is the commit
+        point that restores its geometry, swaps document state, and emits one full resync.
+        """
+        if prepared.engine is not self._engine:
+            raise ValueError("prepared project must use the live scene engine")
+
+        from .geometry_snapshot import capture, restore
+
+        old_state = (
+            self._document,
+            self._handlers,
+            self._cache,
+            self._targets,
+            self._snapshots,
+            self._snapshot_seq,
+            self._last_replay,
+        )
+        with tempfile.TemporaryDirectory(prefix="forge3d-open-rollback-") as temp:
+            rollback = Path(temp) / "current.json"
+            capture(self._engine, str(rollback))
+            try:
+                if geometry_path:
+                    if not restore(self._engine, geometry_path):
+                        raise ValueError("the project geometry snapshot could not be restored")
+                else:
+                    replay = prepared.replay()
+                    if not replay.complete:
+                        raise ValueError(replay.describe())
+                self._document = prepared._document
+                self._handlers = dict(prepared._handlers)
+                self._cache = dict(prepared._cache)
+                self._targets = prepared._targets
+                self._snapshots = prepared._snapshots
+                self._snapshot_seq = prepared._snapshot_seq
+                self._last_replay = prepared._last_replay
+            except Exception:
+                restore(self._engine, str(rollback))
+                (
+                    self._document,
+                    self._handlers,
+                    self._cache,
+                    self._targets,
+                    self._snapshots,
+                    self._snapshot_seq,
+                    self._last_replay,
+                ) = old_state
+                raise
+
+        object_ids = tuple(self._engine.list_objects())
+        # The packed current snapshot is authoritative and may include legitimate
+        # pre-existing/seeded geometry that has no construction operation in the log.
+        self._targets = TargetLedger(object_ids)
+        self._emit(
+            SceneChangeEvent(
+                kind=ChangeKind.FULL_RESYNC,
+                object_ids=object_ids,
+                highlight=object_ids,
+                head=self._document.head,
+            )
+        )
+        return self
 
     def save(self, path: str) -> None:
         """Write the document (log, head, checkpoints, barriers, metadata) to ``path`` as

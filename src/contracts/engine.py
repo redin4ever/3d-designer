@@ -26,16 +26,36 @@ from .geometry import AABB, MeshSnapshot, Transform, Vec3
 
 __all__ = [
     "RepairOutcome",
+    "ModelImportResult",
+    "SUPPORTED_MODEL_IMPORT_EXTENSIONS",
+    "SUPPORTED_MODEL_EXPORT_EXTENSIONS",
+    "SUPPORTED_MODEL_EXTENSIONS",
     "MeshOps",
     "ModifierOps",
     "MaterialOps",
     "UVBakeOps",
+    "ImportOps",
     "ExportOps",
     "RawOps",
     "EngineProtocol",
     "EngineError",
     "EngineUnavailable",
 ]
+
+
+SUPPORTED_MODEL_EXPORT_EXTENSIONS: tuple[str, ...] = (
+    ".glb", ".gltf", ".fbx", ".obj", ".stl", ".ply", ".usd", ".usda", ".usdc",
+)
+"""Interchange formats supported by the installed Blender 5.2 export adapter."""
+
+SUPPORTED_MODEL_IMPORT_EXTENSIONS: tuple[str, ...] = (
+    *SUPPORTED_MODEL_EXPORT_EXTENSIONS,
+    ".blend",
+)
+"""Model sources accepted by import, including non-destructive Blender library append."""
+
+# Compatibility for callers that historically used the shared tuple for export choices.
+SUPPORTED_MODEL_EXTENSIONS = SUPPORTED_MODEL_EXPORT_EXTENSIONS
 
 
 class EngineError(RuleError):
@@ -87,6 +107,20 @@ class RepairOutcome:
         return self.skipped == 0
 
 
+@dataclass(frozen=True, slots=True)
+class ModelImportResult:
+    """Meshes created by one atomic import and any non-fatal omissions."""
+
+    object_ids: tuple[str, ...]
+    warnings: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.object_ids:
+            raise ValueError("a successful model import must create at least one mesh")
+        if len(set(self.object_ids)) != len(self.object_ids):
+            raise ValueError("a model import cannot report the same object twice")
+
+
 @runtime_checkable
 class MeshOps(Protocol):
     """Create and edit mesh data."""
@@ -103,6 +137,22 @@ class MeshOps(Protocol):
         self, object_id: str, kind: str, size: Vec3, transform: Transform | None = None
     ) -> str:
         """``kind`` is one of: cube, cylinder, sphere, plane, cone, torus."""
+        ...
+
+    def create_text(
+        self,
+        object_id: str,
+        text: str,
+        height: float,
+        depth: float,
+        transform: Transform | None = None,
+    ) -> str:
+        """Create centered extruded text as portable mesh geometry.
+
+        Local X runs along the text, local Y runs from baseline to cap, and local Z is
+        extrusion depth. The local bounds are centred on the origin in all three axes so
+        a surface-mount transform places the sign by its visible centre.
+        """
         ...
 
     def replace_mesh(
@@ -249,6 +299,12 @@ class MaterialOps(Protocol):
 
     def assign_material(self, object_id: str, material_id: str, slot: int = 0) -> None: ...
 
+    def create_texture_material(self, material: object) -> str: ...
+
+    def assign_texture_material(
+        self, object_id: str, material_id: str, slot: int = 0, material: object | None = None
+    ) -> None: ...
+
 
 @runtime_checkable
 class UVBakeOps(Protocol):
@@ -269,7 +325,40 @@ class UVBakeOps(Protocol):
 
 
 @runtime_checkable
+class ImportOps(Protocol):
+    def import_model(
+        self,
+        path: str,
+        *,
+        source_up: str = "AUTO",
+        unit_scale: float = 1.0,
+        flatten: bool = True,
+    ) -> ModelImportResult:
+        """Import one supported model atomically.
+
+        Implementations keep mesh geometry and materials, deterministically rename incoming
+        collisions, and report ignored non-mesh content through ``warnings``. ``source_up``
+        is ``AUTO``, ``X``, ``Y`` or ``Z``; the result is always internal metres and Z-up.
+        """
+        ...
+
+
+@runtime_checkable
 class ExportOps(Protocol):
+    def export_model(
+        self,
+        object_ids: Sequence[str],
+        path: str,
+        *,
+        y_up: bool,
+        mirror_x: bool = False,
+        negate_rotation: bool = False,
+        scale: float = 1.0,
+        apply_modifiers: bool = True,
+    ) -> str:
+        """Write a supported interchange format inferred from ``path`` and return it."""
+        ...
+
     def export_gltf(
         self,
         object_ids: Sequence[str],
@@ -328,7 +417,9 @@ class RawOps(Protocol):
 
 
 @runtime_checkable
-class EngineProtocol(MeshOps, ModifierOps, MaterialOps, UVBakeOps, ExportOps, RawOps, Protocol):
+class EngineProtocol(
+    MeshOps, ModifierOps, MaterialOps, UVBakeOps, ImportOps, ExportOps, RawOps, Protocol
+):
     """The complete engine surface. ``src/engine/`` implements it against bpy; the test
     fake implements it in pure Python."""
 

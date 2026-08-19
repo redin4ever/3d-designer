@@ -85,6 +85,12 @@ def for_query(query: AcceptanceQuery, defects: tuple[Defect, ...]) -> str:
 
     if query.comparison is not Comparison.NONE and query.metric is MetricKind.TRIANGLE_COUNT:
         return f"add_lod_chain(object_id={query.subject!r}, ratios=[0.5, 0.25])"
+    if query.comparison is not Comparison.NONE and query.metric is MetricKind.GAP_WIDTH:
+        try:
+            a, b = query.subject.split("|", 1)
+        except ValueError:
+            return ""
+        return f"close_visual_gap(a={a!r}, b={b!r}, max_gap={query.tolerance:.4g})"
     for defect_class in query.forbidden_defects:
         template = _SINGLE_OBJECT_FIX.get(defect_class)
         if template:

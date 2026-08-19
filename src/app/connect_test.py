@@ -9,17 +9,25 @@ from __future__ import annotations
 
 import json
 import sys
+import tomllib
+from pathlib import Path
 
 import pytest
 
-from app.connect import CLIENTS, config_for, config_path_for, describe, write_config
+from app.connect import CLIENTS, config_for, config_path_for, describe, detect_clients, write_config
+
+
+def _command_for(client: str) -> dict:
+    config = config_for(client)
+    servers = config["mcp_servers"] if client == "codex" else config["mcpServers"]
+    return servers["forge3d"]
 
 
 @pytest.mark.parametrize("client", sorted(CLIENTS))
 def test_the_config_launches_this_interpreter_not_whatever_is_on_path(client: str) -> None:
     """`python` on PATH here is the Windows Store alias stub and runs nothing. A config
     naming it produces a client that reports the server as failed to start, with no clue."""
-    cmd = config_for(client)["mcpServers"]["forge3d"]
+    cmd = _command_for(client)
     assert cmd["command"] == sys.executable
 
 
@@ -28,7 +36,7 @@ def test_the_config_sets_pythonpath_rather_than_inheriting_it(client: str) -> No
     """A client launches the server with a small, sanitised environment. Relying on an
     inherited PYTHONPATH makes it work or not depending on how the client itself was
     started, which is the worst kind of intermittent."""
-    cmd = config_for(client)["mcpServers"]["forge3d"]
+    cmd = _command_for(client)
     assert cmd["env"]["PYTHONPATH"].endswith("src")
 
 
@@ -36,7 +44,7 @@ def test_the_config_sets_pythonpath_rather_than_inheriting_it(client: str) -> No
 def test_the_config_forces_utf8(client: str) -> None:
     """This tool's errors, defect reports and export banners are full of em dashes, and a
     Windows console is cp1252. Without this the first clipping defect kills the server."""
-    cmd = config_for(client)["mcpServers"]["forge3d"]
+    cmd = _command_for(client)
     assert "-X" in cmd["args"] and "utf8" in cmd["args"]
     assert cmd["env"]["PYTHONIOENCODING"] == "utf-8"
 
@@ -80,6 +88,59 @@ def test_writing_creates_the_directory_when_the_client_has_never_run(tmp_path, m
     assert json.loads(target.read_text(encoding="utf-8"))["mcpServers"]["forge3d"]
 
 
+def test_codex_is_one_global_toml_client_shared_by_its_local_surfaces() -> None:
+    """Codex CLI, the IDE extension and ChatGPT desktop share one host configuration.
+    Offering three picker rows would let the same file be written three indistinguishable
+    ways, while using a project file would make Connect mysteriously vanish elsewhere."""
+    assert CLIENTS["codex"]["label"] == "Codex"
+    assert config_path_for("codex") == Path.home() / ".codex" / "config.toml"
+    assert _command_for("codex")["command"] == sys.executable
+
+
+def test_writing_codex_merges_parseable_toml_without_erasing_comments(tmp_path, monkeypatch) -> None:
+    """Codex's config is TOML, not the JSON every existing client uses. The button must
+    preserve unrelated settings and comments because this file controls far more than MCP."""
+    target = tmp_path / ".codex" / "config.toml"
+    target.parent.mkdir()
+    target.write_text(
+        "# keep this operator note\nmodel = \"gpt-5\"\n\n[mcp_servers.other]\ncommand = \"keep-me\"\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setitem(CLIENTS["codex"], "path", lambda: target)
+
+    write_config("codex")
+    write_config("codex")
+
+    text = target.read_text(encoding="utf-8")
+    parsed = tomllib.loads(text)
+    assert "# keep this operator note" in text
+    assert parsed["model"] == "gpt-5"
+    assert parsed["mcp_servers"]["other"]["command"] == "keep-me"
+    assert parsed["mcp_servers"]["forge3d"]["command"] == sys.executable
+    assert parsed["mcp_servers"]["forge3d"]["env"]["PYTHONPATH"].endswith("src")
+    assert text.count("[mcp_servers.forge3d]") == 1, "reconnect duplicated the server table"
+
+
+def test_malformed_codex_toml_is_reported_and_left_untouched(tmp_path, monkeypatch) -> None:
+    target = tmp_path / "config.toml"
+    broken = "[mcp_servers.forge3d\ncommand = nope"
+    target.write_text(broken, encoding="utf-8")
+    monkeypatch.setitem(CLIENTS["codex"], "path", lambda: target)
+
+    with pytest.raises(RuntimeError, match="TOML"):
+        write_config("codex")
+
+    assert target.read_text(encoding="utf-8") == broken
+
+
+def test_describe_codex_prints_toml_not_a_json_mcpservers_object() -> None:
+    text = describe("codex")
+    assert "Unknown client" not in text
+    assert "[mcp_servers.forge3d]" in text
+    assert "mcpServers" not in text
+    assert "config.toml" in text
+
+
 def test_chatgpt_is_a_known_client_and_says_why_localhost_cannot_work() -> None:
     """Asking for it by name must not read as a typo, and the answer must be the real one:
     ChatGPT's servers make the request, so 127.0.0.1 is unreachable to them by definition.
@@ -101,4 +162,34 @@ def test_the_chatgpt_route_states_the_exposure_rather_than_just_the_recipe() -> 
 
 def test_every_client_names_a_real_config_path() -> None:
     for client in CLIENTS:
-        assert config_path_for(client).name.endswith(".json")
+        suffix = ".toml" if client == "codex" else ".json"
+        assert config_path_for(client).name.endswith(suffix)
+
+
+def test_detection_distinguishes_the_current_server_from_a_stale_config(
+    tmp_path, monkeypatch
+) -> None:
+    """Presence of a forge3d table is not a live-ready state when it launches another
+    checkout or interpreter. Startup must ask for repair instead of claiming success."""
+    target = tmp_path / "installed" / "claude.json"
+    target.parent.mkdir()
+    target.write_text(
+        json.dumps({"mcpServers": {"forge3d": {"command": "old-python", "args": []}}}),
+        encoding="utf-8",
+    )
+    for name in CLIENTS:
+        isolated = target if name == "claude-code" else tmp_path / name / "missing" / "config.json"
+        monkeypatch.setitem(CLIENTS[name], "path", lambda path=isolated: path)
+
+    stale = detect_clients()
+
+    assert len(stale) == 1
+    assert stale[0]["id"] == "claude-code"
+    assert stale[0]["configured"] is False
+    assert stale[0]["status"] == "needs_update"
+
+    target.write_text(json.dumps(config_for("claude-code")), encoding="utf-8")
+    ready = detect_clients()
+
+    assert ready[0]["configured"] is True
+    assert ready[0]["status"] == "ready"

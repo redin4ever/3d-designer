@@ -15,7 +15,7 @@ deliberate:
 - ``session_specs.SESSION_SPECS`` is declared here because it reports on the phase and on
   this registry, and no operation module owns either (Gate B 3.1).
 
-**Nothing here caps, trims or hides a tool.** A ``_cap.py`` used to round-robin each role
+**Nothing here caps or trims a role.** A ``_cap.py`` used to round-robin each role
 down to eight and log what it dropped, and it silently hid ``repair``, ``make_plumb`` and
 ``close_visual_gap`` — three core operations — from every agent that would have called
 them. Asked at Gate B 3.3 whether to split roles further, hide tools, or exceed the
@@ -23,7 +23,9 @@ them. Asked at Gate B 3.3 whether to split roles further, hide tools, or exceed 
 over-subscribed role is *recorded* (``registry_test.py`` pins every role's count, and
 ``README.md`` states which roles are over) and logged, never trimmed. The real fix for
 ``REFINE``'s 19 tools was splitting ``REPAIR`` and ``ALIGN`` out of it, which
-``contracts.ToolRole`` has now done; capping was the symptom.
+``contracts.ToolRole`` has now done; capping was the symptom. ``focused_tools`` now narrows
+MCP discovery to one complete role plus orientation tools. That is a reversible attention
+aid, not authorization: the registry remains complete and callers can switch focus.
 """
 
 from __future__ import annotations
@@ -32,16 +34,35 @@ import importlib
 import logging
 from typing import Final
 
-from contracts import ToolRole, ToolSpec
+from contracts import Phase, ToolRole, ToolSpec, roles_for_phase
 from ops import OP_SPECS
 from raw import RAW_TOOL_SPEC
 
 from .export_specs import EXPORT_TOOL_SPECS
+from .import_specs import IMPORT_TOOL_SPECS
 from .session_specs import SESSION_SPECS
 
 _LOG = logging.getLogger(__name__)
 
-__all__ = ["build_registry", "tools_for"]
+__all__ = ["build_registry", "tools_for", "focused_tools"]
+
+_DEFAULT_FOCUS: Final[dict[Phase, ToolRole]] = {
+    Phase.BLOCKOUT: ToolRole.BLOCKOUT,
+    Phase.REFINE: ToolRole.REFINE,
+    Phase.DETAIL: ToolRole.DETAIL,
+    Phase.POLISH: ToolRole.POLISH,
+}
+
+# These are the few tools that make every specialist self-correcting. More specialised
+# measurement and defect tools remain one ``inspect`` focus away instead of competing with
+# construction schemas on every turn.
+_ORIENTATION_CORE: Final[frozenset[str]] = frozenset({
+    "get_phase",
+    "get_operator_context",
+    "list_objects",
+    "describe_object",
+    "promote_phase",
+})
 
 #: The accuracy-optimal visible-set band (``contracts.ToolRole``'s own docstring, ADR-003).
 #: Guidance derived from other systems, not law here — Gate B 3.3. Crossing it is logged so
@@ -87,6 +108,7 @@ def _sources(*, include_raw: bool) -> list[tuple[str, tuple[ToolSpec, ...]]]:
     sources: list[tuple[str, tuple[ToolSpec, ...]]] = [
         ("ops", OP_SPECS),
         ("export", EXPORT_TOOL_SPECS),
+        ("import", IMPORT_TOOL_SPECS),
         ("session", SESSION_SPECS),
     ]
     for module_name, attr_name in _OPTIONAL_SOURCES:
@@ -149,3 +171,35 @@ def tools_for(role: ToolRole) -> tuple[ToolSpec, ...]:
     ``build_registry``). Computed once at import time: every source this collects from is
     static, constructed data, so there is nothing to gain from recomputing per call."""
     return _DEFAULT_REGISTRY[role]
+
+
+def focused_tools(
+    phase: Phase,
+    focus: ToolRole | None = None,
+    *,
+    include_raw: bool = False,
+) -> tuple[ToolSpec, ...]:
+    """Return the complete semantic role an agent is working in plus orientation tools.
+
+    This narrows MCP *discovery*, never the role catalogue or phase authorization. It is
+    intentionally role-shaped rather than an arbitrary numerical cap: no operation from
+    the selected specialist is dropped. ``raw_execute`` is absent unless the server owner
+    explicitly opts in.
+    """
+    selected = focus or _DEFAULT_FOCUS[phase]
+    if selected is ToolRole.ADMIN or selected not in roles_for_phase(phase):
+        raise ValueError(f"focus {selected.value!r} is not available in phase {phase.value!r}")
+
+    registry = build_registry(include_raw=include_raw)
+    candidates = list(registry[selected])
+    candidates.extend(
+        spec
+        for role in (ToolRole.INSPECT, ToolRole.ADMIN)
+        for spec in registry[role]
+        if spec.name in _ORIENTATION_CORE or (include_raw and spec.name == "raw_execute")
+    )
+
+    by_name: dict[str, ToolSpec] = {}
+    for spec in candidates:
+        by_name.setdefault(spec.name, spec)
+    return tuple(by_name.values())

@@ -36,6 +36,8 @@ class MetricKind(StrEnum):
     DIMENSIONS = "dimensions"
     DISTANCE = "distance"
     ANGLE = "angle"
+    SURFACE_ANGLE = "surface_angle"
+    """Acute angle between dominant face normals, independent of normal sign."""
     GAP_WIDTH = "gap_width"
     VOLUME = "volume"
     TRIANGLE_COUNT = "triangle_count"

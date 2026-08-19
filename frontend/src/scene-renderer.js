@@ -1,8 +1,8 @@
 // The real renderer-like object, implemented on Canvas2D — no three.js, no network
 // fetch, no dependency (see frontend/CLAUDE.md "Why no three.js"). Implements the exact
 // four-method shape frontend/src/viewport.js drives against a fake in tests:
-// createNode / updateTransform / removeNode / setHighlighted, plus start()/stop() for
-// its own render loop.
+// createNode / updateTransform / removeNode / setHighlighted, plus the operator's
+// hovered/selected/focused emphasis and start()/stop() for its own render loop.
 //
 // Most of this file is a browser adapter and is exercised by eye. The camera is NOT: it
 // lives in ./camera.js and is covered by frontend/tests/camera.test.js. That split exists
@@ -15,12 +15,22 @@
 // `--token` custom property defined in tokens.css, read once per resize/theme change and
 // cached as opaque CSS color strings — translucency is done with ctx.globalAlpha rather
 // than hand-parsed rgba(), so no hex digit ever appears as a literal in this file. The
-// fallbacks below are CSS color keywords, not hex, for the same reason. That is what
+// fallbacks below are CSS system colours, not literals, for the same reason. That is what
 // lets frontend/tests/tokens.test.js scan this file for a raw hex literal and find none.
 
 import { OrbitCamera, clipTriangleNear, shadeFactor, triangleNormal, zUpToYUp } from './camera.js';
-import { clearFrame, createFrame, drawTriangle } from './raster.js';
+import { hitTestMoveAxis, projectMoveGizmo } from './gizmo.js';
+import { paintIdOutline } from './point-outline.js';
+import { clearFrame, createFrame, drawTexturedTriangle, drawTriangle } from './raster.js';
 import { createIdIndex } from './picking.js';
+import {
+  createInvalidationScheduler,
+  CANVAS_TRIANGLE_BUDGET,
+  distributedTriangleIndexes,
+  INTERACTION_SETTLE_MS,
+  INTERACTION_TRIANGLE_BUDGET,
+} from './render-scheduler.js';
+import { createTextureCache, sampleRgba as sampleTexture } from './texture-renderer.js';
 
 function readColor(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -64,13 +74,25 @@ export class SceneRenderer {
     this._running = false;
     this._rafId = null;
     this._lastFrameAt = 0;
+    this._interactionActive = false;
+    this._interactionTimer = null;
     this.camera = new OrbitCamera();
     this._dragging = false;
     this._lastPointerX = 0;
     this._lastPointerY = 0;
-    // Named CSS colours as the pre-theme fallback, never hex: tests/tokens.test.js scans
-    // every source file for a hex literal outside tokens.css and fails on one.
-    this._colors = { ink: 'white', muted: 'gray', accent: 'slateblue', canvas: 'black', marked: 'gold' };
+    // CSS system colours are the pre-theme fallback. The authored palette still lives
+    // exclusively in tokens.css; these values only matter before styles are available.
+    this._colors = {
+      ink: 'CanvasText',
+      muted: 'GrayText',
+      accent: 'Highlight',
+      pointed: 'Highlight',
+      canvas: 'Canvas',
+      marked: 'Mark',
+      axisX: 'LinkText',
+      axisY: 'VisitedText',
+      axisZ: 'ActiveText',
+    };
     this._frame = null;
     this._image = null;
     this._rgbCache = new Map();
@@ -78,7 +100,35 @@ export class SceneRenderer {
     // can assign these — see picking.js for why this is not a ray cast.
     this.ids = createIdIndex();
     this._focused = new Set();
+    this._hovered = new Set();
+    this._selected = new Set();
+    this._textureCache = createTextureCache({
+      fallback: null,
+      loadImage: async (source) => {
+        const image = new Image();
+        image.src = source;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(image, 0, 0);
+        return { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data };
+      },
+    });
+    this._toolMode = 'orbit';
+    this._moveEnabled = false;
+    this._activeMoveAxis = null;
+    this._moveGizmo = null;
     this._probeCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    this._scheduler = createInvalidationScheduler({
+      requestFrame: (callback) => requestAnimationFrame(callback),
+      cancelFrame: (id) => cancelAnimationFrame(id),
+      draw: (now) => {
+        this._lastFrameAt = now;
+        this._draw();
+      },
+    });
     this._bindPointer();
     this._resizeObserver = new ResizeObserver(() => this._resize());
     this._resizeObserver.observe(canvas);
@@ -90,10 +140,19 @@ export class SceneRenderer {
       ink: readColor('--ink', this._colors.ink),
       muted: readColor('--muted', this._colors.muted),
       accent: readColor('--accent', this._colors.accent),
+      pointed: readColor('--accent-hover', this._colors.pointed),
       marked: readColor('--marked', this._colors.marked),
+      axisX: readColor('--axis-x', this._colors.axisX),
+      axisY: readColor('--axis-y', this._colors.axisY),
+      axisZ: readColor('--axis-z', this._colors.axisZ),
       canvas: readColor('--canvas', this._colors.canvas),
     };
     this._rgbCache.clear(); // the tokens just changed; the resolved bytes are stale
+    this.invalidate();
+  }
+
+  invalidate() {
+    this._scheduler.invalidate();
   }
 
   createNode(objectId, geometry, materials, groups) {
@@ -103,15 +162,24 @@ export class SceneRenderer {
       geometry,
       materials,
       groups,
+      materialDefinitions: geometry.materialDefinitions ?? {},
       highlighted: false,
       transform: { position: [0, 0, 0], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] },
     };
     this.nodes.set(handle.handleId, handle);
+    for (const definition of Object.values(handle.materialDefinitions)) {
+      const albedo = definition.maps?.find((map) => map.channel === 'albedo');
+      if (albedo && !albedo.path.startsWith('builtin://')) {
+        this._textureCache.load(albedo.path).then(() => this.invalidate());
+      }
+    }
+    this.invalidate();
     return handle;
   }
 
   updateTransform(handle, position, quaternion, scale) {
     handle.transform = { position, quaternion, scale };
+    this.invalidate();
   }
 
   removeNode(handle) {
@@ -119,10 +187,15 @@ export class SceneRenderer {
     // Retire the picking id with the node. Reusing it would let a pick that was in
     // flight when the object was deleted resolve to whatever took its place.
     this.ids.forget(handle.id);
+    this._hovered.delete(handle.id);
+    this._selected.delete(handle.id);
+    this._focused.delete(handle.id);
+    this.invalidate();
   }
 
   setHighlighted(handle, on) {
     handle.highlighted = on;
+    this.invalidate();
   }
 
   /**
@@ -135,6 +208,71 @@ export class SceneRenderer {
    */
   setFocused(objectIds) {
     this._focused = new Set(objectIds ?? []);
+    this.invalidate();
+  }
+
+  /** The visible part currently under the point cursor; cleared as soon as it leaves. */
+  setHovered(objectIds) {
+    this._hovered = new Set(objectIds ?? []);
+    this.invalidate();
+  }
+
+  /** Click, lasso and keyboard selections that stay visible until explicitly cleared. */
+  setSelected(objectIds) {
+    this._selected = new Set(objectIds ?? []);
+    this.invalidate();
+  }
+
+  /** Keep transform interaction state separate from selection and presentation highlights. */
+  setToolMode(mode) {
+    this._toolMode = mode;
+    if (mode !== 'move') this._activeMoveAxis = null;
+    this.invalidate();
+  }
+
+  setMoveEnabled(enabled) {
+    this._moveEnabled = Boolean(enabled);
+    if (!this._moveEnabled) this._activeMoveAxis = null;
+    this.invalidate();
+  }
+
+  setActiveMoveAxis(axis) {
+    this._activeMoveAxis = axis;
+    this.invalidate();
+  }
+
+  get moveGizmo() {
+    return this._moveGizmo;
+  }
+
+  hitMoveAxis(point, radius) {
+    return hitTestMoveAxis(point, this._moveGizmo, radius);
+  }
+
+  objectPosition(objectId) {
+    const handle = [...this.nodes.values()].find((node) => node.id === objectId);
+    return handle ? [...handle.transform.position] : null;
+  }
+
+  previewTranslation(objectId, position) {
+    const handle = [...this.nodes.values()].find((node) => node.id === objectId);
+    if (!handle) return false;
+    handle.transform = { ...handle.transform, position: [...position] };
+    this.invalidate();
+    return true;
+  }
+
+  frameSelection(objectId) {
+    const position = this.objectPosition(objectId);
+    if (!position) return false;
+    this.camera.focusOn(position);
+    this.invalidate();
+    return true;
+  }
+
+  resetView() {
+    this.camera.reset();
+    this.invalidate();
   }
 
   /** The current colour+depth+id frame, for picking. Null before the first draw. */
@@ -147,19 +285,14 @@ export class SceneRenderer {
     this.refreshTheme();
     this._running = true;
     this._lastFrameAt = performance.now();
-    const tick = (now) => {
-      if (!this._running) return;
-      this._lastFrameAt = now;
-      this._draw();
-      this._rafId = requestAnimationFrame(tick);
-    };
-    this._rafId = requestAnimationFrame(tick);
+    this._scheduler.start();
   }
 
   stop() {
     this._running = false;
-    if (this._rafId) cancelAnimationFrame(this._rafId);
-    this._rafId = null;
+    this._scheduler.stop();
+    if (this._interactionTimer !== null) clearTimeout(this._interactionTimer);
+    this._interactionTimer = null;
   }
 
   _resize() {
@@ -168,6 +301,23 @@ export class SceneRenderer {
     this.canvas.width = Math.max(1, Math.round(rect.width * dpr));
     this.canvas.height = Math.max(1, Math.round(rect.height * dpr));
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.invalidate();
+  }
+
+  _beginInteraction() {
+    if (this._interactionTimer !== null) clearTimeout(this._interactionTimer);
+    this._interactionTimer = null;
+    this._interactionActive = true;
+    this.invalidate();
+  }
+
+  _settleInteraction() {
+    if (this._interactionTimer !== null) clearTimeout(this._interactionTimer);
+    this._interactionTimer = setTimeout(() => {
+      this._interactionTimer = null;
+      this._interactionActive = false;
+      this.invalidate();
+    }, INTERACTION_SETTLE_MS);
   }
 
   _bindPointer() {
@@ -176,6 +326,7 @@ export class SceneRenderer {
       this._lastPointerX = event.clientX;
       this._lastPointerY = event.clientY;
       this.canvas.setPointerCapture(event.pointerId);
+      this._beginInteraction();
     });
 
     // Incremental deltas rather than "current minus drag-start", because the pitch clamp
@@ -186,10 +337,12 @@ export class SceneRenderer {
       this.camera.drag(event.clientX - this._lastPointerX, event.clientY - this._lastPointerY);
       this._lastPointerX = event.clientX;
       this._lastPointerY = event.clientY;
+      this.invalidate();
     });
 
     const release = () => {
       this._dragging = false;
+      this._settleInteraction();
     };
     this.canvas.addEventListener('pointerup', release);
     this.canvas.addEventListener('pointercancel', release);
@@ -200,7 +353,10 @@ export class SceneRenderer {
       'wheel',
       (event) => {
         event.preventDefault();
+        this._beginInteraction();
         this.camera.zoomByWheel(event.deltaY);
+        this.invalidate();
+        this._settleInteraction();
       },
       { passive: false },
     );
@@ -223,7 +379,10 @@ export class SceneRenderer {
       const action = keys[event.key];
       if (!action) return;
       event.preventDefault();
+      this._beginInteraction();
       action();
+      this.invalidate();
+      this._settleInteraction();
     });
   }
 
@@ -240,7 +399,7 @@ export class SceneRenderer {
       // the projection, the painter's sort — assumes Y-up. Without the conversion an 8x8m
       // deck rendered as a wall standing on its edge, which is what the live view showed
       // the first time it had geometry in it.
-      v = zUpToYUp(v);
+      v = zUpToYUp(v.map((component, index) => component - this.camera.target[index]));
       v = rotateY(v, orbit);
       v = rotateX(v, this.camera.pitch);
       out[i / 3] = v;
@@ -277,6 +436,71 @@ export class SceneRenderer {
     ];
   }
 
+  /** Draw after putImageData so arrows never write depth or object ids. */
+  _drawMoveOverlay({ cameraDistance, focalLength, width, height, dpr }) {
+    this._moveGizmo = null;
+    if (this._toolMode !== 'move' || this._selected.size !== 1) return;
+    const selectedId = [...this._selected][0];
+    const handle = [...this.nodes.values()].find((node) => node.id === selectedId);
+    if (!handle) return;
+
+    const gizmo = projectMoveGizmo({
+      position: handle.transform.position,
+      target: this.camera.target,
+      yaw: this.camera.yaw,
+      pitch: this.camera.pitch,
+      cameraDistance,
+      focalLength,
+      width,
+      height,
+      arrowLength: 72 * dpr,
+    });
+    if (!gizmo) return;
+    this._moveGizmo = gizmo;
+
+    const colors = { x: this._colors.axisX, y: this._colors.axisY, z: this._colors.axisZ };
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = this._moveEnabled ? 1 : 0.42;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.font = `600 ${11 * dpr}px ${readColor('--font-mono', 'monospace')}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (const axis of ['x', 'y', 'z']) {
+      const projected = gizmo.axes[axis];
+      if (!(projected.pixelsPerWorld > 1e-6)) continue;
+      const active = axis === this._activeMoveAxis;
+      ctx.strokeStyle = colors[axis];
+      ctx.fillStyle = colors[axis];
+      ctx.lineWidth = (active ? 5 : 3) * dpr;
+      ctx.beginPath();
+      ctx.moveTo(gizmo.origin[0], gizmo.origin[1]);
+      ctx.lineTo(projected.end[0], projected.end[1]);
+      ctx.stroke();
+
+      const [ux, uy] = projected.direction;
+      const [nx, ny] = projected.normal;
+      const head = 10 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(projected.end[0] + ux * head * 0.35, projected.end[1] + uy * head * 0.35);
+      ctx.lineTo(projected.end[0] - ux * head + nx * head * 0.62, projected.end[1] - uy * head + ny * head * 0.62);
+      ctx.lineTo(projected.end[0] - ux * head - nx * head * 0.62, projected.end[1] - uy * head - ny * head * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillText(projected.label, projected.end[0] + ux * 16 * dpr, projected.end[1] + uy * 16 * dpr);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = this._colors.ink;
+    ctx.beginPath();
+    ctx.arc(gizmo.origin[0], gizmo.origin[1], 4 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   _draw() {
     const { ctx, canvas } = this;
     const width = canvas.width;
@@ -286,7 +510,9 @@ export class SceneRenderer {
     const background = this._rgb(this._colors.canvas);
     const surface = this._rgb(this._colors.muted);
     const accent = this._rgb(this._colors.accent);
+    const pointed = this._rgb(this._colors.pointed);
     const marked = this._rgb(this._colors.marked);
+    const ink = this._rgb(this._colors.ink);
 
     if (!this._frame || this._frame.width !== width || this._frame.height !== height) {
       this._frame = createFrame(width, height);
@@ -306,6 +532,18 @@ export class SceneRenderer {
 
     let radius = 1;
     const allWorld = new Map();
+    const pointedIds = new Set();
+    const totalTriangles = [...this.nodes.values()].reduce(
+      (sum, handle) => sum + handle.geometry.triangleCount,
+      0,
+    );
+    const drawBudget = this._interactionActive
+      ? Math.min(CANVAS_TRIANGLE_BUDGET, INTERACTION_TRIANGLE_BUDGET)
+      : CANVAS_TRIANGLE_BUDGET;
+    const interactionTriangles = totalTriangles > drawBudget
+      ? new Set(distributedTriangleIndexes(totalTriangles, drawBudget))
+      : null;
+    let globalTriangleIndex = 0;
     for (const handle of this.nodes.values()) {
       const world = this._worldVertices(handle);
       allWorld.set(handle.handleId, world);
@@ -332,16 +570,91 @@ export class SceneRenderer {
       return [width / 2 + x * f, height / 2 - y * f, invW];
     };
 
+    // Dense scenes use the browser's native Canvas2D path rasterizer. The exact software
+    // depth/id raster below is excellent for picking small scenes, but its per-pixel loops
+    // can monopolize the UI thread on imported meshes. This path keeps orbit/zoom live;
+    // authoritative geometry and the richer server preview remain unchanged.
+    if (totalTriangles > CANVAS_TRIANGLE_BUDGET) {
+      const dpr = window.devicePixelRatio || 1;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = this._colors.canvas;
+      ctx.fillRect(0, 0, width, height);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(1, dpr);
+
+      for (const handle of this.nodes.values()) {
+        const world = allWorld.get(handle.handleId);
+        const { indices } = handle.geometry;
+        const isPointed = this._selected.has(handle.id) || this._hovered.has(handle.id);
+        const focused = this._focused.has(handle.id);
+        const base = isPointed ? this._colors.pointed
+          : focused ? this._colors.marked
+            : handle.highlighted ? this._colors.accent : this._colors.muted;
+        ctx.beginPath();
+        for (let i = 0; i < indices.length; i += 3) {
+          const includeTriangle = !interactionTriangles || interactionTriangles.has(globalTriangleIndex);
+          globalTriangleIndex += 1;
+          if (!includeTriangle) continue;
+          const a = world[indices[i]];
+          const b = world[indices[i + 1]];
+          const c = world[indices[i + 2]];
+          if (!a || !b || !c) continue;
+          for (const [ca, cb, cc] of clipTriangleNear(a, b, c, nearPlane)) {
+            const pa = project(ca); const pb = project(cb); const pc = project(cc);
+            if (![...pa, ...pb, ...pc].every(Number.isFinite)) continue;
+            ctx.moveTo(pa[0], pa[1]);
+            ctx.lineTo(pb[0], pb[1]);
+            ctx.lineTo(pc[0], pc[1]);
+            ctx.closePath();
+          }
+        }
+        ctx.globalAlpha = isPointed || focused || handle.highlighted ? 0.92 : 0.56;
+        ctx.strokeStyle = base;
+        ctx.stroke();
+      }
+      ctx.restore();
+      this._drawMoveOverlay({ cameraDistance: camDist, focalLength: focal, width, height, dpr });
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return;
+    }
+
     for (const handle of this.nodes.values()) {
       const world = allWorld.get(handle.handleId);
       const { indices } = handle.geometry;
-      // A part the operator marked reads as focus first: it is standing state they put up
-      // deliberately, where a change-highlight is a moment that fades (Q-13).
+      // Point feedback reads first while it is active, then reveals the exact standing
+      // state underneath when cleared. Focus is persistent operator intent; a change
+      // highlight is the last thing the agent touched and may be replaced at any moment.
+      const isPointed = this._selected.has(handle.id) || this._hovered.has(handle.id);
       const focused = this._focused.has(handle.id);
-      const base = focused ? marked : handle.highlighted ? accent : surface;
+      const base = isPointed ? pointed : focused ? marked : handle.highlighted ? accent : surface;
       const id = this.ids.idFor(handle.id);
+      if (isPointed) pointedIds.add(id);
+
+      const materialStates = (handle.materials ?? []).map((materialName) => {
+        const material = handle.materialDefinitions?.[materialName];
+        const albedo = material?.maps?.find((map) => map.channel === 'albedo');
+        const texture = albedo?.path?.startsWith('builtin://')
+          ? { builtin: materialName }
+          : albedo ? this._textureCache.get(albedo.path) : null;
+        const builtinSample = ([u, v]) => {
+          const seed = [...(materialName ?? '')].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+          const cell = (Math.floor(u * 8) + Math.floor(v * 8)) & 1;
+          const baseValue = 70 + (seed % 100);
+          return [baseValue + cell * 34, baseValue + cell * 20, Math.max(35, baseValue - 30), 255];
+        };
+        return {
+          sampler: texture?.builtin
+            ? builtinSample
+            : texture ? (sampleUv) => sampleTexture(texture, sampleUv, material.transform ?? {}) : null,
+        };
+      });
+      let groupIndex = 0;
 
       for (let i = 0; i < indices.length; i += 3) {
+        const includeTriangle = !interactionTriangles || interactionTriangles.has(globalTriangleIndex);
+        globalTriangleIndex += 1;
+        if (!includeTriangle) continue;
         const a = world[indices[i]];
         const b = world[indices[i + 1]];
         const c = world[indices[i + 2]];
@@ -349,22 +662,55 @@ export class SceneRenderer {
 
         const shade = shadeFactor(triangleNormal(a, b, c));
         const rgb = this._shaded(base, background, shade);
+        while (groupIndex < (handle.groups?.length ?? 0)) {
+          const candidate = handle.groups[groupIndex];
+          const start = candidate.start ?? candidate[0];
+          const count = candidate.count ?? candidate[1];
+          if (i < start + count) break;
+          groupIndex += 1;
+        }
+        const group = handle.groups?.[groupIndex];
+        const materialIndex = group ? (group.material_index ?? group[2]) : 0;
+        const materialState = materialStates[materialIndex] ?? {};
+        const hasUv = handle.geometry.uvs?.length === handle.geometry.vertexCount * 2;
 
         // No sort, no subdivision, no seam inflation. The depth buffer decides visibility
         // per pixel, so draw order does not matter and none of those are needed.
-        for (const [ca, cb, cc] of clipTriangleNear(a, b, c, nearPlane)) {
-          drawTriangle(frame, project(ca), project(cb), project(cc), rgb, id);
+        const uv = handle.geometry.uvs;
+        const ia = indices[i]; const ib = indices[i + 1]; const ic = indices[i + 2];
+        const withUv = (point, vertex) => [point[0], point[1], point[2], uv?.[vertex * 2] ?? 0, uv?.[vertex * 2 + 1] ?? 0];
+        for (const [ca, cb, cc] of clipTriangleNear(withUv(a, ia), withUv(b, ib), withUv(c, ic), nearPlane)) {
+          const pa = [...project(ca), ca[3], ca[4]];
+          const pb = [...project(cb), cb[3], cb[4]];
+          const pc = [...project(cc), cc[3], cc[4]];
+          if (!isPointed && !focused && !handle.highlighted && hasUv && materialState.sampler) {
+            drawTexturedTriangle(frame, pa, pb, pc, materialState.sampler, id, shade);
+          } else {
+            drawTriangle(frame, pa, pb, pc, rgb, id);
+          }
         }
       }
     }
 
     this._image.data.set(frame.color);
+    // Fill colour alone can disappear into flat shading. Draw an unshaded, DPR-aware halo
+    // around the visible silhouette so hover and committed selection read at a glance.
+    const dpr = window.devicePixelRatio || 1;
+    paintIdOutline(
+      this._image.data,
+      frame.ids,
+      width,
+      height,
+      pointedIds,
+      ink,
+      Math.max(2, Math.round(dpr * 2)),
+    );
     // putImageData ignores the current transform, so the DPR scale set in _resize would
     // double-apply. Reset around it and restore afterwards for anything drawing in CSS
     // pixels later.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.putImageData(this._image, 0, 0);
-    const dpr = window.devicePixelRatio || 1;
+    this._drawMoveOverlay({ cameraDistance: camDist, focalLength: focal, width, height, dpr });
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }

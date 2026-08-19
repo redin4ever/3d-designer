@@ -29,6 +29,8 @@ import {
 import { attachControls, buildRequestFullSceneMessage } from './controls.js';
 import { attachPointing } from './point-ui.js';
 import { attachConnectButton } from './connect-ui.js';
+import { attachTextureInspector } from './texture-inspector.js';
+import { attachFileMenu } from './file-io.js';
 
 function resolveSocketUrl() {
   const override = new URLSearchParams(location.search).get('ws');
@@ -53,6 +55,9 @@ function main() {
   const viewportState = createViewportState();
   const actionLog = createActionLog();
   const transcript = createTranscript();
+  let runControls;
+  // A live session begins as an unsaved project, even when it was seeded with geometry.
+  let sceneDirty = true;
 
   renderer.start();
 
@@ -88,6 +93,7 @@ function main() {
               : undefined,
         );
         pointing.setRun({ connected: status === 'open' });
+        runControls?.setRunState({ connected: status === 'open' });
         if (status === 'open') {
           pushLog('connected', 'status');
           pushTranscript({ text: 'connected', data: { role: 'system' } });
@@ -105,18 +111,30 @@ function main() {
     },
   );
 
+  function reportPreviewQuality(message) {
+    const preview = message.data?.preview;
+    if (!preview?.simplified) return;
+    pushLog(
+      'preview simplified for responsiveness — full model preserved for editing and export',
+      'status',
+    );
+  }
+
   function handleServerMessage(message) {
     switch (message.type) {
       case ServerMessageType.HELLO:
         pushLog(`hello — wire v${message.data?.wire_version ?? '?'}`, 'status');
         break;
       case ServerMessageType.FULL_SCENE:
+        pointing.rejectMove('Move cancelled because the scene was refreshed.');
         clearViewportState(viewportState, renderer);
         applyMeshUpsert(viewportState, { meshes: message.meshes }, renderer);
         applyTransformUpdate(viewportState, { transforms: message.transforms }, renderer);
+        reportPreviewQuality(message);
         pushLog(`full scene — ${message.meshes?.length ?? 0} objects`, 'status');
         break;
       case ServerMessageType.MESH_UPSERT:
+        sceneDirty = true;
         applyMeshUpsert(viewportState, message, renderer);
         // The server sends `transforms` alongside `meshes` on every MESH_UPSERT
         // (src/viewer/translate.py builds both from the same snapshot), and
@@ -126,11 +144,16 @@ function main() {
         // moment its topology changed — silently, with nothing logged. FULL_SCENE above
         // always did both; this case did not.
         applyTransformUpdate(viewportState, { transforms: message.transforms }, renderer);
+        pointing.reconcileTransforms(message.transforms);
+        reportPreviewQuality(message);
         break;
       case ServerMessageType.TRANSFORM_UPDATE:
+        sceneDirty = true;
         applyTransformUpdate(viewportState, message, renderer);
+        pointing.reconcileTransforms(message.transforms);
         break;
       case ServerMessageType.OBJECTS_REMOVED:
+        sceneDirty = true;
         applyObjectsRemoved(viewportState, message, renderer);
         break;
       case ServerMessageType.HIGHLIGHT:
@@ -152,7 +175,11 @@ function main() {
         // Editing is only reachable while paused (Q-17), so the edit panel has to learn
         // about a pause the agent's own operator caused from another tab, not just one
         // this browser asked for.
-        pointing.setRun({ runState: /paus/i.test(message.text) ? 'paused' : 'running' });
+        {
+          const runState = /paus/i.test(message.text) ? 'paused' : 'running';
+          pointing.setRun({ runState });
+          runControls?.setRunState({ runState });
+        }
         break;
       case ServerMessageType.FOCUS:
         // The server is the authority on what is marked. A browser that kept its own idea
@@ -175,6 +202,7 @@ function main() {
         pushLog('resync required — requesting full scene', 'status');
         break;
       case ServerMessageType.ERROR:
+        pointing.rejectMove(message.text || 'Move rejected by the build.');
         pushLog(`error: ${message.text}`, 'error');
         break;
       default:
@@ -185,6 +213,7 @@ function main() {
   // Pointing, priority and the edit tools. Given the renderer because picking reads the
   // frame the renderer just drew — the id channel is written in the same inner loop as the
   // depth, so this is the only object that can answer "what is under that pixel".
+  let textureInspector;
   const pointing = attachPointing(controlsRoot, {
     renderer,
     send: (clientMessage) => {
@@ -195,9 +224,28 @@ function main() {
     onError: (message) => {
       controlError.textContent = message;
     },
+    onSelection: (ids) => textureInspector?.setSelection(ids),
   });
 
-  attachControls(controlsRoot, {
+  textureInspector = attachTextureInspector(controlsRoot, {
+    send: (message) => socket.send(message),
+  });
+
+  attachFileMenu(document, {
+    selectedIds: () => pointing.selectedIds(),
+    isDirty: () => sceneDirty,
+    onStatus: (status) => {
+      if (status.phase === 'complete') pushLog(`file: ${status.message || 'complete'}`, 'log');
+      if (status.phase === 'error') pushLog(`file error: ${status.message}`, 'error');
+    },
+    onResult: (result, action) => {
+      if (!result?.ok || result.status === 'cancelled') return;
+      if (['save-project', 'save-as', 'open-project'].includes(action)) sceneDirty = false;
+      if (action === 'import-model') sceneDirty = true;
+    },
+  });
+
+  runControls = attachControls(controlsRoot, {
     send: (clientMessage) => {
       // Show the operator's own words the instant they press Enter. The server echoes
       // them back once it has queued them, and that echo is what turns this line from
@@ -226,7 +274,14 @@ function main() {
   // layer and lives outside <main>, so a root scoped to the layout cannot see it. Nothing
   // here touches the socket — connecting an AI client is a one-off setup action against the
   // page's own HTTP origin, and it is deliberately not on the wire protocol.
-  attachConnectButton(document);
+  const connectController = attachConnectButton(document);
+  // Client configuration and restarts happen outside this tab. Re-check when the operator
+  // comes back so the top bar cannot stay stuck on stale "restart required" state.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && connectController) {
+      connectController.refreshStatus();
+    }
+  });
 
   setStatus('connecting');
   socket.connect();

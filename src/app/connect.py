@@ -11,7 +11,7 @@ filled in, and can write it into the client's own file.
 
 The honest part matters as much as the config. The two clients are not equally reachable:
 
-* **Claude Desktop, Claude Code and Cursor** speak MCP over **stdio** — they launch the
+* **Claude Desktop, Claude Code, Cursor and Codex** speak MCP over **stdio** — they launch the
   server as a subprocess. Localhost is not involved, nothing is exposed, and it works as
   soon as the config is saved.
 
@@ -32,9 +32,13 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tomllib
 from pathlib import Path
 
-__all__ = ["CLIENTS", "config_for", "config_path_for", "describe", "write_config"]
+from app.codex_config import format_server as format_codex_server
+from app.codex_config import write_server as write_codex_server
+
+__all__ = ["CLIENTS", "config_for", "config_path_for", "describe", "detect_clients", "write_config"]
 
 _SRC = Path(__file__).resolve().parents[1]
 _REPO = _SRC.parent
@@ -82,6 +86,17 @@ CLIENTS: dict[str, dict] = {
         "wrap": lambda cmd: {"mcpServers": {"forge3d": cmd}},
         "note": "Settings -> MCP shows it once the file is saved.",
     },
+    "codex": {
+        "label": "Codex",
+        "transport": "stdio",
+        "path": lambda: Path.home() / ".codex" / "config.toml",
+        "wrap": lambda cmd: {"mcp_servers": {"forge3d": cmd}},
+        "format": "toml",
+        "note": (
+            "Restart Codex after saving, then use /mcp to verify forge3d. "
+            "Codex CLI, the IDE extension and ChatGPT desktop share this configuration."
+        ),
+    },
 }
 
 
@@ -102,15 +117,43 @@ def _looks_installed(client: str) -> bool:
     return path.exists() or path.parent.exists()
 
 
-def _already_configured(client: str) -> bool:
+def _contains_expected(actual: object, expected: object) -> bool:
+    """Whether ``actual`` contains the command shape Forge3D currently requires.
+
+    Client-specific optional fields are allowed, but every command, argument and environment
+    value that determines which checkout starts must match. Presence alone is not readiness:
+    an old checkout under the right server name is a stale connection.
+    """
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(
+            key in actual and _contains_expected(actual[key], value)
+            for key, value in expected.items()
+        )
+    return actual == expected
+
+
+def _configuration_status(client: str) -> str:
     path = config_path_for(client)
     if not path.exists():
-        return False
+        return "needs_configuration"
     try:
-        data = json.loads(path.read_text(encoding="utf-8")) or {}
+        text = path.read_text(encoding="utf-8")
+        data = (
+            tomllib.loads(text)
+            if CLIENTS[client].get("format") == "toml"
+            else json.loads(text) or {}
+        )
     except (OSError, ValueError):
-        return False
-    return "forge3d" in (data.get("mcpServers") or {})
+        return "invalid"
+    key = "mcp_servers" if CLIENTS[client].get("format") == "toml" else "mcpServers"
+    server = (data.get(key) or {}).get("forge3d")
+    if server is None:
+        return "needs_configuration"
+    return "ready" if _contains_expected(server, _server_command()) else "needs_update"
+
+
+def _already_configured(client: str) -> bool:
+    return _configuration_status(client) == "ready"
 
 
 def detect_clients() -> list[dict]:
@@ -123,13 +166,15 @@ def detect_clients() -> list[dict]:
     for name, spec in CLIENTS.items():
         if not _looks_installed(name):
             continue
+        status = _configuration_status(name)
         found.append(
             {
                 "id": name,
                 "label": spec["label"],
                 "transport": spec["transport"],
                 "config_path": str(config_path_for(name)),
-                "configured": _already_configured(name),
+                "configured": status == "ready",
+                "status": status,
                 "note": spec["note"],
             }
         )
@@ -137,7 +182,7 @@ def detect_clients() -> list[dict]:
 
 
 def config_for(client: str) -> dict:
-    """The JSON this client expects, ready to paste."""
+    """The client-native configuration shape, ready to render or write."""
     if client not in CLIENTS:
         raise KeyError(f"unknown client {client!r}; known: {', '.join(sorted(CLIENTS))}")
     return CLIENTS[client]["wrap"](_server_command())
@@ -155,6 +200,10 @@ def write_config(client: str) -> Path:
     or malformed existing file is left alone and reported rather than clobbered.
     """
     path = config_path_for(client)
+    if CLIENTS[client].get("format") == "toml":
+        write_codex_server(path, _server_command())
+        return path
+
     existing: dict = {}
     if path.exists():
         try:
@@ -190,7 +239,11 @@ def describe(client: str | None = None, *, http_port: int = 8765) -> str:
         lines.append(f"\n  {spec['label']}  ({spec['transport']})")
         lines.append(f"  config: {config_path_for(name)}")
         lines.append("")
-        for row in json.dumps(config_for(name), indent=2).splitlines():
+        if spec.get("format") == "toml":
+            rendered = format_codex_server(_server_command()).rstrip()
+        else:
+            rendered = json.dumps(config_for(name), indent=2)
+        for row in rendered.splitlines():
             lines.append(f"    {row}")
         lines.append("")
         lines.append(f"  {spec['note']}")

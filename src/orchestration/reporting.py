@@ -305,7 +305,8 @@ class ReportingMixin:
         lease = self.acquire("operator", self.phase)
         try:
             with self._write_mutex:
-                result = self._scene.apply(op, lease=lease)
+                snapshot_path = self._capture_snapshot(op) if op.opaque else ""
+                result = self._scene.apply(op, lease=lease, snapshot_path=snapshot_path)
             changed = _touched(result)
             report = ActionReport(
                 op_id=op.op_id,

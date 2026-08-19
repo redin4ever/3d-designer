@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Point at parts in the live view and edit them: hover/lasso a part so the model gets text+image context about it, mark parts to raise their priority, and direct manipulation tools so simple changes need no model round-trip",
-  "slug": "point-and-edit",
-  "phase": 4,
-  "baseSha": "49f3f8f8f3f80d1461831f189bf060acd2a1b98b",
-  "branch": "build/pass-1",
-  "docsDir": "docs/features/point-and-edit",
-  "startedAt": "2026-08-06",
-  "status": "running"
+  "feature": "Repair native Blender .blend import and verify the real import path",
+  "slug": "blend-import-verification",
+  "phase": 5,
+  "baseSha": "01c2ffb2ce78d53a0621c510f542a9590b934b04",
+  "branch": "fix/blend-import-verification",
+  "docsDir": "docs/features/blend-import-verification",
+  "startedAt": "2026-08-19",
+  "status": "finished"
 }

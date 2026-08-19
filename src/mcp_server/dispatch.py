@@ -10,6 +10,7 @@ from typing import Any
 
 from contracts import Operation, Phase, ToolError, ToolRole, ToolSpec, roles_for_phase
 from raw import RAW_TOOL_SPEC
+from importing import IMPORT_OPERATION_KIND
 
 from .authorize import authorize
 from .context import context_for
@@ -136,13 +137,18 @@ def dispatch(
     # one. `granted` cannot normally be empty here (authorize only returns after a match),
     # so the fallback is belt-and-braces rather than an expected path.
     acting_role = granted[0].value if granted else spec.roles[0].value
+    op_id = f"{name}-{uuid.uuid4().hex[:8]}"
+    from ops import joinery_for, runtime_acceptance_for
+
     op = Operation(
-        op_id=f"{name}-{uuid.uuid4().hex[:8]}",
+        op_id=op_id,
         kind=name,
         params=dict(params),
+        acceptance=runtime_acceptance_for(name, params, op_id=op_id),
+        joinery=joinery_for(name, params),
         phase=phase.value,
         author=f"mcp:{acting_role}:{getattr(lease, 'holder', '')}",
-        opaque=(name == RAW_TOOL_SPEC.name),
+        opaque=(name in {RAW_TOOL_SPEC.name, IMPORT_OPERATION_KIND}),
     )
     report = orchestrator.perform(op, lease)
     return to_jsonable(report)

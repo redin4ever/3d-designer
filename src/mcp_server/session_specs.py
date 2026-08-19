@@ -24,12 +24,25 @@ from contracts import ToolRole, ToolSpec
 from .operator_context import get_operator_context
 from .phase_tools import get_phase, promote_phase
 from .scene_query import DEFAULT_PAGE, MAX_PAGE, describe_object, list_objects
+from .texture_tools import list_texture_materials
 
 __all__ = ["SESSION_SPECS"]
 
 _NO_PARAMS = {"type": "object", "properties": {}, "additionalProperties": False}
 
 SESSION_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name="list_texture_materials",
+        description="List built-in presets and reusable managed texture materials with their PBR maps and transforms.",
+        roles=(ToolRole.INSPECT,),
+        input_schema={
+            "type": "object",
+            "properties": {"managed_root": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        handler=list_texture_materials,
+        mutating=False,
+    ),
     ToolSpec(
         name="get_operator_context",
         description=(
@@ -61,7 +74,8 @@ SESSION_SPECS: tuple[ToolSpec, ...] = (
         name="get_phase",
         description=(
             "Where this session is and what it may do: the current phase, the roles legal "
-            "in it, every tool callable right now, and each of the phase's acceptance "
+            "in it, the focused discovery tools, operator focus, next actions, every tool "
+            "callable right now, and each of the phase's acceptance "
             "queries with the ones that currently fail — each failure naming its subject, "
             "measured value, threshold and the operation that would fix it. Call this "
             "first in a new session, and after any refusal you did not expect."

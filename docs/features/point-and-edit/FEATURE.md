@@ -64,9 +64,10 @@ with 63 tests between them, written red first — but the wiring itself is a Rul
   is 307, both over the 300 soft cap. Both were already over before this feature and both are
   under the 1000 hard cap. Splitting `operations.py` would mean amending the package's
   documented acyclic import order — a wider change than this feature warrants.
-- The gizmo is numeric-entry plus buttons, not draggable arrows in the 3D view. Q-15 asked for
-  handles *with* numbers; the numbers, snapping and axis arithmetic are all built and tested
-  (`edit-tools.js`), and what is missing is the on-canvas arrow rendering and hit-testing.
+- The draggable-arrow gap is closed by
+  [Blender-style editor tools and move gizmo](../blender-tools-gizmo/FEATURE.md). Numeric entry
+  remains available beside the on-canvas X/Y/Z arrows, with shared snapping and one committed
+  move per drag.
 - Rotate and scale have operations, tools and message builders but no control in the panel
   yet — only move, duplicate and delete are exposed.
 - `_handle_select` is still a no-op. That is now a decision (see `seams.json`), not a gap.

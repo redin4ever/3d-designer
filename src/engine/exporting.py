@@ -12,11 +12,13 @@ delegated, per the docstring on ``ExportOps.export_gltf`` in ``src/contracts/eng
 
 from __future__ import annotations
 
+import threading
 from typing import Sequence
 
 from contracts import EngineError, Quat, Transform, Vec3
 
 from ._shared import get_object, read_transform_fields
+from .texture_materials import export_settings
 
 __all__ = ["ExportingMixin"]
 
@@ -35,6 +37,12 @@ class ExportingMixin:
         scale: float = 1.0,
         apply_modifiers: bool = True,
     ) -> str:
+        if threading.current_thread() is not threading.main_thread():
+            raise EngineError(
+                "engine.thread_affinity",
+                "Blender export must execute on the engine-owning main thread",
+                "marshal the export through the live operation dispatcher",
+            )
         import bpy
 
         if not object_ids:
@@ -83,7 +91,7 @@ class ExportingMixin:
                 bpy.data.objects[tid].select_set(True)
             bpy.context.view_layer.objects.active = bpy.data.objects[temp_ids[0]]
 
-            export_format = "GLB" if path.lower().endswith(".glb") else "GLTF_EMBEDDED"
+            export_format = export_settings(path)["format"]
             bpy.ops.export_scene.gltf(
                 filepath=path,
                 export_format=export_format,

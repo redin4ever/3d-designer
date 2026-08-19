@@ -126,25 +126,66 @@ def add_opening(engine: EngineProtocol, op: Operation) -> OperationResult:
 
     # The wall's footprint minus the opening rectangle, decomposed into up to four boxes
     # (left / right / below-sill / above-head) — each spans the wall's full thickness.
-    segments: list[tuple[float, float, float, float]] = []
-    if a0 > length_min + EPSILON:
-        segments.append((length_min, a0, z_min, z_max))
-    if a1 < length_max - EPSILON:
-        segments.append((a1, length_max, z_min, z_max))
-    if c0 > z_min + EPSILON:
-        segments.append((a0, a1, z_min, c0))
-    if c1 < z_max - EPSILON:
-        segments.append((a0, a1, c1, z_max))
+    # Preserve prior cuts: after one opening the wall is a joined set of disconnected
+    # boxes. Subtracting a later opening from the outer AABB would fill the earlier hole.
+    adjacency = [set() for _ in snapshot.vertices]
+    for tri in snapshot.triangles:
+        for left, right in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+            adjacency[left].add(right)
+            adjacency[right].add(left)
+    components = []
+    unseen = set(range(len(snapshot.vertices)))
+    while unseen:
+        seed = unseen.pop()
+        component = {seed}
+        pending = [seed]
+        while pending:
+            current = pending.pop()
+            for neighbour in adjacency[current] & unseen:
+                unseen.remove(neighbour)
+                component.add(neighbour)
+                pending.append(neighbour)
+        components.append(component)
+
+    segments: list[tuple[float, float, float, float, float, float]] = []
+    cut_solid = False
+    for component in components:
+        bounds = AABB.from_points(snapshot.vertices[index] for index in component)
+        am = vec_component(bounds.minimum, length_axis)
+        ax = vec_component(bounds.maximum, length_axis)
+        bm = vec_component(bounds.minimum, thickness_axis)
+        bx = vec_component(bounds.maximum, thickness_axis)
+        zm, zx = bounds.minimum.z, bounds.maximum.z
+        ia0, ia1 = max(am, a0), min(ax, a1)
+        ic0, ic1 = max(zm, c0), min(zx, c1)
+        if ia0 >= ia1 - EPSILON or ic0 >= ic1 - EPSILON:
+            segments.append((am, ax, bm, bx, zm, zx))
+            continue
+        cut_solid = True
+        if ia0 > am + EPSILON:
+            segments.append((am, ia0, bm, bx, zm, zx))
+        if ia1 < ax - EPSILON:
+            segments.append((ia1, ax, bm, bx, zm, zx))
+        if ic0 > zm + EPSILON:
+            segments.append((ia0, ia1, bm, bx, zm, ic0))
+        if ic1 < zx - EPSILON:
+            segments.append((ia0, ia1, bm, bx, ic1, zx))
+    if not cut_solid:
+        raise ToolError(
+            "ops.opening_outside_wall",
+            f"add_opening: the requested opening intersects no remaining solid region of {wall_id!r}",
+            "move the opening away from an existing cut or choose a different wall",
+        )
     if not segments:
         # The opening consumes the wall's entire face — keep a sliver so the object
         # remains a valid, non-empty mesh rather than vanishing outright.
-        segments.append((length_min, length_min + EPSILON, z_min, z_min + EPSILON))
+        segments.append((length_min, length_min + EPSILON, b_min, b_max, z_min, z_min + EPSILON))
 
     engine.delete(wall_id)
 
-    def _segment_mesh(a_lo: float, a_hi: float, c_lo: float, c_hi: float):
-        mins = vec_with_axes(**{length_axis: a_lo, thickness_axis: b_min, "z": c_lo})
-        maxs = vec_with_axes(**{length_axis: a_hi, thickness_axis: b_max, "z": c_hi})
+    def _segment_mesh(a_lo: float, a_hi: float, b_lo: float, b_hi: float, c_lo: float, c_hi: float):
+        mins = vec_with_axes(**{length_axis: a_lo, thickness_axis: b_lo, "z": c_lo})
+        maxs = vec_with_axes(**{length_axis: a_hi, thickness_axis: b_hi, "z": c_hi})
         return box_mesh(mins, maxs)
 
     first_verts, first_faces = _segment_mesh(*segments[0])

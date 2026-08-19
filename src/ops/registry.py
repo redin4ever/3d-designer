@@ -26,8 +26,15 @@ from contracts import HandlerRegistry, ToolRole, ToolSpec
 
 from .architecture import add_floor, add_opening, add_wall
 from .arrays import add_lod_chain, add_modular_kit, array_along
+from .chimney import add_chimney
+from .facade_ribs import add_facade_ribs
+from .impact_head import add_impact_head
+from .profiled_solid import add_profiled_solid
 from .primitives import add_primitive
 from .railing import add_railing
+from .roof import add_gable_roof
+from .surface_mounts import add_roof_window, add_wall_sign
+from .landing_stairs import add_staircase_to_landing
 from .stairs import add_staircase
 from .transform import (
     delete_object,
@@ -37,6 +44,12 @@ from .transform import (
     rotate_object,
     scale_object,
     set_object_material,
+)
+from .texture_materials import (
+    TEXTURE_MATERIAL_SPECS,
+    apply_texture_material,
+    create_texture_material,
+    update_texture_material,
 )
 
 __all__ = ["OPS", "OP_SPECS", "EDIT_SPECS"]
@@ -60,17 +73,54 @@ _PATH_SCHEMA = {
 
 _PAIR_SCHEMA = {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
 
+_PROFILE_POINT_SCHEMA = {
+    "type": "array",
+    "items": {"type": "number"},
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Local [u, v] profile coordinate in metres.",
+}
+
+_PROFILE_SECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "offset": {
+            "type": "number",
+            "description": "Distance in metres along the selected world axis from origin.",
+        },
+        "profile": {
+            "type": "array",
+            "items": _PROFILE_POINT_SCHEMA,
+            "minItems": 3,
+            "description": (
+                "Closed convex profile, counter-clockwise in local [u, v]. Every section "
+                "must use the same vertex count and corresponding point order."
+            ),
+        },
+    },
+    "required": ["offset", "profile"],
+    "additionalProperties": False,
+}
+
 
 OPS: HandlerRegistry = {
     "add_primitive": add_primitive,
     "add_wall": add_wall,
     "add_floor": add_floor,
+    "add_gable_roof": add_gable_roof,
+    "add_chimney": add_chimney,
+    "add_impact_head": add_impact_head,
+    "add_profiled_solid": add_profiled_solid,
     "add_opening": add_opening,
     "add_staircase": add_staircase,
+    "add_staircase_to_landing": add_staircase_to_landing,
     "add_railing": add_railing,
     "array_along": array_along,
     "add_lod_chain": add_lod_chain,
     "add_modular_kit": add_modular_kit,
+    "add_roof_window": add_roof_window,
+    "add_wall_sign": add_wall_sign,
+    "add_facade_ribs": add_facade_ribs,
     # The direct edits (Q-14). Registered here with everything else, deliberately: Q-19 chose
     # one shared history, and OPS is what `scene` replays through. An operator's nudge and an
     # agent's staircase are the same kind of thing to everything downstream of this dict.
@@ -81,6 +131,9 @@ OPS: HandlerRegistry = {
     "duplicate_object": duplicate_object,
     "rename_object": rename_object,
     "set_object_material": set_object_material,
+    "create_texture_material": create_texture_material,
+    "update_texture_material": update_texture_material,
+    "apply_texture_material": apply_texture_material,
 }
 
 
@@ -89,6 +142,49 @@ OPS: HandlerRegistry = {
 #: is as much a polish action as a roughing-out one — and because the operator reaching for
 #: these should not depend on which phase the run happens to be in.
 _EDIT_ROLES = (ToolRole.BLOCKOUT, ToolRole.REFINE)
+
+_SURFACE_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name="add_roof_window",
+        description="Mount a framed skylight flush to an existing upward roof face; orientation is derived from the host.",
+        roles=(ToolRole.REFINE,),
+        input_schema={"type": "object", "properties": {
+            "object_id": {"type": "string"}, "roof_id": {"type": "string"},
+            "width": {"type": "number", "exclusiveMinimum": 0},
+            "height": {"type": "number", "exclusiveMinimum": 0},
+            "frame_width": {"type": "number", "exclusiveMinimum": 0},
+            "depth": {"type": "number", "exclusiveMinimum": 0},
+            "horizontal_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+            "vertical_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        }, "required": ["object_id", "roof_id", "width", "height", "frame_width", "depth", "horizontal_fraction", "vertical_fraction"], "additionalProperties": False},
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_wall_sign",
+        description="Create centered mesh text on the wall face aimed at a point; rejects text that cannot fit.",
+        roles=(ToolRole.REFINE,),
+        input_schema={"type": "object", "properties": {
+            "object_id": {"type": "string"}, "wall_id": {"type": "string"},
+            "text": {"type": "string", "minLength": 1}, "toward": _VEC3_SCHEMA,
+            "center_height": {"type": "number"}, "height": {"type": "number", "exclusiveMinimum": 0},
+            "depth": {"type": "number", "exclusiveMinimum": 0},
+            "edge_margin": {"type": "number", "minimum": 0},
+        }, "required": ["object_id", "wall_id", "text", "toward", "center_height", "height", "depth", "edge_margin"], "additionalProperties": False},
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_facade_ribs",
+        description="Lay out joined façade ribs only on remaining solid wall regions, split around openings with explicit clearance.",
+        roles=(ToolRole.REFINE,),
+        input_schema={"type": "object", "properties": {
+            "object_id": {"type": "string"}, "wall_id": {"type": "string"}, "toward": _VEC3_SCHEMA,
+            "spacing": {"type": "number", "exclusiveMinimum": 0}, "width": {"type": "number", "exclusiveMinimum": 0},
+            "depth": {"type": "number", "exclusiveMinimum": 0}, "edge_margin": {"type": "number", "minimum": 0},
+            "opening_clearance": {"type": "number", "minimum": 0}, "min_segment": {"type": "number", "exclusiveMinimum": 0},
+        }, "required": ["object_id", "wall_id", "toward", "spacing", "width", "depth", "edge_margin", "opening_clearance", "min_segment"], "additionalProperties": False},
+        mutating=True,
+    ),
+)
 
 _SNAP_SCHEMA = {
     "type": "number",
@@ -223,9 +319,9 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         name="add_primitive",
         description=(
             "Place one named, validated primitive mesh (cube, cylinder, sphere, plane, "
-            "cone, torus). Not the default tool — the other eight operations in this "
-            "library are themselves built from primitives; reach for one of those first "
-            "(ADR-004)."
+            "cone, torus). Not the default tool — use a semantic construction operation "
+            "when one describes the intended object; those operations are themselves "
+            "built from primitives and preserve architectural relationships (ADR-004)."
         ),
         roles=(ToolRole.BLOCKOUT,),
         input_schema={
@@ -328,6 +424,175 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         mutating=True,
     ),
     ToolSpec(
+        name="add_impact_head",
+        description=(
+            "Build a coherent dual-strike mechanical head from one fitted parameter set: "
+            "corner-clipped body, seated top and cheek armor, socketed shoulders, load "
+            "collars, striking faces, retaining rims, and an underside handle socket. Use "
+            "this instead of independently placing plates and rotated cylinders."
+        ),
+        roles=(ToolRole.REFINE,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "depth": {"type": "number", "exclusiveMinimum": 0},
+                "height": {"type": "number", "exclusiveMinimum": 0},
+                "corner_chamfer": {"type": "number", "exclusiveMinimum": 0},
+                "plate_thickness": {"type": "number", "exclusiveMinimum": 0},
+                "plate_inset": {"type": "number", "exclusiveMinimum": 0},
+                "shoulder_depth": {"type": "number", "exclusiveMinimum": 0},
+                "shoulder_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "socket_depth": {"type": "number", "exclusiveMinimum": 0},
+                "collar_depth": {"type": "number", "exclusiveMinimum": 0},
+                "collar_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "face_depth": {"type": "number", "exclusiveMinimum": 0},
+                "face_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "striker_depth": {"type": "number", "exclusiveMinimum": 0},
+                "striker_socket_depth": {"type": "number", "exclusiveMinimum": 0},
+                "striker_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "rim_depth": {"type": "number", "exclusiveMinimum": 0},
+                "rim_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "handle_socket_diameter": {"type": "number", "exclusiveMinimum": 0},
+                "handle_socket_depth": {"type": "number", "exclusiveMinimum": 0},
+                "handle_collar_depth": {"type": "number", "exclusiveMinimum": 0},
+                "handle_collar_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "bevel_width": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": [
+                "object_id", "origin", "width", "depth", "height", "corner_chamfer",
+                "plate_thickness", "plate_inset", "shoulder_depth", "shoulder_diameter",
+                "socket_depth", "collar_depth", "collar_diameter", "face_depth",
+                "face_diameter", "striker_depth", "striker_socket_depth",
+                "striker_diameter", "rim_depth", "rim_overhang", "handle_socket_diameter",
+                "handle_socket_depth", "handle_collar_depth", "handle_collar_overhang",
+                "bevel_width",
+            ],
+            "additionalProperties": False,
+        },
+        mutating=True,
+        examples=(
+            "A 3.6m wide sci-fi maul head with fitted armor and 1.6m striking faces.",
+        ),
+    ),
+    ToolSpec(
+        name="add_profiled_solid",
+        description=(
+            "Build one exact closed hard-surface solid from corresponding 2D sections. "
+            "Two identical sections make an extrusion; changing sections make a taper or "
+            "loft. Use this for anvils, extraction hoods, brackets, furniture legs and "
+            "other silhouette-critical forms that would otherwise become stacks of cubes "
+            "and cones. Invalid winding, correspondence and station order reject atomically."
+        ),
+        roles=(ToolRole.REFINE,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "axis": {
+                    "type": "string",
+                    "enum": ["x", "y", "z"],
+                    "description": "World axis the ordered sections advance along.",
+                },
+                "sections": {
+                    "type": "array",
+                    "items": _PROFILE_SECTION_SCHEMA,
+                    "minItems": 2,
+                    "description": "Ordered sections; offsets must increase strictly.",
+                },
+                "bevel_width": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Edge bevel width in metres; 0 keeps exact sharp edges.",
+                },
+            },
+            "required": ["object_id", "origin", "axis", "sections", "bevel_width"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+        examples=(
+            "A tapered forge hood narrowing from a 3m rectangle to a 0.8m flue neck.",
+            "An anvil body whose horizontal sections narrow through the waist and horn.",
+            "A furniture leg extruded from a chamfered octagonal profile.",
+        ),
+    ),
+    ToolSpec(
+        name="add_gable_roof",
+        description=(
+            "Build a complete gable roof assembly from architectural dimensions: two "
+            "sloped panels, ridge cap and full-face compound-mitered rake/eave corner trim. "
+            "Use this for a house "
+            "roof instead of approximating roof planes with a rotated cube. The origin "
+            "is the footprint centre at the wall-top bearing plane."
+        ),
+        roles=(ToolRole.BLOCKOUT,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "depth": {"type": "number", "exclusiveMinimum": 0},
+                "pitch_degrees": {
+                    "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 80,
+                },
+                "thickness": {"type": "number", "exclusiveMinimum": 0},
+                "overhang": {"type": "number", "minimum": 0},
+                "trim_width": {"type": "number", "exclusiveMinimum": 0},
+                "trim_depth": {"type": "number", "exclusiveMinimum": 0},
+                "ridge_axis": {"type": "string", "enum": ["x", "y"]},
+            },
+            "required": [
+                "object_id", "origin", "width", "depth", "pitch_degrees", "thickness",
+                "overhang", "trim_width", "trim_depth", "ridge_axis",
+            ],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_chimney",
+        description=(
+            "Build a complete masonry chimney from explicit architectural dimensions: "
+            "shaft, tapered roof flashing, overhanging crown, and finished rimmed flues. "
+            "Use this for a house chimney instead of a tall cube. Origin is the centre of "
+            "the shaft footprint at its base."
+        ),
+        roles=(ToolRole.BLOCKOUT,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "origin": _VEC3_SCHEMA,
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "depth": {"type": "number", "exclusiveMinimum": 0},
+                "shaft_height": {"type": "number", "exclusiveMinimum": 0},
+                "flashing_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "flashing_height": {"type": "number", "exclusiveMinimum": 0},
+                "crown_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "crown_height": {"type": "number", "exclusiveMinimum": 0},
+                "flue_count": {"type": "integer", "minimum": 1, "maximum": 4},
+                "flue_radius": {"type": "number", "exclusiveMinimum": 0},
+                "flue_wall_thickness": {"type": "number", "exclusiveMinimum": 0},
+                "flue_height": {"type": "number", "exclusiveMinimum": 0},
+                "rim_overhang": {"type": "number", "exclusiveMinimum": 0},
+                "rim_height": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": [
+                "object_id", "origin", "width", "depth", "shaft_height",
+                "flashing_overhang", "flashing_height", "crown_overhang",
+                "crown_height", "flue_count", "flue_radius", "flue_wall_thickness",
+                "flue_height",
+                "rim_overhang", "rim_height",
+            ],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
         name="add_staircase",
         description="A straight run of treads at a given rise, run and width.",
         roles=(ToolRole.REFINE,),
@@ -342,6 +607,35 @@ OP_SPECS: tuple[ToolSpec, ...] = (
                 "origin": _VEC3_SCHEMA,
             },
             "required": ["object_id", "treads", "rise", "run", "width"],
+            "additionalProperties": False,
+        },
+        mutating=True,
+    ),
+    ToolSpec(
+        name="add_staircase_to_landing",
+        description=(
+            "Build supported entry stairs from a bottom start to an existing landing. "
+            "The live landing bounds determine direction, run and rise, preventing the "
+            "fixed-world-axis and guessed-height errors of a raw staircase. Produces thin "
+            "treads and two side stringers; add a railing separately when needed."
+        ),
+        roles=(ToolRole.REFINE,),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "object_id": {"type": "string"},
+                "landing_id": {"type": "string"},
+                "start": _VEC3_SCHEMA,
+                "treads": {"type": "integer", "exclusiveMinimum": 0},
+                "width": {"type": "number", "exclusiveMinimum": 0},
+                "tread_thickness": {"type": "number", "exclusiveMinimum": 0},
+                "stringer_width": {"type": "number", "exclusiveMinimum": 0},
+                "stringer_depth": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": [
+                "object_id", "landing_id", "start", "treads", "width",
+                "tread_thickness", "stringer_width", "stringer_depth",
+            ],
             "additionalProperties": False,
         },
         mutating=True,
@@ -453,4 +747,4 @@ OP_SPECS: tuple[ToolSpec, ...] = (
         },
         mutating=True,
     ),
-) + EDIT_SPECS
+) + EDIT_SPECS + TEXTURE_MATERIAL_SPECS + _SURFACE_SPECS

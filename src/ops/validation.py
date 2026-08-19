@@ -20,25 +20,34 @@ from typing import Any
 
 from contracts import EPSILON, ToolError, Vec3
 
-from ._acceptance import acceptance_for
+from ._acceptance import acceptance_for, runtime_acceptance_for
+from ._joinery import joinery_for
 from ._geom import path_arc_length
 from ._shapes import as_pair, check_distinct, check_path, normalised_points
 
-__all__ = ["validate_params", "acceptance_for"]
+__all__ = ["validate_params", "acceptance_for", "joinery_for", "runtime_acceptance_for"]
 
-#: The nine kinds this library declares (registry_test.py pins the count). Kept as a local
+#: Construction kinds validated here (registry_test.py pins the public registry count).
 #: literal rather than importing ``registry.OPS`` to avoid a module import cycle:
 #: ``registry`` imports every handler module, and every handler module calls into this one.
 _KNOWN_KINDS = (
     "add_primitive",
     "add_wall",
     "add_floor",
+    "add_gable_roof",
+    "add_chimney",
+    "add_impact_head",
+    "add_profiled_solid",
     "add_opening",
     "add_staircase",
+    "add_staircase_to_landing",
     "add_railing",
     "array_along",
     "add_lod_chain",
     "add_modular_kit",
+    "add_roof_window",
+    "add_wall_sign",
+    "add_facade_ribs",
 )
 
 
@@ -171,6 +180,171 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
         _positive(depth, "depth", kind)
         _positive(thickness, "thickness", kind)
 
+    elif kind == "add_gable_roof":
+        _require(params, "origin", kind)
+        for name in ("width", "depth", "thickness", "trim_width", "trim_depth"):
+            _positive(_require(params, name, kind), name, kind)
+        _non_negative(_require(params, "overhang", kind), "overhang", kind)
+        pitch = _require(params, "pitch_degrees", kind)
+        if not 0 < pitch < 80:
+            raise ToolError(
+                "ops.bad_pitch",
+                f"{kind}: pitch_degrees is {pitch}, must be between 0 and 80",
+                "pass a roof pitch greater than 0 and less than 80 degrees",
+            )
+        ridge_axis = _require(params, "ridge_axis", kind)
+        if ridge_axis not in ("x", "y"):
+            raise ToolError(
+                "ops.bad_ridge_axis",
+                f"{kind}: ridge_axis is {ridge_axis!r}, must be 'x' or 'y'",
+                "pass ridge_axis='x' or ridge_axis='y'",
+            )
+
+    elif kind == "add_chimney":
+        _require(params, "origin", kind)
+        for name in (
+            "width", "depth", "shaft_height", "flashing_overhang", "flashing_height",
+            "crown_overhang", "crown_height", "flue_radius", "flue_wall_thickness",
+            "flue_height",
+            "rim_overhang", "rim_height",
+        ):
+            _positive(_require(params, name, kind), name, kind)
+        count = _require(params, "flue_count", kind)
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 4:
+            raise ToolError(
+                "ops.bad_count", f"{kind}: flue_count is {count!r}, must be an integer 1..4",
+                "pass flue_count as 1, 2, 3, or 4",
+            )
+        if params["flue_wall_thickness"] >= params["flue_radius"]:
+            raise ToolError(
+                "ops.bad_dimension",
+                f"{kind}: flue_wall_thickness must be smaller than flue_radius",
+                "reduce flue_wall_thickness or increase flue_radius",
+            )
+        if params["rim_height"] >= params["flue_height"]:
+            raise ToolError(
+                "ops.bad_dimension",
+                f"{kind}: rim_height must be smaller than flue_height",
+                "reduce rim_height or increase flue_height",
+            )
+        rim_diameter = 2.0 * (params["flue_radius"] + params["rim_overhang"])
+        crown_width = params["width"] + 2.0 * params["crown_overhang"]
+        crown_depth = params["depth"] + 2.0 * params["crown_overhang"]
+        along, across = max(crown_width, crown_depth), min(crown_width, crown_depth)
+        if rim_diameter > across or count * rim_diameter > along:
+            raise ToolError(
+                "ops.chimney_flues_do_not_fit",
+                f"{kind}: {count} flue rim(s) of diameter {rim_diameter:.4f} m do not fit "
+                f"on the {crown_width:.4f} x {crown_depth:.4f} m crown",
+                "reduce flue_count, flue_radius, or rim_overhang; or enlarge the crown",
+            )
+    elif kind == "add_impact_head":
+        _require(params, "origin", kind)
+        dimensions = (
+            "width", "depth", "height", "corner_chamfer", "plate_thickness",
+            "plate_inset", "shoulder_depth", "shoulder_diameter", "socket_depth",
+            "collar_depth", "collar_diameter", "face_depth", "face_diameter",
+            "striker_depth", "striker_socket_depth", "striker_diameter",
+            "rim_depth", "rim_overhang", "handle_socket_diameter",
+            "handle_socket_depth", "handle_collar_depth", "handle_collar_overhang",
+            "bevel_width",
+        )
+        for name in dimensions:
+            _positive(_require(params, name, kind), name, kind)
+
+        width, depth, height = params["width"], params["depth"], params["height"]
+        chamfer, inset = params["corner_chamfer"], params["plate_inset"]
+        if 2.0 * chamfer >= min(width, height):
+            raise ToolError(
+                "ops.impact_body_does_not_fit",
+                f"{kind}: corner_chamfer {chamfer} consumes the {width} x {height} body profile",
+                "reduce corner_chamfer or enlarge width and height",
+            )
+        if inset < chamfer or 2.0 * inset >= min(width, depth, height):
+            raise ToolError(
+                "ops.impact_plate_does_not_fit",
+                f"{kind}: plate_inset {inset} must clear chamfer {chamfer} and leave positive armor spans",
+                "use plate_inset >= corner_chamfer and less than half every body dimension",
+            )
+        shoulder_limit = min(depth, height - 2.0 * chamfer)
+        if params["shoulder_diameter"] > shoulder_limit or params["socket_depth"] >= width / 2.0:
+            raise ToolError(
+                "ops.impact_shoulder_does_not_fit",
+                f"{kind}: shoulder diameter/depth exceeds the body's flat side bearing area",
+                f"keep shoulder_diameter <= {shoulder_limit:.4f} and socket_depth < {width / 2.0:.4f}",
+            )
+        if not (
+            params["shoulder_diameter"] <= params["collar_diameter"]
+            <= params["face_diameter"]
+        ) or params["rim_depth"] >= params["face_depth"]:
+            raise ToolError(
+                "ops.impact_transition_does_not_fit",
+                f"{kind}: strike stack must grow shoulder <= collar <= face and rim_depth < face_depth",
+                "increase the outer transition diameters or reduce rim_depth",
+            )
+        if (
+            params["striker_diameter"] >= params["face_diameter"] - 2.0 * params["rim_overhang"]
+            or params["striker_socket_depth"] >= params["face_depth"]
+        ):
+            raise ToolError(
+                "ops.impact_striker_does_not_fit",
+                f"{kind}: replaceable striker collides with its retaining rim or consumes the face",
+                "reduce striker_diameter/socket depth or enlarge the striking face",
+            )
+        handle_limit = min(depth, width - 2.0 * chamfer)
+        if (
+            params["handle_socket_diameter"] > handle_limit
+            or params["handle_socket_depth"] >= height / 2.0
+        ):
+            raise ToolError(
+                "ops.impact_handle_socket_does_not_fit",
+                f"{kind}: handle socket exceeds the body's underside bearing area",
+                f"keep handle_socket_diameter <= {handle_limit:.4f} and depth < {height / 2.0:.4f}",
+            )
+        smallest_detail = min(
+            params["plate_thickness"], params["rim_depth"], params["handle_collar_depth"]
+        )
+        if 2.0 * params["bevel_width"] >= smallest_detail:
+            raise ToolError(
+                "ops.impact_bevel_does_not_fit",
+                f"{kind}: bevel_width {params['bevel_width']} consumes the smallest detail",
+                f"keep bevel_width below {smallest_detail / 2.0:.4f}",
+            )
+    elif kind == "add_profiled_solid":
+        _require(params, "origin", kind)
+        _require(params, "sections", kind)
+        axis = _require(params, "axis", kind)
+        if axis not in ("x", "y", "z"):
+            raise ToolError(
+                "ops.profiled_bad_axis",
+                f"{kind}: axis is {axis!r}, must be 'x', 'y', or 'z'",
+                "pass one world axis: x, y, or z",
+            )
+        bevel_width = _require(params, "bevel_width", kind)
+        _non_negative(bevel_width, "bevel_width", kind)
+    elif kind == "add_roof_window":
+        _require(params, "roof_id", kind)
+        for name in ("width", "height", "frame_width", "depth"):
+            _positive(_require(params, name, kind), name, kind)
+        for name in ("horizontal_fraction", "vertical_fraction"):
+            value = _require(params, name, kind)
+            if not 0 <= value <= 1:
+                raise ToolError("ops.bad_fraction", f"{kind}: {name} is {value}, must be in [0, 1]", f"pass {name} between 0 and 1")
+
+    elif kind == "add_wall_sign":
+        for name in ("wall_id", "text", "toward", "center_height"):
+            _require(params, name, kind)
+        for name in ("height", "depth"):
+            _positive(_require(params, name, kind), name, kind)
+        _non_negative(_require(params, "edge_margin", kind), "edge_margin", kind)
+
+    elif kind == "add_facade_ribs":
+        for name in ("wall_id", "toward"):
+            _require(params, name, kind)
+        for name in ("spacing", "width", "depth", "min_segment"):
+            _positive(_require(params, name, kind), name, kind)
+        for name in ("edge_margin", "opening_clearance"):
+            _non_negative(_require(params, name, kind), name, kind)
     elif kind == "add_opening":
         _require(params, "wall_id", kind)
         _require(params, "position", kind)
@@ -190,6 +364,19 @@ def validate_params(kind: str, params: dict[str, Any]) -> dict[str, Any]:
         _positive(rise, "rise", kind)
         _positive(run, "run", kind)
         _positive(width, "width", kind)
+
+    elif kind == "add_staircase_to_landing":
+        _require(params, "landing_id", kind)
+        _require(params, "start", kind)
+        treads = _require(params, "treads", kind)
+        if treads <= 0:
+            raise ToolError(
+                "ops.non_positive_count",
+                f"{kind}: treads is {treads}, must be >= 1",
+                "pass treads >= 1",
+            )
+        for name in ("width", "tread_thickness", "stringer_width", "stringer_depth"):
+            _positive(_require(params, name, kind), name, kind)
 
     elif kind == "add_railing":
         path = _require_path(params, kind)

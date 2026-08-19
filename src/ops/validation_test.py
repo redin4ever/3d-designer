@@ -18,6 +18,9 @@ from ops import OPS, acceptance_for, validate_params
 #: One minimal, otherwise-valid params dict per registered kind — used to smoke-test
 #: acceptance_for without also exercising validate_params's rejection paths.
 _MINIMAL_VALID_PARAMS: dict[str, dict] = {
+    "create_texture_material": {"name": "paint", "managed_root": ".textures", "maps": {"albedo": "paint.png"}},
+    "update_texture_material": {"name": "paint", "managed_root": ".textures", "maps": {"albedo": "paint.png"}},
+    "apply_texture_material": {"preset": "wood", "object_ids": ["hero"]},
     # The direct edits (Q-14). Each acts on something that already exists, so the acceptance
     # query is about the object surviving the edit rather than about a shape being built.
     "move_object": {"object_id": "hero", "translation": [1.0, 0.0, 0.0]},
@@ -37,6 +40,39 @@ _MINIMAL_VALID_PARAMS: dict[str, dict] = {
         "thickness": 0.2,
     },
     "add_floor": {"object_id": "floor", "width": 4.0, "depth": 3.0, "thickness": 0.15},
+    "add_gable_roof": {
+        "object_id": "roof", "origin": Vec3(0, 0, 2.4), "width": 4.0,
+        "depth": 5.0, "pitch_degrees": 30.0, "thickness": 0.16,
+        "overhang": 0.3, "trim_width": 0.12, "trim_depth": 0.16,
+        "ridge_axis": "y",
+    },
+    "add_chimney": {
+        "object_id": "chimney", "origin": Vec3(0, 0, 3), "width": 0.8,
+        "depth": 1.0, "shaft_height": 1.4, "flashing_overhang": 0.18,
+        "flashing_height": 0.16, "crown_overhang": 0.1, "crown_height": 0.14,
+        "flue_count": 2, "flue_radius": 0.11, "flue_wall_thickness": 0.025,
+        "flue_height": 0.5,
+        "rim_overhang": 0.03, "rim_height": 0.1,
+    },
+    "add_impact_head": {
+        "object_id": "maul", "origin": Vec3(0, 0, 4), "width": 3.6, "depth": 1.5,
+        "height": 1.45, "corner_chamfer": 0.22, "plate_thickness": 0.12,
+        "plate_inset": 0.26, "shoulder_depth": 0.38, "shoulder_diameter": 0.88,
+        "socket_depth": 0.16, "collar_depth": 0.20, "collar_diameter": 1.24,
+        "face_depth": 0.52, "face_diameter": 1.62, "striker_depth": 0.12,
+        "striker_socket_depth": 0.05, "striker_diameter": 0.82, "rim_depth": 0.10,
+        "rim_overhang": 0.10, "handle_socket_diameter": 0.72,
+        "handle_socket_depth": 0.20, "handle_collar_depth": 0.18,
+        "handle_collar_overhang": 0.10, "bevel_width": 0.025,
+    },
+    "add_profiled_solid": {
+        "object_id": "bracket", "origin": Vec3(1.0, 2.0, 3.0), "axis": "z",
+        "sections": [
+            {"offset": 0.0, "profile": [[-0.5, -0.3], [0.5, -0.3], [0.5, 0.3], [-0.5, 0.3]]},
+            {"offset": 1.2, "profile": [[-0.2, -0.15], [0.2, -0.15], [0.2, 0.15], [-0.2, 0.15]]},
+        ],
+        "bevel_width": 0.02,
+    },
     "add_opening": {
         "object_id": "opening",
         "wall_id": "wall",
@@ -45,6 +81,11 @@ _MINIMAL_VALID_PARAMS: dict[str, dict] = {
         "height": 2.0,
     },
     "add_staircase": {"object_id": "stair", "treads": 6, "rise": 0.18, "run": 0.28, "width": 1.0},
+    "add_staircase_to_landing": {
+        "object_id": "entry", "landing_id": "landing", "start": Vec3(0, -2, 0),
+        "treads": 6, "width": 1.0, "tread_thickness": 0.05,
+        "stringer_width": 0.1, "stringer_depth": 0.18,
+    },
     "add_railing": {
         "object_id": "rail",
         "path": [Vec3(0, 0, 0), Vec3(4, 0, 0)],
@@ -61,6 +102,9 @@ _MINIMAL_VALID_PARAMS: dict[str, dict] = {
         "count_x": 3,
         "count_y": 2,
     },
+    "add_roof_window": {"object_id": "light", "roof_id": "roof"},
+    "add_wall_sign": {"object_id": "sign", "wall_id": "wall"},
+    "add_facade_ribs": {"object_id": "ribs", "wall_id": "wall"},
 }
 
 

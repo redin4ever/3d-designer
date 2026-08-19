@@ -107,11 +107,15 @@ class PhaseMixin:
                 pairs = self._promotion_index(engine).all_pairs(VISUAL_GAP_MAX)
             except Exception:  # noqa: BLE001 — a broken index must not wedge the gate
                 pairs = ()
-        joinery = tuple(
-            intent for op in self._scene.document.operations for intent in op.joinery
+        active_operations = self._scene.document.active_operations
+        joinery = tuple(intent for op in active_operations for intent in op.joinery)
+        operation_queries = tuple(
+            query for op in active_operations for query in op.acceptance
         )
 
-        results = evaluate_phase(engine, phase, objects, pairs, joinery)
+        results = evaluate_phase(
+            engine, phase, objects, pairs, joinery, extra_queries=operation_queries
+        )
         return all(r.passed for r in results), results
 
     def _promotion_index(self, engine) -> NeighbourIndex:

@@ -40,6 +40,7 @@ class App:
     handlers: HandlerRegistry
     registry: dict[ToolRole, tuple[ToolSpec, ...]] = field(default_factory=dict)
     viewer: Any = None
+    file_jobs: Any = None
     backend: str = ""
     missing: tuple[str, ...] = ()
 

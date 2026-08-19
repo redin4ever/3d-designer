@@ -8,18 +8,29 @@ re-measuring rather than by asking whether it worked. Exposed over MCP on both t
 a consumer subscription can drive it. 17 modules, all green.
 <!-- /PIPELINE:PROJECT-SUMMARY -->
 
+## Sub-agents
+
+The only permitted sub-agent is **Luna** (`luna`); do not spawn or delegate to any
+other sub-agent, model, or agent identity. Luna may do anything in the repository,
+including editing shared contracts, configuration, tests, and any module, running
+commands, and crossing ownership boundaries. The usual main-agent-only and
+file-ownership restrictions do not limit Luna. If Luna is unavailable, the main agent
+continues without substituting a different sub-agent. `AGENTS.md` is the companion
+agent-instructions file.
+
 ## Commands
 
 <!-- PIPELINE:COMMANDS -->
 ```bash
-python -m pytest src -q              # backend: 609 tests + 54 conformance checks (fake AND real bpy)
-node --test frontend/tests/          # frontend: 28 tests
-python src/forge3d_cli.py doctor     # is the product actually wired and startable?
-node .pipeline/check.mjs             # the gate — reads disk, re-runs both suites
+node tools/run-pytest.mjs src -q                 # backend + deterministic agent evals
+node --test frontend/tests/                      # frontend unit suite
+node --test frontend/tests-browser/smoke.test.js # rendered UI (set PUPPETEER_EXECUTABLE_PATH if needed)
+node .pipeline/check.mjs                         # complete gate, including doctor + feature wiring
 ```
 
-`python` means `%LOCALAPPDATA%\Programs\Python\Python313\python.exe`. The `python` on PATH
-is the Windows Store alias stub and runs nothing.
+The runners discover Python 3.13 and Chrome/Edge from explicit environment overrides and
+standard install locations. Missing prerequisites are reported as `UNAVAILABLE` with exit
+code 2; product failures use exit code 1, so a missing browser can never look like a pass.
 <!-- /PIPELINE:COMMANDS -->
 
 ## Codebase map
@@ -27,9 +38,9 @@ is the Windows Store alias stub and runs nothing.
 <!-- PIPELINE:CODEBASE-MAP -->
 | Path | What decides here |
 |---|---|
-| `src/contracts/` | The frozen shared surface. **Main-agent only.** |
-| `src/testing/` | `FakeEngine` — a real in-memory engine, not a mock. **Main-agent only.** |
-| `src/app/` | The composition root. Wires everything; owns JSON→domain coercion. **Main-agent only.** |
+| `src/contracts/` | The frozen shared surface. Main-agent or Luna. |
+| `src/testing/` | `FakeEngine` — a real in-memory engine, not a mock. Main-agent or Luna. |
+| `src/app/` | The composition root. Wires everything; owns JSON→domain coercion. Main-agent or Luna. |
 | `src/engine/` | **The only module that may `import bpy`.** |
 | `src/spatial/` | Maintained BVH, broad-phase proximity. |
 | `src/measure/` | 7 metrics, 10 defect classes. Pure — never mutates. |
@@ -55,9 +66,10 @@ Full detail and the reasoning behind each seam: [docs/ARCHITECTURE.md](docs/ARCH
    test failing with `ImportError` has not been verified. Never edit a test to make an
    implementation pass — if a test looks wrong, it is usually describing a requirement you
    have not read yet.
-3. **`src/contracts/`, `src/testing/` and `src/app/` are main-agent only.** Sixteen modules
-   compile against the first, every suite depends on the second, and the third is the one
-   place allowed to know about all of them. A change there is multiplied by everything.
+3. **`src/contracts/`, `src/testing/` and `src/app/` may be changed by the main agent or
+   Luna.** Sixteen modules compile against the first, every suite depends on the second,
+   and the third is the one place allowed to know about all of them. A change there is
+   multiplied by everything.
 
 ## Rules
 
