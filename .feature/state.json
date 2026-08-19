@@ -1,12 +1,12 @@
 {
   "version": 1,
   "skill": "add-feature",
-  "feature": "Contextual file dialog controls that hide export-only options during imports",
-  "slug": "contextual-file-dialog-controls",
-  "phase": 5,
-  "baseSha": "7f1a200d15579487e4228c30ce22f0656a9dcc8e",
-  "branch": "feat/contextual-file-dialog-controls",
-  "docsDir": "docs/features/contextual-file-dialog-controls",
+  "feature": "Repair native Blender .blend import and verify the real import path",
+  "slug": "blend-import-verification",
+  "phase": 2,
+  "baseSha": "01c2ffb2ce78d53a0621c510f542a9590b934b04",
+  "branch": "fix/blend-import-verification",
+  "docsDir": "docs/features/blend-import-verification",
   "startedAt": "2026-08-19",
-  "status": "finished"
+  "status": "running"
 }
