@@ -1,18 +1,18 @@
 {
   "units": [
     {
-      "id": "file-dialog-visibility",
-      "what": "mode-specific File dialog fields with rendered-browser regression coverage",
+      "id": "blend-import-real-path",
+      "what": "preserve native Blender hierarchy placement and shared instances, proven through the browser job boundary",
       "paths": [
-        "frontend/index.html",
-        "frontend/src/file-io.js",
-        "frontend/tests-browser/file-io.browser.mjs"
+        "src/engine/model_io.py",
+        "src/engine/model_io_test.py",
+        "src/app/scene_file_integration_test.py"
       ],
-      "publicInterface": "frontend/src/file-io.js",
+      "publicInterface": "src/engine/model_io.py",
       "dependsOn": [],
-      "seams": ["file-dialog-markup", "file-dialog-runtime", "file-dialog-browser-regression"],
-      "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-06", "Q-07", "Q-08", "Q-09", "Q-10", "Q-11", "Q-12", "Q-14", "Q-15", "Q-16", "Q-17", "Q-18", "Q-19", "Q-20"],
-      "status": "green"
+      "seams": ["native-library-loader", "flattened-mesh-ownership", "native-engine-regression", "browser-job-integration"],
+      "decisions": ["Q-01", "Q-02", "Q-03", "Q-04", "Q-05", "Q-07", "Q-08", "Q-09", "Q-10", "Q-11", "Q-12", "Q-14", "Q-15", "Q-18", "Q-19", "Q-20"],
+      "status": "planned"
     }
   ]
 }
