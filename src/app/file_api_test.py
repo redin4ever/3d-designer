@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from app.file_api import FileApiError, FileJobManager, FileOperationResult
+from app.file_api import FileApiError, FileJobManager, FileOperationResult, OwnerThreadDispatcher
 
 
 def _eventually(manager: FileJobManager, job_id: str, status: str, timeout: float = 2.0) -> dict:
@@ -203,3 +203,37 @@ def test_cleanup_removes_job_files_and_tokens(tmp_path: Path) -> None:
     with pytest.raises(FileApiError):
         manager.read_download(result["download_token"])
     manager.close()
+
+
+def test_operation_runner_marshals_engine_callbacks_to_the_owner_thread(tmp_path: Path) -> None:
+    owner_thread = threading.get_ident()
+    dispatcher = OwnerThreadDispatcher()
+    callback_threads: list[int] = []
+
+    def export(_context):
+        callback_threads.append(threading.get_ident())
+        return FileOperationResult(data=b"glb", filename="scene.glb")
+
+    manager = FileJobManager(
+        tmp_path,
+        operations={"export-model": export},
+        operation_runner=dispatcher.call,
+    )
+    started = manager.submit(
+        {"content-type": "application/json"},
+        b'{"action":"export-model","format":"glb"}',
+    )
+
+    deadline = time.monotonic() + 2
+    result = manager.get(started["job_id"])
+    while result["status"] not in {"complete", "failed", "cancelled"}:
+        dispatcher.drain()
+        if time.monotonic() > deadline:
+            pytest.fail(f"owner-thread job did not finish: {result!r}")
+        time.sleep(0.005)
+        result = manager.get(started["job_id"])
+
+    assert result["status"] == "complete", result
+    assert callback_threads == [owner_thread]
+    manager.close()
+    dispatcher.close()

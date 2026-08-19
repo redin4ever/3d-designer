@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from contracts import ToolRole
 
 
@@ -99,3 +101,55 @@ def test_live_http_routes_create_poll_and_download_a_project_job(tmp_path) -> No
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_real_blender_glb_job_round_trips_on_the_engine_owner_thread(tmp_path) -> None:
+    """The live regression: a worker-thread bpy export has no active-object context."""
+    import pytest
+
+    pytest.importorskip("bpy")
+    from app import build_app
+    from app.file_api import FileJobManager, OwnerThreadDispatcher
+    from app.file_operations import build_file_operations
+    from contracts import Vec3
+
+    app = build_app(prefer_blender=True, attach_viewer=False)
+    app.engine.reset()
+    app.engine.create_primitive("roundtrip_cube", "cube", Vec3(1, 1, 1))
+    app.orchestrator.pause()
+    dispatcher = OwnerThreadDispatcher()
+    manager = FileJobManager(
+        tmp_path / "real-jobs",
+        operations=build_file_operations(app),
+        operation_runner=dispatcher.call,
+    )
+    try:
+        started = manager.submit(
+            {"content-type": "application/json"},
+            b'{"action":"export-model","format":"glb","scope":"scene"}',
+        )
+        deadline = time.monotonic() + 15
+        result = manager.get(started["job_id"])
+        while result["status"] not in {"complete", "failed", "cancelled"}:
+            dispatcher.drain()
+            if time.monotonic() > deadline:
+                raise AssertionError(f"real GLB job did not finish: {result!r}")
+            time.sleep(0.005)
+            result = manager.get(started["job_id"])
+
+        assert result["status"] == "complete", result
+        glb, filename, content_type = manager.read_download(result["download_token"])
+        assert filename.endswith(".glb")
+        assert content_type == "model/gltf-binary"
+        assert len(glb) > 100
+
+        source = tmp_path / "roundtrip.glb"
+        source.write_bytes(glb)
+        app.engine.reset()
+        imported = app.engine.import_model(str(source))
+        assert imported.object_ids
+        assert all(app.engine.get_object(object_id) for object_id in imported.object_ids)
+    finally:
+        manager.close()
+        dispatcher.close()
+        app.engine.reset()

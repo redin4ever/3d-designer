@@ -50,6 +50,19 @@ class FileApiError(Exception):
         self.payload = {"ok": False, "error": error}
 
 
+class OwnerThreadDispatcher:
+    """Owner-thread operation runner; completed in the GREEN implementation."""
+
+    def call(self, callback: Callable[[], Any]) -> Any:
+        return callback()
+
+    def drain(self) -> int:
+        return 0
+
+    def close(self) -> None:
+        return None
+
+
 @dataclass(frozen=True)
 class FileOperationResult:
     """Optional output returned by an injected action callback."""
@@ -127,6 +140,7 @@ class FileJobManager:
         operations: Mapping[str, Callable[[FileJobContext], Any]] | None = None,
         max_upload_bytes: int = MAX_UPLOAD_BYTES,
         max_workers: int = 2,
+        operation_runner: Callable[[Callable[[], Any]], Any] | None = None,
     ):
         self.work_root = Path(work_root).resolve()
         self.upload_root = self.work_root / "uploads"
@@ -135,6 +149,7 @@ class FileJobManager:
         self.download_root.mkdir(parents=True, exist_ok=True)
         self.operations = dict(operations or {})
         self.max_upload_bytes = int(max_upload_bytes)
+        self.operation_runner = operation_runner
         if self.max_upload_bytes <= 0:
             raise ValueError("max_upload_bytes must be positive")
         self._lock = threading.RLock()

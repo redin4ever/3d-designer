@@ -56,7 +56,7 @@
       "dependsOn": [],
       "seams": ["file_ui_flow", "file_job_scheduling", "live_file_wiring", "export_operation", "blender_export_context", "file_browser_regression", "real_file_integration"],
       "decisions": ["Q-14", "Q-15", "Q-16", "Q-17", "Q-18"],
-      "status": "planned"
+      "status": "red"
     },
     {
       "id": "agent-accuracy",

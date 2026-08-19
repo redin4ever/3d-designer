@@ -104,7 +104,7 @@ def test_live_callbacks_save_import_and_export_the_current_scene(tmp_path) -> No
     manager.close()
 
 
-def test_import_and_open_are_refused_until_the_run_is_paused(tmp_path) -> None:
+def test_import_pauses_an_active_run_and_leaves_it_paused_for_inspection(tmp_path) -> None:
     from app.file_operations import build_file_operations
 
     app = build_app(prefer_blender=False, attach_viewer=False)
@@ -121,6 +121,7 @@ def test_import_and_open_are_refused_until_the_run_is_paused(tmp_path) -> None:
         ),
     )
 
-    assert result["status"] == "failed"
-    assert "pause" in result["error"]["message"].lower()
+    assert result["status"] == "complete", result
+    assert app.orchestrator.state.value == "paused"
+    assert app.scene.document.operations[-1].opaque is True
     manager.close()
