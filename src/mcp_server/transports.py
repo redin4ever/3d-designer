@@ -21,6 +21,8 @@ test suite.
 from __future__ import annotations
 
 import logging
+import asyncio
+import contextlib
 from typing import Any
 
 from .sdk_bridge import build_server, load_sdk
@@ -128,6 +130,7 @@ def serve_http(
     host: str = "127.0.0.1",
     port: int = DEFAULT_HTTP_PORT,
     path: str = DEFAULT_HTTP_PATH,
+    maintenance: Any = None,
 ) -> None:
     """Run the MCP server over streamable HTTP until interrupted. Blocking.
 
@@ -138,4 +141,24 @@ def serve_http(
 
     import uvicorn
 
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    if maintenance is None:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+        return
+
+    async def run_with_maintenance() -> None:
+        server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_level="info"))
+
+        async def maintain() -> None:
+            while not server.should_exit:
+                maintenance()
+                await asyncio.sleep(0.01)
+
+        task = asyncio.create_task(maintain())
+        try:
+            await server.serve()
+        finally:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    asyncio.run(run_with_maintenance())

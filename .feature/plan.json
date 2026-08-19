@@ -24,7 +24,6 @@
         "frontend/src/point.css",
         "frontend/src/texture-inspector.css",
         "frontend/src/connect.css",
-        "frontend/index.html",
         "frontend/tests/layout.test.js",
         "frontend/tests-browser/connect.browser.mjs",
         "frontend/tests-browser/harness/static-server.mjs",
@@ -50,13 +49,14 @@
         "src/app/live_test.py",
         "src/app/scene_file_integration_test.py",
         "src/engine/exporting.py",
-        "src/engine/exporting_test.py"
+        "src/mcp_server/transports.py",
+        "src/mcp_server/transports_test.py"
       ],
       "publicInterface": "src/app/file_api.py",
       "dependsOn": [],
       "seams": ["file_ui_flow", "file_job_scheduling", "live_file_wiring", "export_operation", "blender_export_context", "file_browser_regression", "real_file_integration"],
       "decisions": ["Q-14", "Q-15", "Q-16", "Q-17", "Q-18"],
-      "status": "red"
+      "status": "green"
     },
     {
       "id": "agent-accuracy",

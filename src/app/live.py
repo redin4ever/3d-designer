@@ -267,13 +267,22 @@ class _FrontendServer(http.server.ThreadingHTTPServer):
 
     def server_close(self) -> None:
         try:
+            dispatcher = getattr(self, "operation_dispatcher", None)
+            if dispatcher is not None:
+                dispatcher.close()
             self.file_jobs.close()
         finally:
             super().server_close()
             shutil.rmtree(self.file_work_root, ignore_errors=True)
 
 
-def serve_frontend(port: int, directory: Path, app: Any = None) -> http.server.ThreadingHTTPServer:
+def serve_frontend(
+    port: int,
+    directory: Path,
+    app: Any = None,
+    *,
+    operation_dispatcher: Any = None,
+) -> http.server.ThreadingHTTPServer:
     """Serve ``directory`` on loopback, on a daemon thread, and return the server."""
     _QuietHandler.managed_texture_root = directory.parent / ".forge3d" / "textures"
     handler = functools.partial(_QuietHandler, directory=str(directory))
@@ -283,8 +292,11 @@ def serve_frontend(port: int, directory: Path, app: Any = None) -> http.server.T
     work_root = Path(tempfile.mkdtemp(prefix="forge3d-live-files-"))
     httpd = _FrontendServer(("127.0.0.1", port), handler)
     httpd.file_work_root = work_root
+    httpd.operation_dispatcher = operation_dispatcher
     httpd.file_jobs = FileJobManager(
-        work_root, operations=build_file_operations(app) if app is not None else {}
+        work_root,
+        operations=build_file_operations(app) if app is not None else {},
+        operation_runner=(operation_dispatcher.call if operation_dispatcher is not None else None),
     )
     if app is not None:
         app.file_jobs = httpd.file_jobs
@@ -341,7 +353,12 @@ def run_live(
         print(f"  frontend: missing at {FRONTEND_DIR} — the live view will not load", file=sys.stderr)
         web = None
     else:
-        web = serve_frontend(ports["web"], FRONTEND_DIR, app)
+        from app.file_api import OwnerThreadDispatcher
+
+        operation_dispatcher = OwnerThreadDispatcher()
+        web = serve_frontend(
+            ports["web"], FRONTEND_DIR, app, operation_dispatcher=operation_dispatcher
+        )
         print(f"  frontend: http://127.0.0.1:{ports['web']}/index.html", file=sys.stderr)
 
     url = f"http://127.0.0.1:{ports['web']}/index.html"
@@ -368,7 +385,12 @@ def run_live(
     from mcp_server import serve_http
 
     try:
-        serve_http(app.orchestrator, host="127.0.0.1", port=ports["mcp"])
+        serve_http(
+            app.orchestrator,
+            host="127.0.0.1",
+            port=ports["mcp"],
+            maintenance=(operation_dispatcher.drain if web is not None else None),
+        )
     except KeyboardInterrupt:
         print("\n  Stopped.", file=sys.stderr)
     finally:

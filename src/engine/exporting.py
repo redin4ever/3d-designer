@@ -12,6 +12,7 @@ delegated, per the docstring on ``ExportOps.export_gltf`` in ``src/contracts/eng
 
 from __future__ import annotations
 
+import threading
 from typing import Sequence
 
 from contracts import EngineError, Quat, Transform, Vec3
@@ -36,6 +37,12 @@ class ExportingMixin:
         scale: float = 1.0,
         apply_modifiers: bool = True,
     ) -> str:
+        if threading.current_thread() is not threading.main_thread():
+            raise EngineError(
+                "engine.thread_affinity",
+                "Blender export must execute on the engine-owning main thread",
+                "marshal the export through the live operation dispatcher",
+            )
         import bpy
 
         if not object_ids:

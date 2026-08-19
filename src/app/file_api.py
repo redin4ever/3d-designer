@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import queue
 import re
 import secrets
 import shutil
@@ -51,16 +52,58 @@ class FileApiError(Exception):
 
 
 class OwnerThreadDispatcher:
-    """Owner-thread operation runner; completed in the GREEN implementation."""
+    """Marshal callable work back to the thread that created this dispatcher.
+
+    ``bpy`` operators require Blender's owning context. File jobs still prepare uploads and
+    materialize downloads on workers, but their injected scene callback crosses this queue and
+    is executed when the live MCP loop calls :meth:`drain` on its main thread.
+    """
+
+    def __init__(self) -> None:
+        self.owner_thread = threading.get_ident()
+        self._queue: queue.Queue[tuple[Future, Callable[[], Any]]] = queue.Queue()
+        self._lock = threading.Lock()
+        self._closed = False
 
     def call(self, callback: Callable[[], Any]) -> Any:
-        return callback()
+        if threading.get_ident() == self.owner_thread:
+            return callback()
+        future: Future = Future()
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("The owner-thread dispatcher is closed.")
+            self._queue.put((future, callback))
+        return future.result()
 
-    def drain(self) -> int:
-        return 0
+    def drain(self, limit: int | None = None) -> int:
+        if threading.get_ident() != self.owner_thread:
+            raise RuntimeError("OwnerThreadDispatcher.drain() must run on its owning thread.")
+        completed = 0
+        while limit is None or completed < limit:
+            try:
+                future, callback = self._queue.get_nowait()
+            except queue.Empty:
+                break
+            if future.set_running_or_notify_cancel():
+                try:
+                    future.set_result(callback())
+                except BaseException as exc:  # noqa: BLE001 - preserve callback failure for worker
+                    future.set_exception(exc)
+            completed += 1
+        return completed
 
     def close(self) -> None:
-        return None
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            while True:
+                try:
+                    future, _callback = self._queue.get_nowait()
+                except queue.Empty:
+                    break
+                if not future.done():
+                    future.set_exception(RuntimeError("The owner-thread dispatcher closed before execution."))
 
 
 @dataclass(frozen=True)
@@ -378,7 +421,11 @@ class FileJobManager:
             _report=lambda progress, message="": self._report(job, progress, message),
         )
         try:
-            result = callback(context)
+            result = (
+                self.operation_runner(lambda: callback(context))
+                if self.operation_runner is not None
+                else callback(context)
+            )
             with self._lock:
                 if job.cancel_event.is_set() or job.status == "cancelling":
                     job.status = "cancelled"

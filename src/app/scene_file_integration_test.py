@@ -148,7 +148,7 @@ def test_real_blender_glb_job_round_trips_on_the_engine_owner_thread(tmp_path) -
         app.engine.reset()
         imported = app.engine.import_model(str(source))
         assert imported.object_ids
-        assert all(app.engine.get_object(object_id) for object_id in imported.object_ids)
+        assert set(imported.object_ids).issubset(set(app.engine.list_objects()))
     finally:
         manager.close()
         dispatcher.close()

@@ -17,13 +17,18 @@ from .file_api import FileApiError, FileJobContext, FileOperationResult
 __all__ = ["build_file_operations"]
 
 
-def _require_paused(app: Any, action: str) -> None:
+def _pause_for_scene_change(app: Any, action: str) -> bool:
+    """Pause before replacing scene state, returning whether this call changed it."""
+    changed = app.orchestrator.state is not RunState.PAUSED
+    if changed:
+        app.orchestrator.pause()
     if app.orchestrator.state is not RunState.PAUSED:
         raise FileApiError(
             "run_must_be_paused",
-            f"Pause the build before you {action}.",
+            f"The build could not be paused before attempting to {action}.",
             status=409,
         )
+    return changed
 
 
 def _work_path(context: FileJobContext, filename: str) -> Path:
@@ -48,8 +53,11 @@ def _save(app: Any, context: FileJobContext) -> FileOperationResult:
 
 
 def _import(app: Any, context: FileJobContext) -> FileOperationResult:
-    _require_paused(app, "import a model")
-    context.report(0.1, f"Importing {context.filename}.")
+    paused = _pause_for_scene_change(app, "import a model")
+    context.report(
+        0.1,
+        f"{'Build paused. ' if paused else ''}Importing {context.filename}.",
+    )
     payload = context.payload
     operation = make_import_operation(
         f"browser-import-{uuid.uuid4().hex[:8]}",
@@ -72,8 +80,11 @@ def _import(app: Any, context: FileJobContext) -> FileOperationResult:
 
 
 def _open(app: Any, context: FileJobContext) -> FileOperationResult:
-    _require_paused(app, "open a project")
-    context.report(0.1, f"Validating {context.filename}.")
+    paused = _pause_for_scene_change(app, "open a project")
+    context.report(
+        0.1,
+        f"{'Build paused. ' if paused else ''}Validating {context.filename}.",
+    )
     prepared = load_package(
         context.source_path,
         app.engine,

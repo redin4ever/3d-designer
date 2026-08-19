@@ -80,15 +80,24 @@ function cleanIds(ids) {
   return [...new Set(ids.filter((id) => typeof id === 'string' && id.trim() !== ''))];
 }
 
-export function buildExportPayload({ selectedIds = [], profile = DEFAULT_PROFILE, format = DEFAULT_FORMAT } = {}) {
+export function buildExportPayload({
+  selectedIds = [],
+  scope = 'scene',
+  profile = DEFAULT_PROFILE,
+  format = DEFAULT_FORMAT,
+} = {}) {
   if (!PROFILES.has(profile)) throw new Error(`Unsupported export profile "${profile}".`);
   if (!FORMATS.has(format)) throw new Error(`Unsupported export format "${format}".`);
-  const objectIds = cleanIds(selectedIds);
+  if (!['scene', 'selection'].includes(scope)) throw new Error(`Unsupported export scope "${scope}".`);
+  const objectIds = scope === 'selection' ? cleanIds(selectedIds) : [];
+  if (scope === 'selection' && objectIds.length === 0) {
+    throw new Error('Select one or more parts before exporting the selection.');
+  }
   return {
     action: 'export-model',
     profile,
     format,
-    scope: objectIds.length > 0 ? 'selection' : 'scene',
+    scope,
     object_ids: objectIds,
   };
 }
@@ -291,10 +300,15 @@ export function createFileController(options = {}) {
     return start('save-as', { payload: { filename }, download: true });
   }
 
-  async function exportModel({ selectedIds = [], profile = DEFAULT_PROFILE, format = DEFAULT_FORMAT } = {}) {
+  async function exportModel({
+    selectedIds = [],
+    scope = 'scene',
+    profile = DEFAULT_PROFILE,
+    format = DEFAULT_FORMAT,
+  } = {}) {
     let payload;
     try {
-      payload = buildExportPayload({ selectedIds, profile, format });
+      payload = buildExportPayload({ selectedIds, scope, profile, format });
     } catch (error) {
       return failure(error?.message ?? String(error));
     }
@@ -362,6 +376,7 @@ export function attachFileMenu(root, options = {}) {
   const progressNode = root.querySelector('[data-file-progress]');
   const filenameInput = root.querySelector('[data-file-filename]');
   const profileInput = root.querySelector('[data-file-profile]');
+  const scopeInput = root.querySelector('[data-file-scope]');
   const formatInput = root.querySelector('[data-file-format]');
   const unsavedNode = root.querySelector('[data-file-unsaved]');
   const sourceUpInput = root.querySelector('[data-file-source-up]');
@@ -413,6 +428,7 @@ export function attachFileMenu(root, options = {}) {
       file: fileInput?.files?.[0] ?? null,
       filename: filenameInput?.value?.trim() || 'scene.forge3d',
       profile: profileInput?.value || DEFAULT_PROFILE,
+      scope: scopeInput?.value || 'scene',
       format: formatInput?.value || DEFAULT_FORMAT,
       selectedIds: options.selectedIds?.() ?? [],
       sourceUp: sourceUpInput?.value || 'AUTO',
