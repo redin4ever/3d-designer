@@ -6,7 +6,8 @@
       "file": "frontend/index.html",
       "line": 270,
       "anchor": "<div class=\"file-io-dialog-body\">",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-01",
       "what": "the shared dialog markup that pairs labels with the import, save, and export controls",
       "evidence": "all five File actions reuse these controls; no mode-specific grouping exists today",
       "asks": "which visible fields belong to import, export, project open, and project save modes?"
@@ -16,7 +17,8 @@
       "file": "frontend/src/file-io.js",
       "line": 410,
       "anchor": "const showDialog = (action) => {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-07",
       "what": "the single mode switch used by menu actions and keyboard shortcuts",
       "evidence": "showDialog already changes picker acceptance and the import-settings panel, making it the existing visibility policy seam",
       "asks": "should every action apply a complete visibility matrix so stale controls never carry over between modes?"
@@ -26,7 +28,8 @@
       "file": "frontend/tests-browser/file-io.browser.mjs",
       "line": 11,
       "anchor": "export function registerFileIoTests({ withScene, waitUntil }) {",
-      "status": "open",
+      "status": "wired",
+      "decision": "Q-17",
       "what": "the real-browser coverage for the rendered File menu and native dialog",
       "evidence": "this suite follows the existing File flow from rendered action to visible dialog state",
       "asks": "which visible/hidden field combinations must be pinned in a real browser?"
@@ -36,7 +39,9 @@
       "file": "frontend/src/main.js",
       "line": 234,
       "anchor": "attachFileMenu(document, {",
-      "status": "open",
+      "status": "declined",
+      "decision": "Q-18",
+      "reason": "Visibility is local dialog state; the existing application attachment and payload callbacks need no new state or wiring.",
       "what": "the application composition point that activates the shared File dialog",
       "evidence": "all File actions are already attached here once for the whole document",
       "asks": "does contextual visibility require new application state or can it remain local to file-io?"
@@ -46,7 +51,9 @@
       "file": "frontend/src/file-io.css",
       "line": 93,
       "anchor": ".file-io-dialog-body {",
-      "status": "open",
+      "status": "declined",
+      "decision": "Q-13",
+      "reason": "Native hidden semantics already remove elements from layout; no visual styling change is needed.",
       "what": "the dialog layout and hidden-state presentation",
       "evidence": "the current layout is a direct grid of label/control siblings and import details",
       "asks": "can native hidden semantics preserve the layout without adding a new visual style?"

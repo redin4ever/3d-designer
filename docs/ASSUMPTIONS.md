@@ -595,3 +595,9 @@ reversible option; each is recorded here rather than asked, because the gate had
 - **Feature:** responsive-blend-import
 - **Assumption IDs:** A-062, A-063, A-064, A-065, A-066, A-067, A-068, A-069, A-070, A-071, A-072, A-073, A-074, A-075, A-076, A-077, A-078, A-079, A-080, A-081, A-082, A-083, A-084, A-085
 - **Details and reversal costs:** [feature assumptions](features/responsive-blend-import/assumptions.md).
+
+## A-086–A-104 — Contextual file dialog controls
+
+- **Feature:** contextual-file-dialog-controls
+- **Assumption IDs:** A-086, A-087, A-088, A-089, A-090, A-091, A-092, A-093, A-094, A-095, A-096, A-097, A-098, A-099, A-100, A-101, A-102, A-103, A-104
+- **Details and reversal costs:** [feature assumptions](features/contextual-file-dialog-controls/assumptions.md).
