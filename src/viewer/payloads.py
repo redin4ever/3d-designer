@@ -16,7 +16,11 @@ from contracts import MeshPayload, MeshSnapshot, TransformPayload
 __all__ = ["snapshot_to_payload", "transform_payload"]
 
 
-def snapshot_to_payload(snap: MeshSnapshot) -> MeshPayload:
+def snapshot_to_payload(
+    snap: MeshSnapshot,
+    *,
+    triangle_budget: int | None = None,
+) -> MeshPayload:
     """Flatten one ``MeshSnapshot`` into typed-array-friendly buffers.
 
     Once implemented: ``positions`` is ``[v0.x, v0.y, v0.z, v1.x, ...]`` — length
@@ -31,24 +35,53 @@ def snapshot_to_payload(snap: MeshSnapshot) -> MeshPayload:
     ``(start, count, material_index)`` draw ranges derived from
     ``snap.triangle_materials``, empty when there is at most one slot.
     """
+    if triangle_budget is not None and triangle_budget < 0:
+        raise ValueError("triangle_budget must be non-negative")
+    source_count = snap.triangle_count
+    simplified = triangle_budget is not None and triangle_budget < source_count
+    selected_indexes = (
+        [(index * source_count) // triangle_budget for index in range(triangle_budget)]
+        if simplified and triangle_budget
+        else ([] if simplified else list(range(source_count)))
+    )
+
+    if simplified:
+        vertex_indexes: list[int] = []
+        remap: dict[int, int] = {}
+        triangles: list[tuple[int, int, int]] = []
+        for triangle_index in selected_indexes:
+            remapped = []
+            for source_index in snap.triangles[triangle_index]:
+                if source_index not in remap:
+                    remap[source_index] = len(vertex_indexes)
+                    vertex_indexes.append(source_index)
+                remapped.append(remap[source_index])
+            triangles.append(tuple(remapped))
+    else:
+        vertex_indexes = list(range(snap.vertex_count))
+        triangles = list(snap.triangles)
+
     positions: list[float] = []
-    for v in snap.vertices:
+    for index in vertex_indexes:
+        v = snap.vertices[index]
         positions.extend((float(v.x), float(v.y), float(v.z)))
 
     indices: list[int] = []
-    for tri in snap.triangles:
+    for tri in triangles:
         indices.extend(int(i) for i in tri)
 
     normals: list[float] | None = None
     if snap.normals is not None:
         normals = []
-        for n in snap.normals:
+        for index in vertex_indexes:
+            n = snap.normals[index]
             normals.extend((float(n.x), float(n.y), float(n.z)))
 
     uvs: list[float] | None = None
     if snap.uvs is not None:
         uvs = []
-        for u, v in snap.uvs:
+        for index in vertex_indexes:
+            u, v = snap.uvs[index]
             uvs.extend((float(u), float(v)))
 
     definitions = {}
@@ -72,12 +105,15 @@ def snapshot_to_payload(snap: MeshSnapshot) -> MeshPayload:
         uvs=uvs,
         materials=tuple(snap.material_slots),
         material_definitions=definitions,
-        groups=_material_groups(snap),
-        triangle_count=snap.triangle_count,
+        groups=_material_groups(snap, selected_indexes if simplified else None),
+        triangle_count=len(triangles),
     )
 
 
-def _material_groups(snap: MeshSnapshot) -> tuple[tuple[int, int, int], ...]:
+def _material_groups(
+    snap: MeshSnapshot,
+    selected_indexes: list[int] | None = None,
+) -> tuple[tuple[int, int, int], ...]:
     """(start, count, material_index) draw ranges over the flattened indices, one per
     contiguous run of a single material in triangle order.
 
@@ -88,6 +124,10 @@ def _material_groups(snap: MeshSnapshot) -> tuple[tuple[int, int, int], ...]:
     triangle belongs to which slot.
     """
     materials = snap.triangle_materials
+    if not materials:
+        return ()
+    if selected_indexes is not None:
+        materials = tuple(materials[index] for index in selected_indexes)
     if not materials:
         return ()
     groups: list[tuple[int, int, int]] = []

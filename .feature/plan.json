@@ -23,12 +23,12 @@
     {
       "id": "viewer-preview-budget",
       "what": "send deterministic scene-budgeted preview geometry with truthful quality metadata",
-      "paths": ["src/viewer/payloads.py", "src/viewer/payloads_test.py", "src/viewer/translate.py", "src/viewer/translate_test.py", "src/viewer/*translate*_test.py"],
+      "paths": ["src/viewer/**"],
       "publicInterface": "src/viewer/payloads.py",
       "dependsOn": [],
       "seams": ["viewer_preview_payload", "viewer_scene_messages"],
       "decisions": ["Q-11", "Q-12", "Q-14", "Q-15", "Q-16", "Q-20"],
-      "status": "planned"
+      "status": "green"
     },
     {
       "id": "responsive-renderer",
